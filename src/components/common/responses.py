@@ -221,6 +221,29 @@ class TalkoForbiddenResponse(TalkoAPIResponse):
         )
 
 
+class TalkoTooManyRequestsResponse(TalkoAPIResponse):
+    """
+    A response class for handling 429 Too Many Requests (rate limit) errors.
+    """
+
+    def __init__(
+        self,
+        detail: str = "Too many requests",
+        headers: Optional[Dict[str, Any]] = None,
+    ):
+        content = {
+            "status": "error",
+            "error_code": "TOO_MANY_REQUESTS",
+            "detail": detail,
+        }
+        super().__init__(
+            content=self.to_json(content),
+            status_code=429,
+            media_type="application/json",
+            headers=headers,
+        )
+
+
 class TalkoResourceCreatedResponse(JSONResponse):
     """
     A standardized Resource created response with a customizable message and data.

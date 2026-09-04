@@ -8,13 +8,16 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from src.components.common.constants import TalkoCurrentUserMap, TalkoErrorPrompt
 from src.components.common.responses import (
     TalkoInternalServerErrorResponse,
+    TalkoTooManyRequestsResponse,
     TalkoUnauthorizedResponse,
 )
+from src.components.partner_auth.services import TalkoPartnerApiKeyService
 from src.core.container import TalkoContainer
 from src.grpc_client.constants import TalkoGrpcServices
 from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
 from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.middlewares.context import set_request_auth
+from src.utils.token_utils import TalkoApiKeyGenerator
 
 
 async def resolve_user_payload(
@@ -53,6 +56,9 @@ class TalkoAuthMiddleware(BaseHTTPMiddleware):
         call_next,
         redis_pool: Redis = Depends(Provide[TalkoContainer.redis_pool]),
         logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+        partner_api_key_service: TalkoPartnerApiKeyService = Depends(
+            Provide[TalkoContainer.partner_api_key_service]
+        ),
     ):
         # List of endpoints to exclude from middleware
 
@@ -87,6 +93,7 @@ class TalkoAuthMiddleware(BaseHTTPMiddleware):
                 call_next=call_next,
                 redis_pool=redis_pool,
                 logger=logger,
+                partner_api_key_service=partner_api_key_service,
             )
 
         logger.debug("Extracting Authorization Header...")
@@ -141,8 +148,45 @@ class TalkoAuthMiddleware(BaseHTTPMiddleware):
         call_next,
         redis_pool: Redis,
         logger: TalkoServiceLogger,
+        partner_api_key_service: TalkoPartnerApiKeyService,
     ):
         try:
+            # Talko-issued partner keys (tkp_live_*) are validated locally —
+            # never touch the gRPC/console flow or its api_key:{key} cache
+            # namespace below. Old-format keys fall straight through.
+            if TalkoApiKeyGenerator.is_partner_key(api_key):
+                result = await partner_api_key_service.validate_and_get_partner(
+                    api_key
+                )
+                if result is None:
+                    logger.error("Invalid partner API key presented.")
+                    return TalkoUnauthorizedResponse(detail="Invalid API Key")
+
+                if not await partner_api_key_service.check_rate_limit(
+                    result["partner_id"]
+                ):
+                    logger.error(
+                        "Rate limit exceeded for partner_id: {}".format(
+                            result["partner_id"]
+                        )
+                    )
+                    return TalkoTooManyRequestsResponse()
+
+                request.state.user = {
+                    "partner_id": result["partner_id"],
+                    "api_key_id": result["api_key_id"],
+                    "is_api_key_auth": True,
+                }
+                logger.debug(
+                    "Partner API key auth completed. state.user={}".format(
+                        request.state.user
+                    )
+                )
+                set_request_auth("API-KEY", api_key)
+                return await call_next(request)
+
+            # --- everything below is the existing gRPC-backed flow, unchanged ---
+
             # Redis cache check — keyed by api_key value
             payload = await redis_pool.get(f"api_key:{api_key}")
 

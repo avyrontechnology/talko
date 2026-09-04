@@ -39,6 +39,10 @@ from src.components.email_service.services import TalkoEmailService
 from src.components.inbound_call_events.connection_manager import TalkoInboundCallEventBroker
 from src.components.inbound_call_events.publisher import TalkoInboundCallEventPublisher
 from src.components.integrations.console.maglo_client import TalkoMagloClient
+from src.components.partner_auth.rate_limiter import TalkoPartnerApiKeyRateLimiter
+from src.components.partner_auth.repository import TalkoPartnerApiKeyRepository
+from src.components.partner_auth.services import TalkoPartnerApiKeyService
+from src.components.partner_auth.validation import TalkoPartnerApiKeyValidator
 from src.components.partner_config.repository import TalkoPartnerConfigRepository
 from src.components.partner_config.services import TalkoPartnerConfigService
 from src.components.partner_config.validation import TalkoPartnerConfigValidator
@@ -89,6 +93,7 @@ class TalkoContainer(containers.DeclarativeContainer):
                 "src.components.dialer.controllers",
                 "src.components.pstn.controllers",
                 "src.components.inbound_call_events.controllers",
+                "src.components.partner_auth.controllers",
             ]
         )
 
@@ -156,6 +161,9 @@ class TalkoContainer(containers.DeclarativeContainer):
     partner_config_repo = providers.Factory(
         TalkoPartnerConfigRepository, db_manager=db, logger=logger
     )
+    partner_api_key_repo = providers.Factory(
+        TalkoPartnerApiKeyRepository, db_manager=db, logger=logger
+    )
     cdr_repository = providers.Factory(TalkoCDRRepository, db_manager=db, logger=logger)
     custom_field_repository = providers.Factory(
         TalkoCustomFieldRepository, db_manager=db, logger=logger
@@ -195,6 +203,12 @@ class TalkoContainer(containers.DeclarativeContainer):
         TalkoPartnerConfigValidator,
         logger=logger,
         partner_config_repository=partner_config_repo,
+    )
+    partner_api_key_validator = providers.Factory(
+        TalkoPartnerApiKeyValidator, logger=logger, repository=partner_api_key_repo
+    )
+    partner_api_key_rate_limiter = providers.Factory(
+        TalkoPartnerApiKeyRateLimiter, cache_helper=cache_helper, logger=logger
     )
     call_agent_mapping_validation = providers.Factory(
         TalkoAgentMapperValidator, logger=logger, repository=call_agent_mapping_repository
@@ -260,6 +274,14 @@ class TalkoContainer(containers.DeclarativeContainer):
         vendor_config_repository=vendor_config_repo,
         partner_config_validator=partner_config_validator,
         did_management_service=did_service,
+    )
+    partner_api_key_service = providers.Factory(
+        TalkoPartnerApiKeyService,
+        repository=partner_api_key_repo,
+        validator=partner_api_key_validator,
+        rate_limiter=partner_api_key_rate_limiter,
+        logger=logger,
+        datetime_util=TalkoDateTimeUtil,
     )
     custom_field_service = providers.Factory(
         TalkoCustomFieldService,

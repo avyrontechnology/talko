@@ -12,6 +12,7 @@ from src.components.did_management.controllers import TalkoDIDController
 from src.components.digital_assets.controllers import TalkoDigitalAssetController
 from src.components.health.controllers import TalkoHealthController
 from src.components.inbound_call_events.controllers import TalkoInboundCallEventController
+from src.components.partner_auth.controllers import TalkoPartnerApiKeyController
 from src.components.partner_config.controllers import TalkoPartnerConfigController
 from src.components.pstn.controllers import TalkoPSTNAgentController
 from src.components.reports.daily_lead_report.daily_lead_connection import (
@@ -96,4 +97,9 @@ class TalkoRouter:
             TalkoInboundCallEventController.router,
             prefix="",
             tags=["Inbound Call Events"],
+        )
+        router.include_router(
+            TalkoPartnerApiKeyController.router,
+            prefix="/partner_api_keys",
+            tags=["Partner API Keys"],
         )
