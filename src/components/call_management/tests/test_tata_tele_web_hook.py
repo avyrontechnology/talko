@@ -338,3 +338,110 @@ class TestRelayToMakunai:
             response = await handler.process_webhook(payload)
 
         assert response == {"status": "success", "call_id": "abc123"}
+
+
+@pytest.mark.asyncio
+class TestWebhookEventTrigger:
+    """A completed call (source=WEBHOOK, call_status answered/missed) must
+    enqueue a partner webhook delivery — see partner_webhook/tasks.py."""
+
+    _DELIVER_PATCH_PATH = (
+        "src.components.partner_webhook.tasks.deliver_webhook_event.apply_async"
+    )
+
+    def _make_handler(self):
+        logger = MagicMock()
+        call_repository = AsyncMock()
+        handler = TalkoTataTeleWebhookHandler(logger, call_repository, "tata_tele")
+        handler.datetime_util = MagicMock()
+        handler.datetime_util.get_current_time.return_value = "TIME"
+        return handler, call_repository
+
+    def _patch_mappings(self):
+        return patch.multiple(
+            "src.components.call_management.tata_tele.call_webhook",
+            TATA_WEBHOOK_FIELD_MAPPINGS={"call_status": "call_status"},
+            TATA_CDR_FIELD_MAPPING={"call_status": "call_status"},
+        )
+
+    async def test_answered_call_enqueues_webhook_delivery(self):
+        handler, call_repository = self._make_handler()
+        call_repository.get_cdr_by_call_id_or_uuid.return_value = {
+            "_id": "some_id",
+            "call_id": "abc123",
+            "partner_id": 101,
+        }
+        call_repository.update_cdr.return_value = True
+
+        payload = {"call_id": "abc123", "call_status": "answered"}
+        with self._patch_mappings(), patch(self._DELIVER_PATCH_PATH) as mock_apply_async:
+            await handler.process_webhook(payload)
+
+        mock_apply_async.assert_called_once()
+        kwargs = mock_apply_async.call_args.kwargs["kwargs"]
+        assert kwargs["partner_id"] == 101
+        assert kwargs["event_type"] == "call.completed"
+        assert "event_id" in kwargs
+        assert kwargs["payload"]["call_status"] == "answered"
+
+    async def test_missed_call_enqueues_webhook_delivery(self):
+        handler, call_repository = self._make_handler()
+        call_repository.get_cdr_by_call_id_or_uuid.return_value = {
+            "_id": "some_id",
+            "call_id": "abc123",
+            "partner_id": 101,
+            "action": "outbound",
+        }
+        call_repository.update_cdr.return_value = True
+
+        payload = {"call_id": "abc123", "call_status": "missed"}
+        with self._patch_mappings(), patch(self._DELIVER_PATCH_PATH) as mock_apply_async:
+            await handler.process_webhook(payload)
+
+        mock_apply_async.assert_called_once()
+
+    async def test_no_partner_id_skips_webhook_delivery(self):
+        handler, call_repository = self._make_handler()
+        call_repository.get_cdr_by_call_id_or_uuid.return_value = {
+            "_id": "some_id",
+            "call_id": "abc123",
+        }
+        call_repository.update_cdr.return_value = True
+
+        payload = {"call_id": "abc123", "call_status": "answered"}
+        with self._patch_mappings(), patch(self._DELIVER_PATCH_PATH) as mock_apply_async:
+            await handler.process_webhook(payload)
+
+        mock_apply_async.assert_not_called()
+
+    async def test_non_terminal_status_skips_webhook_delivery(self):
+        handler, call_repository = self._make_handler()
+        call_repository.get_cdr_by_call_id_or_uuid.return_value = {
+            "_id": "some_id",
+            "call_id": "abc123",
+            "partner_id": 101,
+        }
+        call_repository.update_cdr.return_value = True
+
+        payload = {"call_id": "abc123", "call_status": "ringing"}
+        with self._patch_mappings(), patch(self._DELIVER_PATCH_PATH) as mock_apply_async:
+            await handler.process_webhook(payload)
+
+        mock_apply_async.assert_not_called()
+
+    async def test_api_source_never_enqueues_webhook_delivery(self):
+        """process_cdr_api_payload (source=API, TalkoCDR polling) must not
+        fire live-delivery side effects, same rule as the makun-ai relay."""
+        handler, call_repository = self._make_handler()
+        call_repository.get_cdr_by_call_id_or_uuid.return_value = {
+            "_id": "some_id",
+            "call_id": "abc123",
+            "partner_id": 101,
+        }
+        call_repository.update_cdr.return_value = True
+
+        payload = {"call_status": "answered"}
+        with self._patch_mappings(), patch(self._DELIVER_PATCH_PATH) as mock_apply_async:
+            await handler.process_cdr_api_payload(payload, call_id="abc123")
+
+        mock_apply_async.assert_not_called()

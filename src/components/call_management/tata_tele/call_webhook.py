@@ -1,5 +1,6 @@
 import re
 from typing import Any, Dict, Optional
+from uuid import uuid4
 
 from src.components.analytics.constants import INBOUND
 from src.components.call_management.constant import (
@@ -17,6 +18,7 @@ from src.components.call_management.messages import (
 )
 from src.components.call_management.repository import TalkoCallRepository
 from src.components.cdr.entity_fields import derive_entity_fields
+from src.components.cdr.helper import TalkoCommonCDRHelper
 from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.datetime_util import TalkoDateTimeUtil
@@ -465,6 +467,30 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
                 partner_id = cdr.get("partner_id")
                 if partner_id:
                     await self._relay_to_makunai(partner_id, raw_payload)
+
+                # Push a signed webhook to the partner's configured URL, if
+                # any (see src/components/partner_webhook/). Fire-and-forget
+                # via Celery, same best-effort philosophy as the makun-ai
+                # relay above — our TalkoCDR write already succeeded, so a
+                # delivery failure must never surface as a failure of this
+                # webhook. Local import avoids pulling the Celery task
+                # module into every import of this handler.
+                call_status = updates.get("call_status")
+                if partner_id and call_status in ("answered", "missed"):
+                    from src.components.partner_webhook.tasks import (
+                        deliver_webhook_event,
+                    )
+
+                    deliver_webhook_event.apply_async(
+                        kwargs={
+                            "partner_id": partner_id,
+                            "event_type": "call.completed",
+                            "event_id": str(uuid4()),
+                            "payload": TalkoCommonCDRHelper.create_filtered_cdr(
+                                {**cdr, **updates}, self.logger
+                            ),
+                        }
+                    )
 
                 if (
                     updates.get("call_status") == "missed"

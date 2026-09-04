@@ -22,6 +22,7 @@ TASK_MODULES = [
     "src.components.call_assets.tasks",
     "src.components.did_management.tasks",
     "src.components.call_management.tasks",
+    "src.components.partner_webhook.tasks",
 ]
 
 task_routes = {
@@ -39,6 +40,7 @@ task_routes = {
     "src.components.call_operation.*": {
         "queue": "call_operation_queue"
     },  # Dedicated queue for call operation tasks
+    "src.components.partner_webhook.*": {"queue": "webhook_delivery_queue"},
     "src.talko_celery.*": {"queue": "default_queue"},
     "src.components.call_assets.*": {"queue": "call_assets_queue"},
     "src.components.did_management.*": {"queue": "did_management_queue"},

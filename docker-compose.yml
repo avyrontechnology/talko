@@ -46,7 +46,7 @@ services:
   celery-worker:
     build: .
     container_name: talko-worker
-    command: poetry run celery -A src.talko_celery.celery_app.celery worker --loglevel=info --concurrency=6 -Q default_queue,call_operation_queue,call_assets_queue,did_management_queue,call_management_queue,missed_callback_queue
+    command: poetry run celery -A src.talko_celery.celery_app.celery worker --loglevel=info --concurrency=6 -Q default_queue,call_operation_queue,call_assets_queue,did_management_queue,call_management_queue,missed_callback_queue,webhook_delivery_queue
     volumes:
       - .:/talko-service
     networks:

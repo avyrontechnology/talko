@@ -46,6 +46,10 @@ from src.components.partner_auth.validation import TalkoPartnerApiKeyValidator
 from src.components.partner_config.repository import TalkoPartnerConfigRepository
 from src.components.partner_config.services import TalkoPartnerConfigService
 from src.components.partner_config.validation import TalkoPartnerConfigValidator
+from src.components.partner_webhook.crypto import TalkoWebhookSecretCipher
+from src.components.partner_webhook.repository import TalkoPartnerWebhookRepository
+from src.components.partner_webhook.services import TalkoPartnerWebhookService
+from src.components.partner_webhook.validation import TalkoPartnerWebhookValidator
 from src.components.pstn.services import TalkoPSTNBridgeService
 from src.components.reports.daily_lead_report.lead_connection_service import (
     TalkoLeadConnectionReportService,
@@ -94,6 +98,7 @@ class TalkoContainer(containers.DeclarativeContainer):
                 "src.components.pstn.controllers",
                 "src.components.inbound_call_events.controllers",
                 "src.components.partner_auth.controllers",
+                "src.components.partner_webhook.controllers",
             ]
         )
 
@@ -164,6 +169,9 @@ class TalkoContainer(containers.DeclarativeContainer):
     partner_api_key_repo = providers.Factory(
         TalkoPartnerApiKeyRepository, db_manager=db, logger=logger
     )
+    partner_webhook_repo = providers.Factory(
+        TalkoPartnerWebhookRepository, db_manager=db, logger=logger
+    )
     cdr_repository = providers.Factory(TalkoCDRRepository, db_manager=db, logger=logger)
     custom_field_repository = providers.Factory(
         TalkoCustomFieldRepository, db_manager=db, logger=logger
@@ -209,6 +217,12 @@ class TalkoContainer(containers.DeclarativeContainer):
     )
     partner_api_key_rate_limiter = providers.Factory(
         TalkoPartnerApiKeyRateLimiter, cache_helper=cache_helper, logger=logger
+    )
+    partner_webhook_validator = providers.Factory(
+        TalkoPartnerWebhookValidator, logger=logger, repository=partner_webhook_repo
+    )
+    webhook_secret_cipher = providers.Singleton(
+        TalkoWebhookSecretCipher, master_key=TalkoENV.WEBHOOK_SECRET_MASTER_KEY
     )
     call_agent_mapping_validation = providers.Factory(
         TalkoAgentMapperValidator, logger=logger, repository=call_agent_mapping_repository
@@ -280,6 +294,14 @@ class TalkoContainer(containers.DeclarativeContainer):
         repository=partner_api_key_repo,
         validator=partner_api_key_validator,
         rate_limiter=partner_api_key_rate_limiter,
+        logger=logger,
+        datetime_util=TalkoDateTimeUtil,
+    )
+    partner_webhook_service = providers.Factory(
+        TalkoPartnerWebhookService,
+        repository=partner_webhook_repo,
+        validator=partner_webhook_validator,
+        cipher=webhook_secret_cipher,
         logger=logger,
         datetime_util=TalkoDateTimeUtil,
     )

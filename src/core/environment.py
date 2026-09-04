@@ -62,6 +62,14 @@ class TalkoENV:
         "41139a57c40445ecf227b4cb36c9adb48be454591aac7cae95fa39557cc2c149",
     )
 
+    # Fernet master key (generate via `Fernet.generate_key()`) used to
+    # encrypt partner webhook signing secrets at rest — must be identical
+    # across all pods/replicas, since any of them may need to decrypt a
+    # secret to sign an outbound delivery. Rotating it invalidates every
+    # stored webhook secret. No default: validate_env_vars() below forces
+    # this to be provisioned as a real secret in deployed environments.
+    WEBHOOK_SECRET_MASTER_KEY = os.getenv("WEBHOOK_SECRET_MASTER_KEY", "")
+
     @classmethod
     def validate_env_vars(cls):
         """

@@ -14,6 +14,7 @@ from src.components.health.controllers import TalkoHealthController
 from src.components.inbound_call_events.controllers import TalkoInboundCallEventController
 from src.components.partner_auth.controllers import TalkoPartnerApiKeyController
 from src.components.partner_config.controllers import TalkoPartnerConfigController
+from src.components.partner_webhook.controllers import TalkoPartnerWebhookController
 from src.components.pstn.controllers import TalkoPSTNAgentController
 from src.components.reports.daily_lead_report.daily_lead_connection import (
     router as daily_lead_connection_router,
@@ -102,4 +103,9 @@ class TalkoRouter:
             TalkoPartnerApiKeyController.router,
             prefix="/partner_api_keys",
             tags=["Partner API Keys"],
+        )
+        router.include_router(
+            TalkoPartnerWebhookController.router,
+            prefix="/partner_webhooks",
+            tags=["Partner Webhooks"],
         )
