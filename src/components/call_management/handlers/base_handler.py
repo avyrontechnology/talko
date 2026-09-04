@@ -1,20 +1,20 @@
 from abc import ABC, abstractmethod
 from typing import Union
 
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class VendorCallHandler(ABC):
+class TalkoVendorCallHandler(ABC):
     """
     Base class for vendor call handlers.
 
     Handles config setup and defines the interface for making calls.
     """
 
-    def __init__(self, config: dict, logger: HollerServiceLogger, vendor_type: str):
+    def __init__(self, config: dict, logger: TalkoServiceLogger, vendor_type: str):
         self.vendor_config: dict = config
         self.config: dict = config.get("generic_url_handler", {}).get("call_api", {})
-        self.logger: HollerServiceLogger = logger
+        self.logger: TalkoServiceLogger = logger
         self.vendor_type: str = vendor_type
 
     @abstractmethod

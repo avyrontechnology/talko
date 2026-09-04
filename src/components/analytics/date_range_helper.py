@@ -3,24 +3,24 @@ from typing import Optional, Tuple
 
 from dateutil.relativedelta import relativedelta
 
-from src.components.analytics.enums import DateRangePeriod
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.analytics.enums import TalkoDateRangePeriod
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class DateRangeHelper:
+class TalkoDateRangeHelper:
     """
     Helper class to calculate and adjust date ranges for analytics requests.
 
     Attributes:
-        logger (HollerServiceLogger): Logger instance for debug and error messages.
+        logger (TalkoServiceLogger): Logger instance for debug and error messages.
     """
 
-    def __init__(self, logger: HollerServiceLogger):
+    def __init__(self, logger: TalkoServiceLogger):
         """
-        Initialize DateRangeHelper with a logger.
+        Initialize TalkoDateRangeHelper with a logger.
 
         Args:
-            logger (HollerServiceLogger): Logger instance for debug and error messages.
+            logger (TalkoServiceLogger): Logger instance for debug and error messages.
         """
         self.logger = logger
 
@@ -54,7 +54,7 @@ class DateRangeHelper:
                 start_date_dt, current_date, start_date_ms, end_date_ms
             )
         )
-        return start_date_ms, end_date_ms, DateRangePeriod.THREE_MONTHS.value
+        return start_date_ms, end_date_ms, TalkoDateRangePeriod.THREE_MONTHS.value
 
     def adjust_date_range(
         self, start_date: Optional[int], end_date: Optional[int]
@@ -103,7 +103,7 @@ class DateRangeHelper:
         if 86400 <= duration_seconds <= 86400 * 1.1:
             start_date_ms = int(today_start.timestamp() * 1000)
             end_date_ms = int(today_end.timestamp() * 1000)
-            period = DateRangePeriod.TODAY.value
+            period = TalkoDateRangePeriod.TODAY.value
             self.logger.debug(
                 "Detected 'Today' range: {} to {}".format(today_start, today_end)
             )
@@ -115,7 +115,7 @@ class DateRangeHelper:
             )
             start_date_ms = int(last_week_start.timestamp() * 1000)
             end_date_ms = int(last_week_end.timestamp() * 1000)
-            period = DateRangePeriod.LAST_WEEK.value
+            period = TalkoDateRangePeriod.LAST_WEEK.value
             self.logger.debug(
                 "Detected 'Last Week' range: {} to {}".format(
                     last_week_start, last_week_end
@@ -123,12 +123,12 @@ class DateRangeHelper:
             )
         elif 7776000 <= duration_seconds <= 7776000 * 1.1:
             start_date_ms, end_date_ms, _ = self.get_default_date_range()
-            period = DateRangePeriod.THREE_MONTHS.value
+            period = TalkoDateRangePeriod.THREE_MONTHS.value
             self.logger.debug(
                 "Detected '3 Months' range: {} to {}".format(start_date_ms, end_date_ms)
             )
         else:
-            period = DateRangePeriod.CUSTOM.value
+            period = TalkoDateRangePeriod.CUSTOM.value
             self.logger.debug(
                 "Using custom date range: {} to {}".format(start_date_ms, end_date_ms)
             )

@@ -3,13 +3,13 @@ from typing import Any, Dict, Optional
 from pydantic import BaseModel, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
-from src.components.call_management.enums import OutboundType
-from src.components.cdr.constants import EntityType
+from src.components.call_management.enums import TalkoOutboundType
+from src.components.cdr.constants import TalkoEntityType
 
 
-class Contract:
+class TalkoContract:
     class CallCreate(BaseModel):
-        entity_type: Optional[EntityType] = None  # "Lead" or "Contact"
+        entity_type: Optional[TalkoEntityType] = None  # "Lead" or "Contact"
         entity_id: Optional[int] = None
         entity_name: Optional[str] = None
 
@@ -56,12 +56,12 @@ class Contract:
         def validate_outbound_type(self):
             if (
                 self.outbound_type
-                and self.outbound_type not in OutboundType._value2member_map_
+                and self.outbound_type not in TalkoOutboundType._value2member_map_
             ):
                 raise PydanticCustomError(
                     "invalid_outbound_type",
                     f"Invalid outbound_type. Allowed values are: "
-                    f"{', '.join(OutboundType._value2member_map_.keys())}",
+                    f"{', '.join(TalkoOutboundType._value2member_map_.keys())}",
                 )
             return self
 

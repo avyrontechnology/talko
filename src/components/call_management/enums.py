@@ -2,7 +2,7 @@ from enum import Enum, unique
 
 
 @unique
-class OutboundType(str, Enum):
+class TalkoOutboundType(str, Enum):
     """
     Defines supported outbound calling types.
     """
@@ -29,7 +29,7 @@ class OutboundType(str, Enum):
 
 
 @unique
-class InboundType(str, Enum):
+class TalkoInboundType(str, Enum):
     """
     Defines supported inbound calling types (how the inbound call is transferred/routed to the agent).
     """
@@ -40,7 +40,7 @@ class InboundType(str, Enum):
     @classmethod
     def choices(cls):
         """
-        Returns choices suitable for Django model fields (e.g. choices=InboundType.choices()).
+        Returns choices suitable for Django model fields (e.g. choices=TalkoInboundType.choices()).
         """
         return [(item.value, item.name.replace("_", " ").title()) for item in cls]
 

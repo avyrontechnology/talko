@@ -12,7 +12,7 @@ from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
-class DatabaseSessionManager:
+class TalkoDatabaseSessionManager:
     def __init__(self, host: str, engine_kwargs: dict[str, Any] = {}):
         print(host)
         self._engine = create_async_engine(host, **engine_kwargs)
@@ -22,7 +22,7 @@ class DatabaseSessionManager:
 
     async def close(self):
         if self._engine is None:
-            raise Exception("DatabaseSessionManager is not initialized")
+            raise Exception("TalkoDatabaseSessionManager is not initialized")
         await self._engine.dispose()
 
         self._engine = None
@@ -31,7 +31,7 @@ class DatabaseSessionManager:
     @contextlib.asynccontextmanager
     async def connect(self) -> AsyncIterator[AsyncConnection]:
         if self._engine is None:
-            raise Exception("DatabaseSessionManager is not initialized")
+            raise Exception("TalkoDatabaseSessionManager is not initialized")
 
         async with self._engine.begin() as connection:
             try:
@@ -43,7 +43,7 @@ class DatabaseSessionManager:
     @contextlib.asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
         if self._sessionmaker is None:
-            raise Exception("DatabaseSessionManager is not initialized")
+            raise Exception("TalkoDatabaseSessionManager is not initialized")
 
         session = self._sessionmaker()
         try:

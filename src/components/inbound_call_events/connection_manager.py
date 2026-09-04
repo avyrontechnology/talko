@@ -7,13 +7,13 @@ from fastapi import WebSocket
 from starlette_context import request_cycle_context
 
 from src.components.inbound_call_events.constants import INBOUND_CALL_EVENTS_CHANNEL
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 SEND_TIMEOUT_SECONDS = 5
 _LISTENER_RETRY_DELAY_SECONDS = 2
 
 
-class InboundCallEventBroker:
+class TalkoInboundCallEventBroker:
     """
     Fans out inbound-call events to websocket clients, scoped per partner_id.
 
@@ -25,16 +25,16 @@ class InboundCallEventBroker:
     an event published from any pod reaches clients connected to any pod.
 
     Must be resolved the same way everywhere (via the wired container
-    instance — Depends(Provide[Container.inbound_call_event_broker]) in
+    instance — Depends(Provide[TalkoContainer.inbound_call_event_broker]) in
     controllers, container.inbound_call_event_broker() in main.py) so the
     listener started at app startup and the connections registered by the
     websocket route are the same singleton. A bare class-level
-    Container.inbound_call_event_broker() call resolves to a different
-    instance (dependency_injector deep-copies providers on Container()
+    TalkoContainer.inbound_call_event_broker() call resolves to a different
+    instance (dependency_injector deep-copies providers on TalkoContainer()
     instantiation) — see git history on this file for what that broke.
     """
 
-    def __init__(self, redis_pool, logger: HollerServiceLogger):
+    def __init__(self, redis_pool, logger: TalkoServiceLogger):
         self.__redis_pool = redis_pool
         self.__logger = logger
         self.__connections: Dict[int, Set[WebSocket]] = defaultdict(set)
@@ -104,7 +104,7 @@ class InboundCallEventBroker:
 
     async def __send(self, partner_id: int, websocket: WebSocket, data: Dict[str, Any]) -> None:
         try:
-            # ContextMiddleware wraps every websocket's send() to attach a
+            # TalkoContextMiddleware wraps every websocket's send() to attach a
             # request-id, which reads starlette_context's ContextVar. This
             # runs on the broker's own background listener task (created at
             # app startup), not inside the request cycle that originally

@@ -5,25 +5,25 @@ from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from src.components.digital_assets import constants
-from src.components.digital_assets.logger_adapter import LoggerAdapter
+from src.components.digital_assets.logger_adapter import TalkoLoggerAdapter
 from src.components.digital_assets.messages import NO_CRED_FOUND_DO
-from src.components.digital_assets.storage.base import BaseStorageManager
-from src.core.environment import ENV
+from src.components.digital_assets.storage.base import TalkoBaseStorageManager
+from src.core.environment import TalkoENV
 
-logger = LoggerAdapter().get_logger()
+logger = TalkoLoggerAdapter().get_logger()
 
 
-class DOStorageManager(BaseStorageManager):
+class TalkoDOStorageManager(TalkoBaseStorageManager):
     """
     Storage manager for DigitalOcean Space.
     """
 
     def __init__(self):
-        self.endpoint_url = ENV.DO_ENDPOINT_URL
-        self.space_name = ENV.DO_SPACE_NAME
-        self.secret_access_key = ENV.DO_SECRET_ACCESS_KEY
-        self.access_key_id = ENV.DO_ACCESS_KEY_ID
-        self.env = ENV.ENVIRONMENT
+        self.endpoint_url = TalkoENV.DO_ENDPOINT_URL
+        self.space_name = TalkoENV.DO_SPACE_NAME
+        self.secret_access_key = TalkoENV.DO_SECRET_ACCESS_KEY
+        self.access_key_id = TalkoENV.DO_ACCESS_KEY_ID
+        self.env = TalkoENV.ENVIRONMENT
 
         self.s3_client = boto3.client(
             "s3",
@@ -32,7 +32,7 @@ class DOStorageManager(BaseStorageManager):
             endpoint_url=self.endpoint_url,
             config=Config(signature_version="s3v4"),
         )
-        logger.info("DOStorageManager initialized with endpoint: %s", self.endpoint_url)
+        logger.info("TalkoDOStorageManager initialized with endpoint: %s", self.endpoint_url)
 
     def get_presigned_url(self, file_path: str, view_only: bool = False) -> str:
         """

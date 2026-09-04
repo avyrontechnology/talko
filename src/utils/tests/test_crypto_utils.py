@@ -5,7 +5,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from src.core import environment as env
-from src.utils.crypto_utils import RSAKeyHandler
+from src.utils.crypto_utils import TalkoRSAKeyHandler
 
 
 # Generate fresh RSA keys for testing
@@ -21,13 +21,13 @@ def test_encrypt_decrypt_roundtrip(rsa_keys):
     test_data = {"foo": "bar", "number": 123}
 
     # Encrypt with public key (returns hex string)
-    encrypted = RSAKeyHandler.encrypt_with_public_key(test_data, public_key)
+    encrypted = TalkoRSAKeyHandler.encrypt_with_public_key(test_data, public_key)
     assert isinstance(encrypted, str)
     assert len(encrypted) == 512  # 256 bytes as hex
-    assert RSAKeyHandler._is_valid_hex(encrypted)  # Ensure valid hex
+    assert TalkoRSAKeyHandler._is_valid_hex(encrypted)  # Ensure valid hex
 
     # Decrypt the hex-encoded ciphertext
-    decrypted = RSAKeyHandler.decrypt_with_private_key(encrypted, private_key)
+    decrypted = TalkoRSAKeyHandler.decrypt_with_private_key(encrypted, private_key)
     assert decrypted == test_data
 
 
@@ -38,7 +38,7 @@ def test_decrypt_invalid_hex(rsa_keys):
         ValueError,
         match="Invalid ciphertext encoding: must be base64 or valid hex. Error:.*",
     ):
-        RSAKeyHandler.decrypt_with_private_key(bad_ciphertext, private_key)
+        TalkoRSAKeyHandler.decrypt_with_private_key(bad_ciphertext, private_key)
 
 
 def test_decrypt_wrong_ciphertext(rsa_keys):
@@ -46,22 +46,22 @@ def test_decrypt_wrong_ciphertext(rsa_keys):
     # Generate a valid 256-byte hex string (512 chars) that won't decrypt correctly
     bad_ciphertext = binascii.hexlify(b"x" * 256).decode("utf-8")
     with pytest.raises(ValueError, match="Decryption failed:.*"):
-        RSAKeyHandler.decrypt_with_private_key(bad_ciphertext, private_key)
+        TalkoRSAKeyHandler.decrypt_with_private_key(bad_ciphertext, private_key)
 
 
 def test_missing_env(monkeypatch):
-    # Patch attributes on ENV directly
-    monkeypatch.setattr(env.ENV, "RSA_PRIVATE_KEY", None)
-    monkeypatch.setattr(env.ENV, "RSA_PUBLIC_KEY", None)
+    # Patch attributes on TalkoENV directly
+    monkeypatch.setattr(env.TalkoENV, "RSA_PRIVATE_KEY", None)
+    monkeypatch.setattr(env.TalkoENV, "RSA_PUBLIC_KEY", None)
 
     # Just call the methods, ignore if they raise
     try:
-        RSAKeyHandler.load_private_key()
+        TalkoRSAKeyHandler.load_private_key()
     except Exception:
         pass
 
     try:
-        RSAKeyHandler.load_public_key()
+        TalkoRSAKeyHandler.load_public_key()
     except Exception:
         pass
 
@@ -73,7 +73,7 @@ def test_encrypt_with_invalid_public_key():
             raise RuntimeError("encryption failed internally")
 
     with pytest.raises(ValueError, match="Encryption failed:.*"):
-        RSAKeyHandler.encrypt_with_public_key({"foo": "bar"}, BadPublicKey())
+        TalkoRSAKeyHandler.encrypt_with_public_key({"foo": "bar"}, BadPublicKey())
 
 
 def test_decrypt_with_invalid_private_key():
@@ -84,7 +84,7 @@ def test_decrypt_with_invalid_private_key():
 
     bad_hex = binascii.hexlify(b"x" * 256).decode("utf-8")  # Valid 256-byte hex
     with pytest.raises(ValueError, match="Decryption failed:.*"):
-        RSAKeyHandler.decrypt_with_private_key(bad_hex, BadPrivateKey())
+        TalkoRSAKeyHandler.decrypt_with_private_key(bad_hex, BadPrivateKey())
 
 
 def test_decrypt_with_unexpected_error():
@@ -95,4 +95,4 @@ def test_decrypt_with_unexpected_error():
 
     bad_hex = binascii.hexlify(b"x" * 256).decode("utf-8")  # Valid 256-byte hex
     with pytest.raises(ValueError, match="Decryption failed: weird internal error"):
-        RSAKeyHandler.decrypt_with_private_key(bad_hex, WeirdPrivateKey())
+        TalkoRSAKeyHandler.decrypt_with_private_key(bad_hex, WeirdPrivateKey())

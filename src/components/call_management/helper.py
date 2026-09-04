@@ -4,68 +4,68 @@ from typing import Any, Dict, List, Optional
 
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from src.components.call_agent_map.repository import AgentMappingRepository
-from src.components.call_agent_map.services import AgentMappingService
+from src.components.call_agent_map.repository import TalkoAgentMappingRepository
+from src.components.call_agent_map.services import TalkoAgentMappingService
 from src.components.call_management import messages as call_messages
-from src.components.call_management.dto import Contract
-from src.components.call_management.handlers.base_handler import VendorCallHandler
+from src.components.call_management.dto import TalkoContract
+from src.components.call_management.handlers.base_handler import TalkoVendorCallHandler
 from src.components.call_management.messages import (
     NO_DID_ASSIGNED_TO_PARTNER,
     PARTNER_CONFIG_NOT_FOUND,
     UNSUPPORTED_VENDOR,
     VENDOR_CONFIG_FOR_VENDOR_ID_NOT_FOUND,
 )
-from src.components.call_management.repository import CallRepository
-from src.components.call_management.tata_tele.call_service import TataTeleCallHandler
-from src.components.cdr.constants import EntityType
+from src.components.call_management.repository import TalkoCallRepository
+from src.components.call_management.tata_tele.call_service import TalkoTataTeleCallHandler
+from src.components.cdr.constants import TalkoEntityType
 from src.components.cdr.entity_fields import derive_entity_fields
-from src.components.cdr.models import CDR
-from src.components.did_management.constants import USABLE_STATUSES, DIDStatus
-from src.components.did_management.services import DidManagementService
-from src.components.partner_config.repository import PartnerConfigRepository
-from src.components.vendor_config.repository import VendorConfigRepository
-from src.exceptions import BadRequestError, ResourceNotFound
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.assignment_strategy import RoundRobinAssignment
-from src.utils.crypto_utils import RSAKeyHandler
-from src.utils.datetime_util import DateTimeUtil
-from src.utils.enums import NumberType, VendorType
+from src.components.cdr.models import TalkoCDR
+from src.components.did_management.constants import USABLE_STATUSES, TalkoDIDStatus
+from src.components.did_management.services import TalkoDidManagementService
+from src.components.partner_config.repository import TalkoPartnerConfigRepository
+from src.components.vendor_config.repository import TalkoVendorConfigRepository
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.assignment_strategy import TalkoRoundRobinAssignment
+from src.utils.crypto_utils import TalkoRSAKeyHandler
+from src.utils.datetime_util import TalkoDateTimeUtil
+from src.utils.enums import TalkoNumberType, TalkoVendorType
 
 
-class CallProcessorHelper:
+class TalkoCallProcessorHelper:
     """
     Helper class responsible for orchestrating the initiation of outbound calls.
     It handles retrieving partner configurations, selecting the appropriate DID,
-    determining the correct vendor handler, and preparing the CDR.
+    determining the correct vendor handler, and preparing the TalkoCDR.
     """
 
     def __init__(
         self,
-        repository: CallRepository,
-        logger: HollerServiceLogger,
-        datetime_util: DateTimeUtil,
-        partner_config_repo: PartnerConfigRepository,
-        vendor_config_repo: VendorConfigRepository,
-        agent_mapping_service: AgentMappingService,
-        agent_mapping_repository: AgentMappingRepository,
-        did_management_service: DidManagementService,
+        repository: TalkoCallRepository,
+        logger: TalkoServiceLogger,
+        datetime_util: TalkoDateTimeUtil,
+        partner_config_repo: TalkoPartnerConfigRepository,
+        vendor_config_repo: TalkoVendorConfigRepository,
+        agent_mapping_service: TalkoAgentMappingService,
+        agent_mapping_repository: TalkoAgentMappingRepository,
+        did_management_service: TalkoDidManagementService,
     ) -> None:
         try:
-            self.__repository: CallRepository = repository
-            self.__logger: HollerServiceLogger = logger
-            self.__datetime_util: DateTimeUtil = datetime_util
-            self.__partner_config_repo: PartnerConfigRepository = partner_config_repo
-            self.__vendor_config_repo: VendorConfigRepository = vendor_config_repo
-            self.__agent_mapping_service: AgentMappingService = agent_mapping_service
-            self.__agent_mapping_repository: AgentMappingRepository = (
+            self.__repository: TalkoCallRepository = repository
+            self.__logger: TalkoServiceLogger = logger
+            self.__datetime_util: TalkoDateTimeUtil = datetime_util
+            self.__partner_config_repo: TalkoPartnerConfigRepository = partner_config_repo
+            self.__vendor_config_repo: TalkoVendorConfigRepository = vendor_config_repo
+            self.__agent_mapping_service: TalkoAgentMappingService = agent_mapping_service
+            self.__agent_mapping_repository: TalkoAgentMappingRepository = (
                 agent_mapping_repository
             )
-            self.__did_management_service: DidManagementService = did_management_service
-            self.__round_robin: RoundRobinAssignment = RoundRobinAssignment()
-            self.__logger.info("CallProcessorHelper initialized successfully")
+            self.__did_management_service: TalkoDidManagementService = did_management_service
+            self.__round_robin: TalkoRoundRobinAssignment = TalkoRoundRobinAssignment()
+            self.__logger.info("TalkoCallProcessorHelper initialized successfully")
         except Exception as e:
             self.__logger.error(
-                "Failed to initialize CallProcessorHelper: {}".format(str(e))
+                "Failed to initialize TalkoCallProcessorHelper: {}".format(str(e))
             )
             raise
 
@@ -78,7 +78,7 @@ class CallProcessorHelper:
                 self.__logger.error(
                     "Partner config for partner_id {} not found".format(partner_id)
                 )
-                raise ResourceNotFound(call_messages.PARTNER_CONFIG_NOT_FOUND)
+                raise TalkoResourceNotFound(call_messages.PARTNER_CONFIG_NOT_FOUND)
 
             if "did_indices" not in partner_config:
                 partner_config["did_indices"] = {"round_robin": 0}
@@ -157,12 +157,12 @@ class CallProcessorHelper:
                     did, partner_id
                 )
             )
-            raise ResourceNotFound("DID {} does not exist in the system".format(did))
+            raise TalkoResourceNotFound("DID {} does not exist in the system".format(did))
 
         self.__logger.debug("Fetched DID record for {}: {}".format(did, did_record))
 
         if not did_record.get("is_active"):
-            raise BadRequestError("The dedicated DID {} is not active".format(did))
+            raise TalkoBadRequestError("The dedicated DID {} is not active".format(did))
 
         # Available DIDs already carry a real partner_id here — that's the
         # normal state for a campaign's dedicated DID (Section 16.x): the
@@ -170,14 +170,14 @@ class CallProcessorHelper:
         # what flips a DID to Mapped) since that would tie the DID to one
         # specific agent_bot_id, and a campaign needs to hold several DIDs
         # not bound to any single agent. Available vs Mapped has no
-        # vendor/SIP-side effect — it's purely Holler's own bookkeeping — so
+        # vendor/SIP-side effect — it's purely Talko's own bookkeeping — so
         # both are equally valid for an explicit dedicated_did call as long
         # as the DID genuinely belongs to the requesting partner (checked
         # just below).
         current_status = did_record.get("status")
         if current_status not in USABLE_STATUSES:
             status_display = current_status or "Unknown"
-            raise BadRequestError(
+            raise TalkoBadRequestError(
                 "DID {} cannot be used for calls (current status: {}). Only available or mapped DIDs are allowed for outbound calls.".format(
                     did, status_display
                 )
@@ -189,14 +189,14 @@ class CallProcessorHelper:
                     partner_id, did, did_record.get("partner_id")
                 )
             )
-            raise BadRequestError(
+            raise TalkoBadRequestError(
                 "DID {} is not assigned to your partner account".format(did)
             )
 
         if service_board_id is not None:
             did_board_id = did_record.get("service_board_id")
             if did_board_id is not None and str(did_board_id) != str(service_board_id):
-                raise BadRequestError(
+                raise TalkoBadRequestError(
                     "DID {} is restricted to service board {}, but request is for service board {}".format(
                         did, did_board_id, service_board_id
                     )
@@ -232,7 +232,7 @@ class CallProcessorHelper:
                 self.__logger.error(
                     "Service board ID is required when service boards are enabled"
                 )
-                raise BadRequestError(
+                raise TalkoBadRequestError(
                     "Service board ID is required when service boards are enabled."
                 )
 
@@ -266,7 +266,7 @@ class CallProcessorHelper:
                         partner_id, partner_config
                     )
                 )
-                raise ResourceNotFound(NO_DID_ASSIGNED_TO_PARTNER)
+                raise TalkoResourceNotFound(NO_DID_ASSIGNED_TO_PARTNER)
 
             if enable_round_robin or enable_service_board:
                 from_number: str = await self._assign_round_robin_did(
@@ -281,7 +281,7 @@ class CallProcessorHelper:
                         partner_config, partner_id, dids
                     )
             else:
-                raise ResourceNotFound(NO_DID_ASSIGNED_TO_PARTNER)
+                raise TalkoResourceNotFound(NO_DID_ASSIGNED_TO_PARTNER)
 
             self.__logger.info(
                 "Selected DID {} for partner {}".format(from_number, partner_id)
@@ -306,7 +306,7 @@ class CallProcessorHelper:
                     partner_id
                 )
             )
-            raise ResourceNotFound(NO_DID_ASSIGNED_TO_PARTNER)
+            raise TalkoResourceNotFound(NO_DID_ASSIGNED_TO_PARTNER)
 
         index_key = "round_robin" if service_board_id is None else str(service_board_id)
         self.__logger.debug(
@@ -337,13 +337,13 @@ class CallProcessorHelper:
             self.__logger.error(
                 "Failed to update did_indices for partner_id {}".format(partner_id)
             )
-            raise ResourceNotFound(PARTNER_CONFIG_NOT_FOUND)
+            raise TalkoResourceNotFound(PARTNER_CONFIG_NOT_FOUND)
 
         return from_number
 
     async def get_vendor_handler(
         self, vendor_id: str, vendor_config_id: Optional[str] = None
-    ) -> VendorCallHandler:
+    ) -> TalkoVendorCallHandler:
         try:
             self.__logger.info(
                 "Get vendor config data, vendor id: {}, vendor config id: {}".format(
@@ -357,21 +357,21 @@ class CallProcessorHelper:
                 self.__logger.error(
                     "Vendor config for vendor_id {} not found".format(vendor_id)
                 )
-                raise ResourceNotFound(VENDOR_CONFIG_FOR_VENDOR_ID_NOT_FOUND)
+                raise TalkoResourceNotFound(VENDOR_CONFIG_FOR_VENDOR_ID_NOT_FOUND)
 
             vendor_type: Optional[str] = vendor_config.get("vendor_type")
-            if vendor_type in [VendorType.TATA_TELE.value, VendorType.ACEFHONE.value]:
+            if vendor_type in [TalkoVendorType.TATA_TELE.value, TalkoVendorType.ACEFHONE.value]:
                 self.__logger.info(
                     "Retrieved vendor handler for vendor_id {}".format(vendor_id)
                 )
-                return TataTeleCallHandler(vendor_config, self.__logger, vendor_type)
+                return TalkoTataTeleCallHandler(vendor_config, self.__logger, vendor_type)
 
             self.__logger.error(
                 "Unsupported vendor type {} for vendor_id {}".format(
                     vendor_type, vendor_id
                 )
             )
-            raise BadRequestError(UNSUPPORTED_VENDOR.format(vendor_type))
+            raise TalkoBadRequestError(UNSUPPORTED_VENDOR.format(vendor_type))
         except Exception as e:
             self.__logger.error(
                 "Error getting vendor handler for {}: {}".format(vendor_id, str(e))
@@ -380,13 +380,13 @@ class CallProcessorHelper:
 
     def _derive_entity_fields(
         self,
-        call_data: Optional[Contract.CallCreate] = None,
+        call_data: Optional[TalkoContract.CallCreate] = None,
         entity_type: Optional[str] = None,
         entity_id: Optional[int] = None,
         entity_name: Optional[str] = None,
         lead_id: Optional[int] = None,
         lead_name: Optional[str] = None,
-        default_entity_type: Optional[EntityType] = None,
+        default_entity_type: Optional[TalkoEntityType] = None,
     ) -> Dict[str, Optional[Any]]:
         entity_type = (
             entity_type
@@ -427,7 +427,7 @@ class CallProcessorHelper:
 
     def prepare_cdr(
         self,
-        call_data: Contract.CallCreate,
+        call_data: TalkoContract.CallCreate,
         call_id: str,
         call_uuid: str,
         call_status: str,
@@ -442,7 +442,7 @@ class CallProcessorHelper:
         try:
             entity_fields = self._derive_entity_fields(call_data=call_data)
 
-            cdr = CDR(
+            cdr = TalkoCDR(
                 action="outbound",
                 calling_mode="clicktocall",
                 date_time=timestamp,
@@ -477,17 +477,17 @@ class CallProcessorHelper:
                     str(vendor_config_id) if vendor_config_id is not None else None
                 ),
             )
-            self.__logger.info("Prepared CDR for call_id {}".format(call_id))
+            self.__logger.info("Prepared TalkoCDR for call_id {}".format(call_id))
             return cdr.model_dump()
         except Exception as e:
             self.__logger.error(
-                "Error preparing CDR for call_id {}: {}".format(call_id, str(e))
+                "Error preparing TalkoCDR for call_id {}: {}".format(call_id, str(e))
             )
             raise
 
     def decrypt_lead_data(
         self,
-        call_data: Contract.CallCreate,
+        call_data: TalkoContract.CallCreate,
     ) -> Dict[str, Any]:
         decrypted_lead_data: dict = {}
         if call_data.lead_secret:
@@ -497,10 +497,10 @@ class CallProcessorHelper:
                         call_data.lead_secret[:32]
                     )
                 )
-                private_key: rsa.RSAPrivateKey = RSAKeyHandler.load_private_key()
+                private_key: rsa.RSAPrivateKey = TalkoRSAKeyHandler.load_private_key()
                 try:
                     self.__logger.debug("Trying to decrypt lead_secret as hex")
-                    decrypted_lead_data = RSAKeyHandler.decrypt_with_private_key(
+                    decrypted_lead_data = TalkoRSAKeyHandler.decrypt_with_private_key(
                         call_data.lead_secret, private_key
                     )
                     self.__logger.debug("Successfully decrypted lead_secret as hex")
@@ -521,15 +521,15 @@ class CallProcessorHelper:
         return decrypted_lead_data
 
     def extract_to_number(
-        self, call_data: Contract.CallCreate, decrypted_lead_data: Dict[str, Any]
+        self, call_data: TalkoContract.CallCreate, decrypted_lead_data: Dict[str, Any]
     ) -> str:
         try:
             to_number: str = ""
-            if call_data.number_type == NumberType.PRIMARY_NUMBER.value:
+            if call_data.number_type == TalkoNumberType.PRIMARY_NUMBER.value:
                 to_number = decrypted_lead_data.get("phone_number")
-            elif call_data.number_type == NumberType.ADDITIONAL_NUMBER.value:
+            elif call_data.number_type == TalkoNumberType.ADDITIONAL_NUMBER.value:
                 to_number = decrypted_lead_data.get("additional_number")
-            elif call_data.number_type == NumberType.WHATSAPP_NUMBER.value:
+            elif call_data.number_type == TalkoNumberType.WHATSAPP_NUMBER.value:
                 to_number = decrypted_lead_data.get("whatsapp_number")
 
             if not to_number:
@@ -558,8 +558,8 @@ class CallProcessorHelper:
         entity_id: Optional[int] = None,
         entity_name: Optional[str] = None,
     ) -> None:
-        self.__logger.info("Creating new CDR for incoming call")
-        self.__logger.debug("Request data for CDR creation: {}".format(request_data))
+        self.__logger.info("Creating new TalkoCDR for incoming call")
+        self.__logger.debug("Request data for TalkoCDR creation: {}".format(request_data))
         self.__logger.debug(
             "Partner ID: {}, agent id: {}, service board id: {}, agent_numbers: {}, "
             "agent_ids: {}, lead_id: {}, lead_name: {}, vendor_id: {}, "
@@ -600,10 +600,10 @@ class CallProcessorHelper:
             entity_name=entity_name,
             lead_id=lead_id,
             lead_name=lead_name,
-            default_entity_type=EntityType.LEAD,
+            default_entity_type=TalkoEntityType.LEAD,
         )
 
-        cdr_model = CDR(
+        cdr_model = TalkoCDR(
             action="inbound",
             calling_mode="inbound",
             date_time=timestamp,
@@ -642,4 +642,4 @@ class CallProcessorHelper:
 
         new_cdr = cdr_model.model_dump()
         await self.__repository.insert_cdr(new_cdr)
-        self.__logger.info("Created new CDR for incoming call: {}".format(new_cdr))
+        self.__logger.info("Created new TalkoCDR for incoming call: {}".format(new_cdr))

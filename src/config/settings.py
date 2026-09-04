@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings
 
 
-class LocalSettings(BaseSettings):
+class TalkoLocalSettings(BaseSettings):
     # database_url: "postgresql+asyncpg://jaggerbomb:jaggerbomb@maglo-db/magloservice"
     echo_sql: bool = True
     test: bool = False
@@ -14,9 +14,9 @@ class LocalSettings(BaseSettings):
     redis_password: str = "pwd"
 
 
-class DevSettings(BaseSettings):
+class TalkoDevSettings(BaseSettings):
     pass
 
 
-local_settings = LocalSettings()  # type: ignore
-live_server_settings = LocalSettings()  # TODO: Change to DevSettings() when its setup
+local_settings = TalkoLocalSettings()  # type: ignore
+live_server_settings = TalkoLocalSettings()  # TODO: Change to TalkoDevSettings() when its setup

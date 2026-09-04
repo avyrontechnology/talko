@@ -1,7 +1,7 @@
 from typing import Any, List
 
 
-class TitleCaseUtil:
+class TalkoTitleCaseUtil:
     """Utility class for converting string values to title case."""
 
     @staticmethod
@@ -24,13 +24,13 @@ class TitleCaseUtil:
         if isinstance(obj, dict):
             return {
                 k: (obj[k] if k in exclude_keys
-                    else TitleCaseUtil.convert_values_to_title_case(v, exclude_keys))
+                    else TalkoTitleCaseUtil.convert_values_to_title_case(v, exclude_keys))
                 for k, v in obj.items()
             }
         elif isinstance(obj, list):
-            return [TitleCaseUtil.convert_values_to_title_case(item, exclude_keys) for item in obj]
+            return [TalkoTitleCaseUtil.convert_values_to_title_case(item, exclude_keys) for item in obj]
         elif hasattr(obj, "__dict__"):
-            return TitleCaseUtil.convert_values_to_title_case(obj.__dict__, exclude_keys)
+            return TalkoTitleCaseUtil.convert_values_to_title_case(obj.__dict__, exclude_keys)
         elif isinstance(obj, str):
-            return TitleCaseUtil.to_title_case(obj)
+            return TalkoTitleCaseUtil.to_title_case(obj)
         return obj

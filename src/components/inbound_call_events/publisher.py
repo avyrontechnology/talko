@@ -1,15 +1,15 @@
 from typing import List, Optional
 
-from src.components.inbound_call_events.connection_manager import InboundCallEventBroker
+from src.components.inbound_call_events.connection_manager import TalkoInboundCallEventBroker
 from src.components.inbound_call_events.constants import (
     INBOUND_CALL_EVENT_TYPE,
     OUTBOUND_CALL_EVENT_TYPE,
 )
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.datetime_util import DateTimeUtil
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.datetime_util import TalkoDateTimeUtil
 
 
-class InboundCallEventPublisher:
+class TalkoInboundCallEventPublisher:
     """
     Publishes agent-dialplan resolution results (partner, service board, DID, agent)
     for an inbound call so subscribed websocket clients get notified in real time.
@@ -20,7 +20,7 @@ class InboundCallEventPublisher:
     broker/channel, distinguished only by the "event" field.
     """
 
-    def __init__(self, broker: InboundCallEventBroker, logger: HollerServiceLogger):
+    def __init__(self, broker: TalkoInboundCallEventBroker, logger: TalkoServiceLogger):
         self.__broker = broker
         self.__logger = logger
 
@@ -49,7 +49,7 @@ class InboundCallEventPublisher:
             "agent_ids": agent_ids or [],
             "display_name": display_name,
             "customer_number": customer_number,
-            "timestamp": DateTimeUtil.get_current_time(),
+            "timestamp": TalkoDateTimeUtil.get_current_time(),
         }
 
         try:
@@ -87,7 +87,7 @@ class InboundCallEventPublisher:
             "agent_ids": agent_ids or [],
             "display_name": display_name,
             "customer_number": customer_number,
-            "timestamp": DateTimeUtil.get_current_time(),
+            "timestamp": TalkoDateTimeUtil.get_current_time(),
         }
 
         try:

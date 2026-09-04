@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-class BaseStorageManager(ABC):
+class TalkoBaseStorageManager(ABC):
     """
     Abstract base class for managing file storage operations.
     """

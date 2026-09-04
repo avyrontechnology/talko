@@ -1,6 +1,6 @@
 from fastapi import Request
 from functools import wraps
-from src.components.rbac.constants import ServiceName
+from src.components.rbac.constants import TalkoServiceName
 
 
 def permission_check(permission_class):
@@ -16,7 +16,7 @@ def permission_check(permission_class):
         async def wrapper(request: Request, *args, **kwargs):
             # Dynamically retrieve the route name
             route_name = request.scope["route"].name
-            permission_name = ServiceName.APP_NAME + ":" + route_name
+            permission_name = TalkoServiceName.APP_NAME + ":" + route_name
 
             # Create an instance of the permission class and perform the check
             instance = permission_class(permission_name=permission_name)

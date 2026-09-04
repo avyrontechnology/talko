@@ -4,15 +4,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.components.analytics import constants as analytics_constants
-from src.components.analytics.builder import QueryBuilder
-from src.components.analytics.enums import DateRangePeriod
-from src.components.analytics.repositories import AnalyticsRepository
+from src.components.analytics.builder import TalkoQueryBuilder
+from src.components.analytics.enums import TalkoDateRangePeriod
+from src.components.analytics.repositories import TalkoAnalyticsRepository
 
 
 class TestQueryBuilder:
     def setup_method(self):
         self.mock_logger = MagicMock()
-        self.query_builder = QueryBuilder(logger=self.mock_logger)
+        self.query_builder = TalkoQueryBuilder(logger=self.mock_logger)
 
     def test_build_query_basic(self):
         """Test build_query with basic parameters."""

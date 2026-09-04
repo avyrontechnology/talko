@@ -1,4 +1,4 @@
-class SwaggerConfig:
+class TalkoSwaggerConfig:
     """Defines the JWT Bearer authentication scheme for Swagger."""
 
     jwt_auth_scheme = {
@@ -11,6 +11,6 @@ class SwaggerConfig:
         app.openapi_schema = app.openapi()
         app.openapi_schema["components"][
             "securitySchemes"
-        ] = SwaggerConfig.jwt_auth_scheme
+        ] = TalkoSwaggerConfig.jwt_auth_scheme
         app.openapi_schema["security"] = [{"BearerAuth": []}]
         return app

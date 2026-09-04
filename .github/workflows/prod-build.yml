@@ -59,15 +59,15 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ secrets.PROD_DOCKER_REGISTRY }}/holler-service:prodlatest
+          tags: ${{ secrets.PROD_DOCKER_REGISTRY }}/talko-service:prodlatest
           cache-from: |
             type=local,src=/tmp/.buildx-cache
-            type=registry,ref=${{ secrets.PROD_DOCKER_REGISTRY }}/holler-service:build-cache-${{ github.ref_name }}
+            type=registry,ref=${{ secrets.PROD_DOCKER_REGISTRY }}/talko-service:build-cache-${{ github.ref_name }}
           cache-to: |
-            type=registry,ref=${{ secrets.PROD_DOCKER_REGISTRY }}/holler-service:build-cache-${{ github.ref_name }},mode=max
+            type=registry,ref=${{ secrets.PROD_DOCKER_REGISTRY }}/talko-service:build-cache-${{ github.ref_name }},mode=max
           build-args: |
             VERSION=latest
-          outputs: type=image,name=${{ secrets.PROD_DOCKER_REGISTRY }}/holler-service,push=true
+          outputs: type=image,name=${{ secrets.PROD_DOCKER_REGISTRY }}/talko-service,push=true
           labels: |
             org.opencontainers.image.version=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}

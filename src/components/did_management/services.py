@@ -3,14 +3,14 @@ from typing import Any, Dict, List, Optional, Union
 
 from bson import ObjectId
 
-from src.components.common.responses import BadRequestResponse
+from src.components.common.responses import TalkoBadRequestResponse
 from src.components.did_management.constants import (
     ADMIN_ACTION_MARK_SPAMMED,
-    DIDStatus,
-    DIDType,
+    TalkoDIDStatus,
+    TalkoDIDType,
 )
-from src.components.did_management.dto import Contract
-from src.components.did_management.helpers import DidStatusUpdateHelper
+from src.components.did_management.dto import TalkoContract
+from src.components.did_management.helpers import TalkoDidStatusUpdateHelper
 from src.components.did_management.messages import (
     DID_ASSIGNMENT_SUCCESS,
     DID_UNASSIGNMENT_SUCCESS,
@@ -20,33 +20,33 @@ from src.components.did_management.messages import (
     MISSING_SERVICE_BOARD_MAPPING_DIDS,
     PARTNER_CONFIG_NOT_FOUND,
 )
-from src.components.did_management.models import DidHistoryModel, PhoneNumberManagement
-from src.components.did_management.repositories import DidRepository
-from src.components.did_management.validator import DidValidator
-from src.components.partner_config.repository import PartnerConfigRepository
-from src.exceptions import ResourceNotFound
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.datetime_util import DateTimeUtil
+from src.components.did_management.models import TalkoDidHistoryModel, TalkoPhoneNumberManagement
+from src.components.did_management.repositories import TalkoDidRepository
+from src.components.did_management.validator import TalkoDidValidator
+from src.components.partner_config.repository import TalkoPartnerConfigRepository
+from src.exceptions import TalkoResourceNotFound
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.datetime_util import TalkoDateTimeUtil
 
 
-class DidManagementService:
+class TalkoDidManagementService:
     """
     Service class for managing DID assignments, default attendances, and history.
     """
 
     def __init__(
         self,
-        did_repository: DidRepository,
-        logger: HollerServiceLogger,
-        datetime_util: DateTimeUtil,
-        validator: DidValidator,
-        partner_config_repository: PartnerConfigRepository,
+        did_repository: TalkoDidRepository,
+        logger: TalkoServiceLogger,
+        datetime_util: TalkoDateTimeUtil,
+        validator: TalkoDidValidator,
+        partner_config_repository: TalkoPartnerConfigRepository,
     ):
-        self.__did_repository: DidRepository = did_repository
-        self.__logger: HollerServiceLogger = logger
-        self.__datetime_util: DateTimeUtil = datetime_util
-        self.__validator: DidValidator = validator
-        self.__partner_config_repository: PartnerConfigRepository = (
+        self.__did_repository: TalkoDidRepository = did_repository
+        self.__logger: TalkoServiceLogger = logger
+        self.__datetime_util: TalkoDateTimeUtil = datetime_util
+        self.__validator: TalkoDidValidator = validator
+        self.__partner_config_repository: TalkoPartnerConfigRepository = (
             partner_config_repository
         )
 
@@ -78,7 +78,7 @@ class DidManagementService:
                     vendor_id_obj, vendor_config_obj
                 )
             )
-            did_data: Dict[str, Any] = PhoneNumberManagement(
+            did_data: Dict[str, Any] = TalkoPhoneNumberManagement(
                 service_board_id=service_board_id,
                 did_number=did_number,
                 partner_id=partner_id,
@@ -87,7 +87,7 @@ class DidManagementService:
                 agent_id=agent_id,
                 assign_date=current_timestamp,
                 mapped_date=current_timestamp if agent_id else None,
-                did_type=DIDType.NORMAL.value,
+                did_type=TalkoDIDType.NORMAL.value,
                 agent_bot_id=0,
             ).model_dump()
             self.__logger.debug("Created did_data: {}".format(did_data))
@@ -110,7 +110,7 @@ class DidManagementService:
             )
             self.__logger.debug("Inserted DID record: {}".format(did_record))
 
-            history_data: Dict[str, Any] = DidHistoryModel(
+            history_data: Dict[str, Any] = TalkoDidHistoryModel(
                 did_number=did_number,
                 partner_id=partner_id,
                 vendor_id=vendor_id_obj,
@@ -145,7 +145,7 @@ class DidManagementService:
                 "agent_bot_id": 0,
                 "agent_id": 0,
                 "service_board_id": 0,
-                "status": DIDStatus.AVAILABLE.value,
+                "status": TalkoDIDStatus.AVAILABLE.value,
                 "status_changed_at": current_timestamp,
             }
 
@@ -156,14 +156,14 @@ class DidManagementService:
             )
 
             if not updated_did:
-                raise ResourceNotFound(
+                raise TalkoResourceNotFound(
                     f"DID {did_number} not found for partner {partner_id}"
                 )
 
             # Update History
             history_update: Dict[str, Any] = {
                 "unassign_date": current_timestamp,
-                "status": DIDStatus.AVAILABLE.value,
+                "status": TalkoDIDStatus.AVAILABLE.value,
             }
 
             await self.__did_repository.update_did_history(
@@ -310,7 +310,7 @@ class DidManagementService:
                 self.__logger.error(
                     "DID {} not found for vendor {}".format(did_number, vendor_id)
                 )
-                raise ResourceNotFound(
+                raise TalkoResourceNotFound(
                     "DID {} not found for the specified vendor".format(did_number)
                 )
 
@@ -326,7 +326,7 @@ class DidManagementService:
             if update_data:
                 update_data["updated_at"] = current_timestamp
 
-            update_data["status"] = DIDStatus.MAPPED.value
+            update_data["status"] = TalkoDIDStatus.MAPPED.value
             self.__logger.debug("Prepared update data: {}".format(update_data))
 
             if not update_data:
@@ -341,9 +341,9 @@ class DidManagementService:
             self.__logger.debug("Updated DID: {}".format(updated_did))
             if not updated_did:
                 self.__logger.error("Failed to update DID {}".format(did_number))
-                raise ResourceNotFound("Failed to update DID {}".format(did_number))
+                raise TalkoResourceNotFound("Failed to update DID {}".format(did_number))
 
-            history_data: Dict[str, Any] = DidHistoryModel(
+            history_data: Dict[str, Any] = TalkoDidHistoryModel(
                 did_number=did_number,
                 partner_id=partner_id,
                 vendor_id=vendor_id_obj,
@@ -542,7 +542,7 @@ class DidManagementService:
                 cleaned_records.append(doc)
             self.__logger.debug("Cleaned records: {}".format(cleaned_records))
 
-            result = [Contract.DIDResponse(**doc) for doc in cleaned_records]
+            result = [TalkoContract.DIDResponse(**doc) for doc in cleaned_records]
             self.__logger.info(
                 "Successfully retrieved DIDs for service_board_id: {}".format(
                     service_board_id
@@ -609,7 +609,7 @@ class DidManagementService:
 
     async def get_dids_available_for_assignment(
         self, partner_id: int
-    ) -> List[Contract.DIDSeriesResponse]:
+    ) -> List[TalkoContract.DIDSeriesResponse]:
         """
         Fetch available DIDs for a partner based on vendor configuration,
         include instance_id, and group them by series.
@@ -676,11 +676,11 @@ class DidManagementService:
 
             self.__logger.debug("Grouped DIDs: {}".format(grouped_dids))
 
-            response: List[Contract.DIDSeriesResponse] = [
-                Contract.DIDSeriesResponse(
+            response: List[TalkoContract.DIDSeriesResponse] = [
+                TalkoContract.DIDSeriesResponse(
                     series=series,
                     dids=[
-                        Contract.DIDDetail(
+                        TalkoContract.DIDDetail(
                             number=did["number"], instance_id=did.get("instance_id")
                         )
                         for did in did_list
@@ -715,7 +715,7 @@ class DidManagementService:
     async def assign_dids_available_for_assignment(
         self,
         partner_id: int,
-        assign_did_data: Contract.AssignDIDToPartner,
+        assign_did_data: TalkoContract.AssignDIDToPartner,
     ) -> dict:
         """
         Assigns available DIDs to a partner based on provided configurations.
@@ -753,7 +753,7 @@ class DidManagementService:
                     vendor_id, partner_id, assign_did_data, vendor_config_id
                 )
             else:
-                return BadRequestResponse(
+                return TalkoBadRequestResponse(
                     detail=MISSING_DID_ASSIGNMENT_CRITERIA.format(partner_id)
                 )
 
@@ -775,12 +775,12 @@ class DidManagementService:
         self,
         vendor_id: ObjectId,
         partner_id: int,
-        assign_did_data: Contract.AssignDIDToPartner,
+        assign_did_data: TalkoContract.AssignDIDToPartner,
         vendor_config_id: Optional[ObjectId] = None,
     ):
         round_robin_dids: List[str] = assign_did_data.dids_for_round_robin or []
         if not round_robin_dids:
-            raise BadRequestResponse(detail=MISSING_ROUND_ROBIN_DIDS)
+            raise TalkoBadRequestResponse(detail=MISSING_ROUND_ROBIN_DIDS)
         for did in round_robin_dids:
             await self.update_did(
                 did_number=did,
@@ -795,14 +795,14 @@ class DidManagementService:
         self,
         vendor_id: ObjectId,
         partner_id: int,
-        assign_did_data: Contract.AssignDIDToPartner,
+        assign_did_data: TalkoContract.AssignDIDToPartner,
         vendor_config_id: Optional[ObjectId] = None,
     ):
-        service_board_dids: List[Contract.ServiceBoardDIDMapping] = (
+        service_board_dids: List[TalkoContract.ServiceBoardDIDMapping] = (
             assign_did_data.dids_for_service_board or []
         )
         if not service_board_dids:
-            raise BadRequestResponse(detail=MISSING_SERVICE_BOARD_MAPPING_DIDS)
+            raise TalkoBadRequestResponse(detail=MISSING_SERVICE_BOARD_MAPPING_DIDS)
         for mapping in service_board_dids:
             board_id = mapping.service_board_id
             for did in mapping.did_numbers:
@@ -819,14 +819,14 @@ class DidManagementService:
         self,
         vendor_id: ObjectId,
         partner_id: int,
-        assign_did_data: Contract.AssignDIDToPartner,
+        assign_did_data: TalkoContract.AssignDIDToPartner,
         vendor_config_id: Optional[ObjectId] = None,
     ):
         agent_mapping_dids: List[Dict[str, Any]] = (
             assign_did_data.dids_for_agent_mapping or []
         )
         if not agent_mapping_dids:
-            raise BadRequestResponse(detail=MISSING_AGENT_MAPPING_DIDS)
+            raise TalkoBadRequestResponse(detail=MISSING_AGENT_MAPPING_DIDS)
         for mapping in agent_mapping_dids:
             await self.update_did(
                 did_number=mapping.get("did_number"),
@@ -930,7 +930,7 @@ class DidManagementService:
             raise
 
     async def apply_did_status_update(
-        self, partner_id: int, payload: Contract.AdminDIDAction
+        self, partner_id: int, payload: TalkoContract.AdminDIDAction
     ) -> dict:
         now = self.__datetime_util.get_current_time()
         self.__logger.info(
@@ -943,19 +943,19 @@ class DidManagementService:
             await self.__process_single_did(did_number, partner_id, payload, now)
             for did_number in payload.did_numbers
         ]
-        return DidStatusUpdateHelper.build_summary(payload.did_numbers, results)
+        return TalkoDidStatusUpdateHelper.build_summary(payload.did_numbers, results)
 
     async def __process_single_did(
         self,
         did_number: str,
         partner_id: int,
-        payload: Contract.AdminDIDAction,
+        payload: TalkoContract.AdminDIDAction,
         now: int,
     ) -> dict:
         doc = await self.__did_repository.get_did_by_number(did_number, partner_id)
-        current_status = (doc or {}).get("status", DIDStatus.AVAILABLE.value)
+        current_status = (doc or {}).get("status", TalkoDIDStatus.AVAILABLE.value)
 
-        error = DidStatusUpdateHelper.validate_did(
+        error = TalkoDidStatusUpdateHelper.validate_did(
             doc, did_number, current_status, payload.action
         )
         if error:
@@ -965,8 +965,8 @@ class DidManagementService:
             return error
 
         try:
-            handler = DidStatusUpdateHelper.ACTION_HANDLERS[payload.action]
-            update_data = DidStatusUpdateHelper.prepare_update_data(
+            handler = TalkoDidStatusUpdateHelper.ACTION_HANDLERS[payload.action]
+            update_data = TalkoDidStatusUpdateHelper.prepare_update_data(
                 handler, current_status, payload, now
             )
 
@@ -988,7 +988,7 @@ class DidManagementService:
             return {"did_number": did_number, "success": True, "status": "updated"}
 
         except ValueError as e:
-            return DidStatusUpdateHelper.parse_value_error(did_number, e)
+            return TalkoDidStatusUpdateHelper.parse_value_error(did_number, e)
 
     async def list_dids(
         self,
@@ -1029,14 +1029,14 @@ class DidManagementService:
             status_clean = status.lower().replace("_", "").replace(" ", "")
 
             status_mapping: Dict[str, str] = {
-                "available": DIDStatus.AVAILABLE.value,
-                "mapped": DIDStatus.MAPPED.value,
-                "coolingperiod": DIDStatus.COOLING_PERIOD.value,
-                "cooling": DIDStatus.COOLING_PERIOD.value,
-                "cooldowncompleted": DIDStatus.COOLDOWN_COMPLETED.value,
-                "cooldown": DIDStatus.COOLDOWN_COMPLETED.value,
-                "cooling period": DIDStatus.COOLING_PERIOD.value,
-                "cooldown completed": DIDStatus.COOLDOWN_COMPLETED.value,
+                "available": TalkoDIDStatus.AVAILABLE.value,
+                "mapped": TalkoDIDStatus.MAPPED.value,
+                "coolingperiod": TalkoDIDStatus.COOLING_PERIOD.value,
+                "cooling": TalkoDIDStatus.COOLING_PERIOD.value,
+                "cooldowncompleted": TalkoDIDStatus.COOLDOWN_COMPLETED.value,
+                "cooldown": TalkoDIDStatus.COOLDOWN_COMPLETED.value,
+                "cooling period": TalkoDIDStatus.COOLING_PERIOD.value,
+                "cooldown completed": TalkoDIDStatus.COOLDOWN_COMPLETED.value,
             }
 
             normalized_status = status_mapping.get(status_clean)
@@ -1076,7 +1076,7 @@ class DidManagementService:
             cleaned_dids.append(
                 {
                     "did_number": clean.get("did_number", ""),
-                    "status": clean.get("status", DIDStatus.AVAILABLE.value),
+                    "status": clean.get("status", TalkoDIDStatus.AVAILABLE.value),
                     "partner_id": clean.get("partner_id", 0),
                     "service_board_id": clean.get("service_board_id"),
                     "agent_id": clean.get("agent_id"),
@@ -1116,8 +1116,8 @@ class DidManagementService:
 
                 if (
                     not existing
-                    or existing.get("did_type") != DIDType.AI_AGENT.value
-                    or existing.get("status") != DIDStatus.AVAILABLE.value
+                    or existing.get("did_type") != TalkoDIDType.AI_AGENT.value
+                    or existing.get("status") != TalkoDIDStatus.AVAILABLE.value
                 ):
                     raise ValueError("DID must be ai_agent type and AVAILABLE")
 
@@ -1127,7 +1127,7 @@ class DidManagementService:
                 update_data={
                     "partner_id": partner_id,
                     "agent_bot_id": agent_bot_id,
-                    "status": DIDStatus.MAPPED.value,
+                    "status": TalkoDIDStatus.MAPPED.value,
                 },
             )
 
@@ -1162,7 +1162,7 @@ class DidManagementService:
         campaign's did_selection.
 
         agent_bot_id IS required here, unlike an earlier version of this
-        method: PSTNBridgeService/CallManagementService._pre_create_session
+        method: TalkoPSTNBridgeService/CallManagementService._pre_create_session
         resolves which AI agent to bridge a call to purely from
         did_record.agent_bot_id (looked up by the DID the call was placed
         from), independent of context_data — an unbound DID makes AI-bridge
@@ -1182,15 +1182,15 @@ class DidManagementService:
             existing: Optional[Dict[str, Any]] = (
                 await self.__did_repository.find_did_attendance(did_number, partner_id)
             )
-            if not existing or existing.get("did_type") != DIDType.AI_AGENT.value:
-                raise ResourceNotFound(
+            if not existing or existing.get("did_type") != TalkoDIDType.AI_AGENT.value:
+                raise TalkoResourceNotFound(
                     "ai_agent DID {} not found for partner {}".format(
                         did_number, partner_id
                     )
                 )
 
             current_status = existing.get("status")
-            if current_status == DIDStatus.MAPPED.value:
+            if current_status == TalkoDIDStatus.MAPPED.value:
                 if existing.get("agent_bot_id") == agent_bot_id:
                     self.__logger.info(
                         "DID {} already Mapped to agent_bot_id={}, claim is a "
@@ -1202,7 +1202,7 @@ class DidManagementService:
                     .format(did_number, existing.get("agent_bot_id"))
                 )
 
-            if current_status != DIDStatus.AVAILABLE.value:
+            if current_status != TalkoDIDStatus.AVAILABLE.value:
                 raise ValueError(
                     "DID {} cannot be claimed from status {}".format(
                         did_number, current_status
@@ -1213,7 +1213,7 @@ class DidManagementService:
                 did_number=did_number,
                 partner_id=partner_id,
                 update_data={
-                    "status": DIDStatus.MAPPED.value,
+                    "status": TalkoDIDStatus.MAPPED.value,
                     "agent_bot_id": agent_bot_id,
                 },
             )
@@ -1255,13 +1255,13 @@ class DidManagementService:
                 await self.__did_repository.find_did_attendance(did_number, partner_id)
             )
             if not existing:
-                raise ResourceNotFound(
+                raise TalkoResourceNotFound(
                     "DID {} not found for partner {}".format(did_number, partner_id)
                 )
 
             current_status = existing.get("status")
             if (
-                current_status != DIDStatus.MAPPED.value
+                current_status != TalkoDIDStatus.MAPPED.value
                 or existing.get("agent_bot_id") != agent_bot_id
             ):
                 self.__logger.info(
@@ -1279,7 +1279,7 @@ class DidManagementService:
                 did_number=did_number,
                 partner_id=partner_id,
                 update_data={
-                    "status": DIDStatus.AVAILABLE.value,
+                    "status": TalkoDIDStatus.AVAILABLE.value,
                     "agent_bot_id": 0,
                 },
             )
@@ -1384,7 +1384,7 @@ class DidManagementService:
                 {
                     "did_number": did.get("did_number", ""),
                     "display_name": did.get("display_name"),
-                    "status": did.get("status", DIDStatus.AVAILABLE.value),
+                    "status": did.get("status", TalkoDIDStatus.AVAILABLE.value),
                     "agent_bot_id": did.get("agent_bot_id") or 0,
                     "mapped_date": did.get("mapped_date"),
                     "vendor_id": str(did.get("vendor_id", "")),

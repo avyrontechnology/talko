@@ -1,10 +1,10 @@
 import grpc
 from grpc import StatusCode
 from grpc.aio import UnaryUnaryClientInterceptor, AioRpcError
-from src.components.common.responses import UnauthorizedResponse
+from src.components.common.responses import TalkoUnauthorizedResponse
 
 
-class ApiKeyClientInterceptor(UnaryUnaryClientInterceptor):
+class TalkoApiKeyClientInterceptor(UnaryUnaryClientInterceptor):
     def __init__(self, api_key: str):
         self.api_key = api_key
 

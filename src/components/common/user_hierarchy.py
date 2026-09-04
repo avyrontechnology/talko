@@ -1,10 +1,10 @@
 from typing import Any
 
-from src.grpc_client.client_services.auth_service_client import AuthServiceClient
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.grpc_client.client_services.auth_service_client import TalkoAuthServiceClient
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class UserHierarchy:
+class TalkoUserHierarchy:
     """
     A service class responsible for fetching and validating user/agent hierarchy data
     from the authentication gRPC service.
@@ -15,14 +15,14 @@ class UserHierarchy:
     - Apply optional filtering on agent IDs provided in the request.
     """
 
-    def __init__(self, grpc_client: AuthServiceClient, logger: HollerServiceLogger):
+    def __init__(self, grpc_client: TalkoAuthServiceClient, logger: TalkoServiceLogger):
         """
-        Initialize UserHierarchy with required dependencies.
+        Initialize TalkoUserHierarchy with required dependencies.
 
         Args:
-            grpc_client (AuthServiceClient): The gRPC client used to communicate with
+            grpc_client (TalkoAuthServiceClient): The gRPC client used to communicate with
                 the authentication service and fetch hierarchy details.
-            logger (HollerServiceLogger): Logger instance for logging hierarchy operations.
+            logger (TalkoServiceLogger): Logger instance for logging hierarchy operations.
         """
         self.grpc_client = grpc_client
         self.logger = logger

@@ -2,9 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.components.digital_assets.constants import DigitalAssetEnum
-from src.components.digital_assets.models import DigitalAssets
-from src.components.digital_assets.repositories import DigitalAssetRepository
+from src.components.digital_assets.constants import TalkoDigitalAssetEnum
+from src.components.digital_assets.models import TalkoDigitalAssets
+from src.components.digital_assets.repositories import TalkoDigitalAssetRepository
 
 
 @pytest.mark.asyncio
@@ -12,12 +12,12 @@ class TestDigitalAssetRepository:
 
     async def test_get_digital_asset_by_partner_id_success(self):
         """Test retrieving a digital asset by partner ID and asset type successfully."""
-        mock_asset = DigitalAssets(
+        mock_asset = TalkoDigitalAssets(
             id=1,
             name="asset1",
             partner_id=123,
             version=1,
-            asset_type=DigitalAssetEnum.CONSOLE_PARTNER_GST.value,
+            asset_type=TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST.value,
             additional_info={"key": "value"},
             created_by=1,
             updated_by=1,
@@ -34,12 +34,12 @@ class TestDigitalAssetRepository:
             return_value=mock_execute
         )
 
-        digital_asset_repo = DigitalAssetRepository(
+        digital_asset_repo = TalkoDigitalAssetRepository(
             session_factory=mock_session_factory
         )
 
         result = await digital_asset_repo.get_digital_asset_by_partner_id(
-            partner_id=123, asset_type=DigitalAssetEnum.CONSOLE_PARTNER_GST
+            partner_id=123, asset_type=TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST
         )
 
         # Compare specific attributes of mock_asset and result
@@ -63,12 +63,12 @@ class TestDigitalAssetRepository:
             return_value=mock_execute
         )
 
-        digital_asset_repo = DigitalAssetRepository(
+        digital_asset_repo = TalkoDigitalAssetRepository(
             session_factory=mock_session_factory
         )
 
         result = await digital_asset_repo.get_digital_asset_by_partner_id(
-            partner_id=123, asset_type=DigitalAssetEnum.CONSOLE_PARTNER_GST
+            partner_id=123, asset_type=TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST
         )
 
         assert result is None
@@ -80,23 +80,23 @@ class TestDigitalAssetRepository:
             side_effect=Exception("Database error")
         )
 
-        digital_asset_repo = DigitalAssetRepository(
+        digital_asset_repo = TalkoDigitalAssetRepository(
             session_factory=mock_session_factory
         )
 
         with pytest.raises(Exception):
             await digital_asset_repo.get_digital_asset_by_partner_id(
-                partner_id=123, asset_type=DigitalAssetEnum.CONSOLE_PARTNER_GST
+                partner_id=123, asset_type=TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST
             )
 
     async def test_create_digital_asset_success(self):
         """Test successfully creating a new digital asset."""
-        mock_asset = DigitalAssets(
+        mock_asset = TalkoDigitalAssets(
             id=1,
             name="asset1",
             partner_id=123,
             version=1,
-            asset_type=DigitalAssetEnum.CONSOLE_PARTNER_GST,
+            asset_type=TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST,
             additional_info={"key": "value"},
             created_by=1,
             updated_by=1,
@@ -113,13 +113,13 @@ class TestDigitalAssetRepository:
             return_value=mock_execute
         )
 
-        digital_asset_repo = DigitalAssetRepository(
+        digital_asset_repo = TalkoDigitalAssetRepository(
             session_factory=mock_session_factory
         )
 
         result = await digital_asset_repo.create_digital_asset(
             partner_id=123,
-            asset_type=DigitalAssetEnum.CONSOLE_PARTNER_GST,
+            asset_type=TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST,
             file_name="new_asset.png",
             user_id=1,
         )
@@ -132,12 +132,12 @@ class TestDigitalAssetRepository:
 
     async def test_create_digital_asset_with_versioning(self):
         """Test creating a digital asset with versioning logic."""
-        mock_asset = DigitalAssets(
+        mock_asset = TalkoDigitalAssets(
             id=1,
             name="asset1",
             partner_id=123,
             version=2,
-            asset_type=DigitalAssetEnum.CONSOLE_PARTNER_GST,
+            asset_type=TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST,
             additional_info={"key": "value"},
             created_by=1,
             updated_by=1,
@@ -154,13 +154,13 @@ class TestDigitalAssetRepository:
             return_value=mock_execute
         )
 
-        digital_asset_repo = DigitalAssetRepository(
+        digital_asset_repo = TalkoDigitalAssetRepository(
             session_factory=mock_session_factory
         )
 
         result = await digital_asset_repo.create_digital_asset(
             partner_id=123,
-            asset_type=DigitalAssetEnum.CONSOLE_PARTNER_GST,
+            asset_type=TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST,
             file_name="new_asset.png",
             user_id=1,
         )
@@ -178,14 +178,14 @@ class TestDigitalAssetRepository:
             side_effect=Exception("Database error")
         )
 
-        digital_asset_repo = DigitalAssetRepository(
+        digital_asset_repo = TalkoDigitalAssetRepository(
             session_factory=mock_session_factory
         )
 
         with pytest.raises(Exception):
             await digital_asset_repo.create_digital_asset(
                 partner_id=123,
-                asset_type=DigitalAssetEnum.CONSOLE_PARTNER_GST,
+                asset_type=TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST,
                 file_name="new_asset.png",
                 user_id=1,
             )

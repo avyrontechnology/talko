@@ -3,12 +3,12 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 
 from src.components.health.state import health_state
-from src.components.security.robots import RobotsController
-from src.config.swagger import SwaggerConfig
-from src.core.container import Container
-from src.core.environment import ENV
+from src.components.security.robots import TalkoRobotsController
+from src.config.swagger import TalkoSwaggerConfig
+from src.core.container import TalkoContainer
+from src.core.environment import TalkoENV
 from src.middlewares import allowed_middlewares
-from src.routes import Router
+from src.routes import TalkoRouter
 
 
 @asynccontextmanager
@@ -24,9 +24,9 @@ async def lifespan(app: FastAPI):
     # redis_pool is an async Resource — providers.Singleton downstream of it
     # resolve to a coroutine, so the provider call itself must be awaited.
     # Must go through the container INSTANCE (not a bare
-    # Container.inbound_call_event_broker() class-level call) so this is the
+    # TalkoContainer.inbound_call_event_broker() class-level call) so this is the
     # same singleton the websocket route resolves via Depends(Provide[...]) —
-    # see InboundCallEventBroker's docstring for what a mismatch there broke.
+    # see TalkoInboundCallEventBroker's docstring for what a mismatch there broke.
     inbound_call_event_broker = await container.inbound_call_event_broker()
     await inbound_call_event_broker.start()
 
@@ -73,27 +73,27 @@ async def lifespan(app: FastAPI):
     health_state["app"] = {"status": "stopped"}
 
 
-# 1. Initialize Container
-container = Container()
+# 1. Initialize TalkoContainer
+container = TalkoContainer()
 container.check_dependencies()
 
 container.wire(modules=["src.components.health.controllers"])
 
 # 2. Initialize FastAPI
 app = FastAPI(
-    title=ENV.SERVICE_NAME,
+    title=TalkoENV.SERVICE_NAME,
     container=container,
     middleware=allowed_middlewares,
     lifespan=lifespan,
 )
 
 # 3. Setup Routes
-holler_service = APIRouter(prefix="/holler-service/v1")
-Router.register_all_routes(holler_service)
-app.include_router(holler_service)
+talko_service = APIRouter(prefix="/talko-service/v1")
+TalkoRouter.register_all_routes(talko_service)
+app.include_router(talko_service)
 
 # 4. Apply Swagger configuration
-SwaggerConfig.get_swagger_config(app)
+TalkoSwaggerConfig.get_swagger_config(app)
 
 # 5. Add robots.txt router
-app.include_router(RobotsController.robot_router)
+app.include_router(TalkoRobotsController.robot_router)

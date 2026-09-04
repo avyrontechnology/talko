@@ -2,9 +2,9 @@ import asyncio
 
 from celery import shared_task
 
-from src.core.container import Container
-from src.loggers.holler_celery_loggers import CeleryLogger
-from src.utils.datetime_util import DateTimeUtil
+from src.core.container import TalkoContainer
+from src.loggers.talko_celery_loggers import TalkoCeleryLogger
+from src.utils.datetime_util import TalkoDateTimeUtil
 
 MISSED_CALLBACK_SWEEP_AGE_SECONDS = 120
 # ... and this recent, so permanently un-callbackable rows (AI DID,
@@ -31,11 +31,11 @@ def missed_call_callback_task(self, call_uuid: str) -> str:
     """
     Places one outbound auto-callback for a missed inbound call. Dispatched
     (immediately, no countdown) by missed_callback_sweeper_task ~2-3 min
-    after the miss — see CallService.initiate_missed_call_callback for the
+    after the miss — see TalkoCallService.initiate_missed_call_callback for the
     full decision chain (partner opt-in, already-connected check,
     active-agent resolution, placing the callback).
     """
-    logger = CeleryLogger.get_logger()
+    logger = TalkoCeleryLogger.get_logger()
     task_id = getattr(getattr(self, "request", None), "id", None)
     logger.info(
         "Missed-call callback task starting for call_uuid={} task_id={}".format(
@@ -55,14 +55,14 @@ def missed_call_callback_task(self, call_uuid: str) -> str:
             # init_resources() is required too — a Resource provider (like
             # redis_pool) only actually runs its async initializer once this
             # is awaited. The web app only does this once at startup (see
-            # src/main.py) since its Container lives for the process
-            # lifetime; a Celery task builds a fresh Container per
+            # src/main.py) since its TalkoContainer lives for the process
+            # lifetime; a Celery task builds a fresh TalkoContainer per
             # invocation, so it has to redo this every time — and tear the
             # resource down after, since nothing else will.
             #
             # Once any provider's dependency graph includes an async
             # Resource, dependency_injector puts that provider itself into
-            # "async mode": call_service() no longer returns a CallService
+            # "async mode": call_service() no longer returns a TalkoCallService
             # synchronously, it returns an awaitable that must itself be
             # awaited to get the real object — same as redis_pool() does.
             # Calling it synchronously (call_service(), no await) silently
@@ -72,13 +72,13 @@ def missed_call_callback_task(self, call_uuid: str) -> str:
             #
             # reset_singletons() is defensive, not strictly required for
             # this bug — dependency_injector caches Singleton/Resource
-            # instances at the class level, shared across every Container()
+            # instances at the class level, shared across every TalkoContainer()
             # instantiation within one process. A Celery prefork worker
             # handles many task invocations over its lifetime, each with
             # its own asyncio.run() loop, so resetting avoids a later task
             # inheriting a Resource bound to an earlier task's now-closed
             # loop.
-            container = Container()
+            container = TalkoContainer()
             container.reset_singletons()
             await container.init_resources()
             try:
@@ -98,7 +98,7 @@ def missed_call_callback_task(self, call_uuid: str) -> str:
             cdr = await call_repository.get_cdr_by_call_id_or_uuid(None, call_uuid)
             if not cdr:
                 logger.warning(
-                    "Missed-call callback: no CDR found for call_uuid={}".format(
+                    "Missed-call callback: no TalkoCDR found for call_uuid={}".format(
                         call_uuid
                     )
                 )
@@ -117,7 +117,7 @@ def missed_call_callback_task(self, call_uuid: str) -> str:
 
             # Exactly-once guards: the ETA task, the beat sweeper, and manual
             # re-dispatches can all reach this point for the same call_uuid.
-            # A finished winner leaves a callback CDR (locks expire, rows
+            # A finished winner leaves a callback TalkoCDR (locks expire, rows
             # don't); a concurrently-running winner holds the exec lock.
             if await call_repository.find_callback_by_parent_uuid(call_uuid):
                 logger.info(
@@ -175,18 +175,18 @@ def missed_callback_sweeper_task(self) -> str:
     exec-lock guards in _do_callback above, so at most one execution per
     call_uuid ever places a call.
     """
-    logger = CeleryLogger.get_logger()
+    logger = TalkoCeleryLogger.get_logger()
     logger.info("Missed-call callback sweeper starting")
 
     try:
 
         async def _run() -> str:
-            container = Container()
+            container = TalkoContainer()
             container.reset_singletons()
             await container.init_resources()
             try:
                 call_repository = container.call_repository()
-                now_ms = DateTimeUtil.get_current_time()
+                now_ms = TalkoDateTimeUtil.get_current_time()
                 candidates = (
                     await call_repository.find_missed_inbounds_needing_callback(
                         older_than_ms=now_ms

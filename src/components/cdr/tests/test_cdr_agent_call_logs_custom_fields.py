@@ -1,13 +1,13 @@
 from unittest.mock import MagicMock
 
-from src.components.cdr.helper import CallLogQueryHelper
+from src.components.cdr.helper import TalkoCallLogQueryHelper
 
 
 class TestBuildCallLogQueryCustomFields:
     def test_custom_fields_param_flows_into_query(self):
         logger = MagicMock()
 
-        query = CallLogQueryHelper.build_call_log_query(
+        query = TalkoCallLogQueryHelper.build_call_log_query(
             lead_id=None,
             logger=logger,
             partner_id=132,
@@ -22,7 +22,7 @@ class TestBuildCallLogQueryCustomFields:
     def test_omitting_custom_fields_adds_no_dotted_keys(self):
         logger = MagicMock()
 
-        query = CallLogQueryHelper.build_call_log_query(
+        query = TalkoCallLogQueryHelper.build_call_log_query(
             lead_id=None,
             logger=logger,
             partner_id=132,
@@ -35,7 +35,7 @@ class TestBuildCallLogQueryCustomFields:
     def test_multiple_custom_field_conditions_are_anded(self):
         logger = MagicMock()
 
-        query = CallLogQueryHelper.build_call_log_query(
+        query = TalkoCallLogQueryHelper.build_call_log_query(
             lead_id=None,
             logger=logger,
             partner_id=132,

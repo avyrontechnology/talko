@@ -1,33 +1,33 @@
 from typing import Any, Dict, Optional
 
 from src.components.analytics.dto import (
-    AgentCallAnalyticsRequest,
-    AgentTalkTimeDistributionRequest,
-    DashboardFollowupTrendsRequest,
-    PartnerServiceBoardRequest,
-    TotalAgentTalkTimeRequest,
+    TalkoAgentCallAnalyticsRequest,
+    TalkoAgentTalkTimeDistributionRequest,
+    TalkoDashboardFollowupTrendsRequest,
+    TalkoPartnerServiceBoardRequest,
+    TalkoTotalAgentTalkTimeRequest,
 )
-from src.components.analytics.repositories import AnalyticsRepository
-from src.components.common.user_hierarchy import UserHierarchy
-from src.exceptions import InvalidPermissionTypeError
-from src.grpc_client.client_services.auth_service_client import AuthServiceClient
-from src.grpc_client.constants import GrpcServices
-from src.grpc_client.rpc_service_factory import RPCServiceFactory
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.analytics.repositories import TalkoAnalyticsRepository
+from src.components.common.user_hierarchy import TalkoUserHierarchy
+from src.exceptions import TalkoInvalidPermissionTypeError
+from src.grpc_client.client_services.auth_service_client import TalkoAuthServiceClient
+from src.grpc_client.constants import TalkoGrpcServices
+from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class AnalyticsProcessor:
+class TalkoAnalyticsProcessor:
     def __init__(
         self,
-        analytics_repository: AnalyticsRepository,
-        logger: HollerServiceLogger,
-        grpc_client: AuthServiceClient,
-        user_hierarchy: UserHierarchy,
+        analytics_repository: TalkoAnalyticsRepository,
+        logger: TalkoServiceLogger,
+        grpc_client: TalkoAuthServiceClient,
+        user_hierarchy: TalkoUserHierarchy,
     ) -> None:
-        self.analytics_repository: AnalyticsRepository = analytics_repository
-        self.logger: HollerServiceLogger = logger
-        self.grpc_client: AuthServiceClient = grpc_client
-        self.user_hierarchy: UserHierarchy = user_hierarchy
+        self.analytics_repository: TalkoAnalyticsRepository = analytics_repository
+        self.logger: TalkoServiceLogger = logger
+        self.grpc_client: TalkoAuthServiceClient = grpc_client
+        self.user_hierarchy: TalkoUserHierarchy = user_hierarchy
 
     async def user_hierarchy_data(
         self, request_data, current_user_id: int
@@ -71,7 +71,7 @@ class AnalyticsProcessor:
         self,
         current_user_id: int,
         partner_id: int,
-        request_data: AgentCallAnalyticsRequest,
+        request_data: TalkoAgentCallAnalyticsRequest,
         limit: int,
         offset: int,
     ) -> Dict[str, Any]:
@@ -125,7 +125,7 @@ class AnalyticsProcessor:
         self,
         current_user_id: int,
         partner_id: int,
-        request_data: TotalAgentTalkTimeRequest,
+        request_data: TalkoTotalAgentTalkTimeRequest,
         limit: int,
         offset: int,
     ) -> Dict[str, Any]:
@@ -182,7 +182,7 @@ class AnalyticsProcessor:
         self,
         current_user_id: int,
         partner_id: int,
-        request_data: AgentTalkTimeDistributionRequest,
+        request_data: TalkoAgentTalkTimeDistributionRequest,
         limit: int,
         offset: int,
     ) -> Dict[str, Any]:
@@ -237,7 +237,7 @@ class AnalyticsProcessor:
         self,
         current_user_id: int,
         partner_id: int,
-        request_data: PartnerServiceBoardRequest,
+        request_data: TalkoPartnerServiceBoardRequest,
         limit: int,
         offset: int,
     ) -> Dict[str, Any]:
@@ -294,7 +294,7 @@ class AnalyticsProcessor:
         self,
         current_user_id: int,
         partner_id: int,
-        request_data: DashboardFollowupTrendsRequest,
+        request_data: TalkoDashboardFollowupTrendsRequest,
         limit: int,
         offset: int,
     ) -> Dict[str, Any]:

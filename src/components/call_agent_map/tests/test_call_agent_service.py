@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock, call
 import pytest, copy
 from bson import ObjectId
 
-from src.components.call_agent_map.dto import Contract
-from src.components.call_agent_map.services import AgentMappingService
-from src.exceptions import BadRequestError, ResourceNotFound
+from src.components.call_agent_map.dto import TalkoContract
+from src.components.call_agent_map.services import TalkoAgentMappingService
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 
 
 @pytest.mark.asyncio
@@ -17,7 +17,7 @@ class TestAgentMappingService:
         self.mock_partner_config_repo = AsyncMock()
         self.validation = AsyncMock()
 
-        self.service = AgentMappingService(
+        self.service = TalkoAgentMappingService(
             repository=self.mock_repository,
             logger=self.mock_logger,
             datetime_util=self.mock_datetime_util,
@@ -44,7 +44,7 @@ class TestAgentMappingService:
         active_did_pool = ["1001", "1002"]
         self.mock_repository.get_agent_did_mapping.return_value = {"did": "9999"}
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await self.service.get_assigned_did(agent_id, partner_id, active_did_pool)
 
     async def test_create_agent_did_mapping_success(self):
@@ -64,7 +64,7 @@ class TestAgentMappingService:
 
         result = await self.service.create_agent_did_mapping(agent_id, partner_id)
 
-        assert isinstance(result, Contract.AgentDidMappingCreationResponse)
+        assert isinstance(result, TalkoContract.AgentDidMappingCreationResponse)
         assert result.message == "Agent mapping creation done."
 
     async def test_create_agent_did_mapping_partner_not_found(self):
@@ -72,7 +72,7 @@ class TestAgentMappingService:
             None
         )
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await self.service.create_agent_did_mapping(agent_id=1, partner_id=999)
 
     async def test_create_agent_did_mapping_no_dids(self):
@@ -81,7 +81,7 @@ class TestAgentMappingService:
         }
 
         with pytest.raises(
-            BadRequestError, match="No DIDs available for agent mapping"
+            TalkoBadRequestError, match="No DIDs available for agent mapping"
         ):
             await self.service.create_agent_did_mapping(agent_id=1, partner_id=999)
 
@@ -91,7 +91,7 @@ class TestAgentMappingService:
         }
         self.mock_repository.count_active_agent_mappings.return_value = 1
 
-        with pytest.raises(BadRequestError, match="Maximum agent mapping limit"):
+        with pytest.raises(TalkoBadRequestError, match="Maximum agent mapping limit"):
             await self.service.create_agent_did_mapping(agent_id=1, partner_id=999)
 
     async def test_get_all_agent_did_mapping_empty(self):
@@ -99,7 +99,7 @@ class TestAgentMappingService:
         self.mock_repository.get_all_agent_mapping = AsyncMock(return_value=[])
 
         # Act & Assert
-        with pytest.raises(ResourceNotFound, match="No agent mapping found."):
+        with pytest.raises(TalkoResourceNotFound, match="No agent mapping found."):
             await self.service.get_all_agent_did_mapping()
 
         self.mock_logger.debug.assert_any_call("No valid mapping for agent.")
@@ -142,7 +142,7 @@ class TestAgentMappingService:
         ]
         # Expected response list
         expected_response = [
-            Contract.AgentDidMappingResponse(
+            TalkoContract.AgentDidMappingResponse(
                 id=str(mapping["_id"]),
                 partner_id=mapping["partner_id"],
                 agent_id=mapping["agent_id"],
@@ -188,7 +188,7 @@ class TestAgentMappingService:
         )
 
         # Assert
-        assert isinstance(result, Contract.AgentServiceBoardMappingCreationResponse)
+        assert isinstance(result, TalkoContract.AgentServiceBoardMappingCreationResponse)
         assert result.id == "12345"
         assert result.message == "Agent–Service Board mapping created successfully."
         self.mock_partner_config_repo.find_partner_config_by_partner_id.assert_awaited_once_with(partner_id)
@@ -200,7 +200,7 @@ class TestAgentMappingService:
         self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = None
 
         # Act & Assert
-        with pytest.raises(ResourceNotFound, match=f"Partner config not found for partner_id 4"):
+        with pytest.raises(TalkoResourceNotFound, match=f"Partner config not found for partner_id 4"):
             await self.service.create_agent_service_board_mapping(
                 partner_id=4,
                 service_board_id=21,
@@ -245,7 +245,7 @@ class TestAgentMappingService:
         result = await self.service.get_agents_by_service_board(service_board_id, partner_id)
 
         expected_response = [
-            Contract.AgentServiceBoardMappingResponse(
+            TalkoContract.AgentServiceBoardMappingResponse(
                 id=str(agent["_id"]),
                 partner_id=agent["partner_id"],
                 service_board_id=agent["service_board_id"],
@@ -270,7 +270,7 @@ class TestAgentMappingService:
 
         self.mock_repository.get_agents_by_service_board_id_and_partner_id.return_value = []
 
-        with pytest.raises(ResourceNotFound, match="No agents mapped to this service board."):
+        with pytest.raises(TalkoResourceNotFound, match="No agents mapped to this service board."):
             await self.service.get_agents_by_service_board(service_board_id, partner_id)
 
         self.mock_logger.debug.assert_any_call(
@@ -314,7 +314,7 @@ class TestAgentMappingService:
 
         self.mock_repository.update_is_active_by_service_board_and_partner_id.return_value = 0
 
-        with pytest.raises(ResourceNotFound, match=f"No mappings found for service_board_id={service_board_id} and partner_id={partner_id}"):
+        with pytest.raises(TalkoResourceNotFound, match=f"No mappings found for service_board_id={service_board_id} and partner_id={partner_id}"):
             await self.service.update_is_active_by_service_board_and_partner_id(
                 partner_id, service_board_id, is_active
             )

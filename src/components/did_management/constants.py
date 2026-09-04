@@ -2,7 +2,7 @@ from enum import Enum, unique
 
 
 @unique
-class DIDStatus(str, Enum):
+class TalkoDIDStatus(str, Enum):
     """
     Enum representing all valid statuses for a DID in phone_number collection.
     Using str + Enum so values can be used directly in MongoDB and Pydantic.
@@ -14,7 +14,7 @@ class DIDStatus(str, Enum):
     COOLDOWN_COMPLETED = "Cooldown Completed"
 
 
-class DIDType(str, Enum):
+class TalkoDIDType(str, Enum):
     """DID types for human vs AI agent routing."""
 
     NORMAL = "normal"
@@ -23,10 +23,10 @@ class DIDType(str, Enum):
 
 # Useful constant sets (type-safe)
 COOLDOWN_BLOCKED_STATUSES = frozenset(
-    [DIDStatus.COOLING_PERIOD, DIDStatus.COOLDOWN_COMPLETED]
+    [TalkoDIDStatus.COOLING_PERIOD, TalkoDIDStatus.COOLDOWN_COMPLETED]
 )
 
-USABLE_STATUSES = frozenset([DIDStatus.AVAILABLE, DIDStatus.MAPPED])
+USABLE_STATUSES = frozenset([TalkoDIDStatus.AVAILABLE, TalkoDIDStatus.MAPPED])
 
 # Cooldown configuration (fixed 30 days as per requirement)
 COOLDOWN_DAYS = 30

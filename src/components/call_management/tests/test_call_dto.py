@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from src.components.call_management.dto import Contract
-from src.components.call_management.enums import OutboundType
+from src.components.call_management.dto import TalkoContract
+from src.components.call_management.enums import TalkoOutboundType
 
 
 class TestCallCreateDTO:
@@ -16,7 +16,7 @@ class TestCallCreateDTO:
             "lead_secret": "supersecret",
             "agent_number": "9876543210",
         }
-        dto = Contract.CallCreate(**data)
+        dto = TalkoContract.CallCreate(**data)
         assert dto.lead_secret == "supersecret"
         assert dto.encryption_enabled is True
 
@@ -29,7 +29,7 @@ class TestCallCreateDTO:
             "encryption_enabled": False,
             "agent_number": "9876543210",
         }
-        dto = Contract.CallCreate(**data)
+        dto = TalkoContract.CallCreate(**data)
         assert dto.to_number == "1234567890"
 
     def test_valid_dedicated_did(self):
@@ -41,7 +41,7 @@ class TestCallCreateDTO:
             "encryption_enabled": False,
             "dedicated_did": "918889560593",  # 12 digits
         }
-        dto = Contract.CallCreate(**data)
+        dto = TalkoContract.CallCreate(**data)
         assert dto.dedicated_did == "918889560593"
 
     def test_invalid_encryption_enabled_without_lead_secret(self):
@@ -51,7 +51,7 @@ class TestCallCreateDTO:
             "agent_number": "9876543210",
         }
         with pytest.raises(ValidationError) as exc:
-            Contract.CallCreate(**data)
+            TalkoContract.CallCreate(**data)
         assert "lead_secret is required" in str(exc.value)
 
     def test_invalid_encryption_disabled_without_to_number(self):
@@ -61,7 +61,7 @@ class TestCallCreateDTO:
             "agent_number": "9876543210",
         }
         with pytest.raises(ValidationError) as exc:
-            Contract.CallCreate(**data)
+            TalkoContract.CallCreate(**data)
         assert "to_number is required" in str(exc.value)
 
     def test_invalid_missing_agent_number(self):
@@ -71,7 +71,7 @@ class TestCallCreateDTO:
             "to_number": "1234567890",
         }
         with pytest.raises(ValidationError) as exc:
-            Contract.CallCreate(**data)
+            TalkoContract.CallCreate(**data)
         assert "agent_number is required" in str(exc.value)
 
     def test_invalid_outbound_type_value(self):
@@ -83,7 +83,7 @@ class TestCallCreateDTO:
             "outbound_type": "not_a_valid_enum_value",
         }
         with pytest.raises(ValidationError) as exc:
-            Contract.CallCreate(**data)
+            TalkoContract.CallCreate(**data)
         assert "Invalid outbound_type" in str(exc.value)
 
     @pytest.mark.parametrize(
@@ -104,7 +104,7 @@ class TestCallCreateDTO:
             "dedicated_did": bad_did,
         }
         with pytest.raises(ValidationError) as exc:
-            Contract.CallCreate(**data)
+            TalkoContract.CallCreate(**data)
         assert "dedicated_did must contain only digits" in str(exc.value)
 
     def test_none_values_for_optional_fields(self):
@@ -117,13 +117,13 @@ class TestCallCreateDTO:
             "outbound_type": None,
             "dedicated_did": None,
         }
-        dto = Contract.CallCreate(**data)
+        dto = TalkoContract.CallCreate(**data)
         assert dto.outbound_type is None
         assert dto.dedicated_did is None
 
 
 class TestCallResponseDTO:
     def test_call_response_success(self):
-        dto = Contract.CallResponse(id="uuid-123", message="Success")
+        dto = TalkoContract.CallResponse(id="uuid-123", message="Success")
         assert dto.id == "uuid-123"
         assert dto.message == "Success"

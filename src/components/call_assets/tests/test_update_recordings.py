@@ -3,20 +3,20 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from fastapi import UploadFile
 
-from src.components.call_assets.tasks import RecordingsUpdateTask
+from src.components.call_assets.tasks import TalkoRecordingsUpdateTask
 
 
 @pytest.mark.asyncio
 class TestRecordingsUpdateTask:
     def setup_method(self):
-        """Initialize mocks and RecordingsUpdateTask instance before each test"""
+        """Initialize mocks and TalkoRecordingsUpdateTask instance before each test"""
         self.mock_logger = MagicMock()
         self.mock_cdr_repo = MagicMock()
         self.mock_call_repo = AsyncMock()
         self.mock_assets_repo = MagicMock()
         self.mock_helper = MagicMock()
 
-        self.task = RecordingsUpdateTask(
+        self.task = TalkoRecordingsUpdateTask(
             logger=self.mock_logger,
             cdr_repository=self.mock_cdr_repo,
             call_repository=self.mock_call_repo,
@@ -89,7 +89,7 @@ class TestRecordingsUpdateTask:
         self.mock_logger.error.assert_called_with("Failed to upload call recording: Upload failed")
 
     async def test_process_recordings_urls_outer_exception(self):
-        """Test outer exception during CDR processing is logged"""
+        """Test outer exception during TalkoCDR processing is logged"""
         pending_cdrs = [
             {
                 "_id": "2",
@@ -111,11 +111,11 @@ class TestRecordingsUpdateTask:
 
         result = await self.task.process_reocrdings_urls()
         assert result == "Recordings saved"
-        assert any("Error processing CDR" in call[0][0] for call in self.mock_logger.error.call_args_list)
+        assert any("Error processing TalkoCDR" in call[0][0] for call in self.mock_logger.error.call_args_list)
 
     async def test_process_recordings_urls_already_saved(self):
             """
-            Test that if a CDR has 'is_recording_saved' = True,
+            Test that if a TalkoCDR has 'is_recording_saved' = True,
             the method logs 'Recording is already saved' and does not attempt upload.
             """
             pending_cdrs = [

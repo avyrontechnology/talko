@@ -7,7 +7,7 @@ from typing_extensions import Annotated
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
-class CallRecordModel(BaseModel):
+class TalkoCallRecordModel(BaseModel):
     call_record_id: Optional[PyObjectId] = Field(alias="_id", default=None)
     caller: str
     receiver: str

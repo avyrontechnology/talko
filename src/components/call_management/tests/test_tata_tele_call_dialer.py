@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from src.components.call_management.tata_tele.call_dialer import DialerWebhookHandler
+from src.components.call_management.tata_tele.call_dialer import TalkoDialerWebhookHandler
 
-_MAGLO_PATCH_PATH = "src.components.call_management.tata_tele.call_dialer.MagloClient"
+_MAGLO_PATCH_PATH = "src.components.call_management.tata_tele.call_dialer.TalkoMagloClient"
 _HTTPX_PATCH_PATH = (
     "src.components.call_management.handlers.webhook_base_handler.httpx.AsyncClient"
 )
@@ -15,7 +15,7 @@ _HTTPX_PATCH_PATH = (
 @pytest.fixture(autouse=True)
 def _patch_maglo_client():
     """
-    Replaces MagloClient with a MagicMock for every test in this module.
+    Replaces TalkoMagloClient with a MagicMock for every test in this module.
     This prevents __init__ from creating an aiohttp session (which needs
     a running event loop) during both collection and execution.
     """
@@ -42,17 +42,17 @@ def _patch_makunai_relay_client():
         yield mock_client
 
 
-def _make_handler() -> DialerWebhookHandler:
+def _make_handler() -> TalkoDialerWebhookHandler:
     """
-    Build a DialerWebhookHandler with plain MagicMock dependencies.
+    Build a TalkoDialerWebhookHandler with plain MagicMock dependencies.
     Must be called inside a test body (sync or async) — never at class scope.
-    The autouse fixture ensures MagloClient is already patched when this runs.
+    The autouse fixture ensures TalkoMagloClient is already patched when this runs.
     """
     logger = MagicMock()
     call_repository = MagicMock()
     did_management_service = MagicMock()
 
-    handler = DialerWebhookHandler(
+    handler = TalkoDialerWebhookHandler(
         logger=logger,
         call_repository=call_repository,
         did_management_service=did_management_service,
@@ -98,7 +98,7 @@ def _default_did_info() -> Dict[str, Any]:
 
 def _default_maglo_response() -> Dict[str, Any]:
     """
-    Keys must match the string literals that MagloApiConstants resolves to:
+    Keys must match the string literals that TalkoMagloApiConstants resolves to:
         FIELD_LEAD_ID               -> "lead_id"
         FIELD_AGENT_NAME            -> "agent_name"
         FIELD_LEAD_REQUEST_ID       -> "lead_request_id"
@@ -115,7 +115,7 @@ def _default_maglo_response() -> Dict[str, Any]:
 class TestProcessWebhookHappyPath:
     @pytest.mark.asyncio
     async def test_process_webhook_creates_new_cdr(self):
-        """When no existing CDR is found a new one should be inserted."""
+        """When no existing TalkoCDR is found a new one should be inserted."""
         handler = _make_handler()
 
         handler.did_management_service.get_dids_by_number = AsyncMock(
@@ -137,7 +137,7 @@ class TestProcessWebhookHappyPath:
 
     @pytest.mark.asyncio
     async def test_process_webhook_updates_existing_cdr(self):
-        """When an existing CDR is found it should be updated."""
+        """When an existing TalkoCDR is found it should be updated."""
         handler = _make_handler()
 
         existing_cdr = {"_id": "mongo-id-999", "call_id": "call-123"}
@@ -181,14 +181,14 @@ class TestProcessWebhookHappyPath:
 
 
 class TestRelayToMakunai:
-    """Covers DialerWebhookHandler._relay_to_makunai in isolation, using the
+    """Covers TalkoDialerWebhookHandler._relay_to_makunai in isolation, using the
     autouse _patch_makunai_relay_client fixture's mock httpx.AsyncClient."""
 
     @pytest.mark.asyncio
     async def test_relay_posts_payload_with_partner_id_and_secret_header(
         self, _patch_makunai_relay_client
     ):
-        from src.core.environment import ENV
+        from src.core.environment import TalkoENV
 
         handler = _make_handler()
         payload = {"call_id": "call-123", "uuid": "uuid-abc-456"}
@@ -197,10 +197,10 @@ class TestRelayToMakunai:
 
         _patch_makunai_relay_client.post.assert_called_once()
         call_args = _patch_makunai_relay_client.post.call_args
-        assert call_args[0][0] == ENV.MAKUNAI_CDR_WEBHOOK_URL
+        assert call_args[0][0] == TalkoENV.MAKUNAI_CDR_WEBHOOK_URL
         assert call_args[1]["json"] == {**payload, "partner_id": 100}
         assert call_args[1]["headers"] == {
-            "X-Webhook-Secret": ENV.CDR_WEBHOOK_RELAY_SECRET
+            "X-Webhook-Secret": TalkoENV.CDR_WEBHOOK_RELAY_SECRET
         }
 
     @pytest.mark.asyncio
@@ -216,7 +216,7 @@ class TestRelayToMakunai:
 
     @pytest.mark.asyncio
     async def test_relay_failure_is_swallowed(self, _patch_makunai_relay_client):
-        """A relay failure must never propagate — our own CDR write already
+        """A relay failure must never propagate — our own TalkoCDR write already
         succeeded by the time _relay_to_makunai runs."""
         _patch_makunai_relay_client.post = AsyncMock(
             side_effect=httpx.ConnectError("boom")
@@ -248,7 +248,7 @@ class TestRelayToMakunai:
     async def test_process_webhook_still_succeeds_when_relay_fails(
         self, _patch_makunai_relay_client
     ):
-        """End-to-end: a broken relay must not turn a successful CDR write
+        """End-to-end: a broken relay must not turn a successful TalkoCDR write
         into a failed webhook response."""
         _patch_makunai_relay_client.post = AsyncMock(
             side_effect=httpx.ConnectError("boom")
@@ -336,7 +336,7 @@ class TestProcessWebhookErrorCases:
         """
         When Maglo upsert raises, _upsert_ivr_lead_if_needed returns None.
         The handler guards for None (if upsert_res:) so lead fields default
-        to None and the CDR is still created successfully.
+        to None and the TalkoCDR is still created successfully.
         """
         handler = _make_handler()
 
@@ -1220,7 +1220,7 @@ class TestAgentResolutionEdgeCases:
     @pytest.mark.asyncio
     async def test_resolve_agent_returns_int_on_success(self):
         """
-        Mock _resolve_agent_from_ivr_phone directly — ConsoleApiConstants.FIELD_AGENT_ID
+        Mock _resolve_agent_from_ivr_phone directly — TalkoConsoleApiConstants.FIELD_AGENT_ID
         is an opaque constant so we cannot reliably mock the response dict key.
         The integration between the constant and maglo_client is tested separately.
         """

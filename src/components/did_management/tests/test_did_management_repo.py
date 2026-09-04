@@ -3,13 +3,13 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from bson import ObjectId
 
-from src.components.did_management.constants import DIDStatus
-from src.components.did_management.repositories import DidRepository
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.did_management.constants import TalkoDIDStatus
+from src.components.did_management.repositories import TalkoDidRepository
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class AsyncContextManagerMock:
+class TalkoAsyncContextManagerMock:
     def __init__(self, collection):
         self.collection = collection
 
@@ -20,7 +20,7 @@ class AsyncContextManagerMock:
         pass
 
 
-class AsyncIteratorMock:
+class TalkoAsyncIteratorMock:
     def __init__(self, items):
         self._items = list(items)
 
@@ -33,7 +33,7 @@ class AsyncIteratorMock:
         return self._items.pop(0)
 
 
-class FailingAsyncIterator:
+class TalkoFailingAsyncIterator:
     def __aiter__(self):
         return self
 
@@ -43,21 +43,21 @@ class FailingAsyncIterator:
 
 @pytest.fixture
 def mock_db_manager():
-    return Mock(spec=DocDatabaseSessionManager)
+    return Mock(spec=TalkoDocDatabaseSessionManager)
 
 
 @pytest.fixture
 def mock_logger():
-    return Mock(spec=HollerServiceLogger)
+    return Mock(spec=TalkoServiceLogger)
 
 
 @pytest.fixture
 def did_repository(mock_db_manager, mock_logger):
-    return DidRepository(db_manager=mock_db_manager, logger=mock_logger)
+    return TalkoDidRepository(db_manager=mock_db_manager, logger=mock_logger)
 
 
 def _wire(mock_db_manager, col):
-    mock_db_manager.collection.return_value = AsyncContextManagerMock(col)
+    mock_db_manager.collection.return_value = TalkoAsyncContextManagerMock(col)
 
 
 class TestInsertDidDefaultAttendance:
@@ -268,7 +268,7 @@ class TestGetAssignedDids:
         vendor_id = ObjectId()
         docs = [{"did_number": "12345"}, {"did_number": "67890"}]
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock(docs))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock(docs))
         _wire(mock_db_manager, col)
 
         result = await did_repository.get_assigned_dids(vendor_id)
@@ -283,7 +283,7 @@ class TestGetAssignedDids:
     @pytest.mark.asyncio
     async def test_empty_result(self, did_repository, mock_db_manager, mock_logger):
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock([]))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock([]))
         _wire(mock_db_manager, col)
 
         result = await did_repository.get_assigned_dids(ObjectId())
@@ -314,7 +314,7 @@ class TestGetAvailableDids:
         vendor_id = ObjectId()
         docs = [{"did_number": "12345"}, {"did_number": "67890"}]
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock(docs))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock(docs))
         _wire(mock_db_manager, col)
 
         result = await did_repository.get_available_dids(vendor_id)
@@ -324,7 +324,7 @@ class TestGetAvailableDids:
                 "vendor_id": vendor_id,
                 "partner_id": 0,
                 "vendor_config_id": None,
-                "status": DIDStatus.AVAILABLE.value,
+                "status": TalkoDIDStatus.AVAILABLE.value,
             }
         )
         assert result == ["12345", "67890"]
@@ -340,7 +340,7 @@ class TestGetAvailableDids:
         vendor_id = ObjectId()
         vendor_config_id = ObjectId()
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock([{"did_number": "11111"}]))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock([{"did_number": "11111"}]))
         _wire(mock_db_manager, col)
 
         result = await did_repository.get_available_dids(vendor_id, vendor_config_id)
@@ -350,7 +350,7 @@ class TestGetAvailableDids:
                 "vendor_id": vendor_id,
                 "partner_id": 0,
                 "vendor_config_id": vendor_config_id,
-                "status": DIDStatus.AVAILABLE.value,
+                "status": TalkoDIDStatus.AVAILABLE.value,
             }
         )
         assert result == ["11111"]
@@ -358,7 +358,7 @@ class TestGetAvailableDids:
     @pytest.mark.asyncio
     async def test_empty_result(self, did_repository, mock_db_manager, mock_logger):
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock([]))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock([]))
         _wire(mock_db_manager, col)
 
         result = await did_repository.get_available_dids(ObjectId())
@@ -519,7 +519,7 @@ class TestGetDidsByPartnerAndVendor:
         partner_id, vendor_id = 1, ObjectId()
         docs = [{"did_number": "12345"}, {"did_number": "67890"}]
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock(docs))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock(docs))
         _wire(mock_db_manager, col)
 
         result = await did_repository.get_dids_by_partner_and_vendor(
@@ -535,7 +535,7 @@ class TestGetDidsByPartnerAndVendor:
     @pytest.mark.asyncio
     async def test_empty(self, did_repository, mock_db_manager, mock_logger):
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock([]))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock([]))
         _wire(mock_db_manager, col)
 
         result = await did_repository.get_dids_by_partner_and_vendor(1, ObjectId())
@@ -562,7 +562,7 @@ class TestGetDidsByPartnerServiceBoardAndVendor:
         partner_id, service_board_id, vendor_id = 1, 100, ObjectId()
         docs = [{"did_number": "12345"}, {"did_number": "67890"}]
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock(docs))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock(docs))
         _wire(mock_db_manager, col)
 
         result = await did_repository.get_dids_by_partner_service_board_and_vendor(
@@ -605,7 +605,7 @@ class TestGetDidsByPartnerAgentServiceBoardAndVendor:
         partner_id, user_id, service_board_id, vendor_id = 1, 200, 100, ObjectId()
         docs = [{"did_number": "12345"}, {"did_number": "67890"}]
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock(docs))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock(docs))
         _wire(mock_db_manager, col)
 
         result = (
@@ -751,7 +751,7 @@ class TestGetDidsByServiceBoard:
         col.find.assert_called_once_with(
             {
                 "service_board_id": service_board_id,
-                "status": DIDStatus.AVAILABLE.value,
+                "status": TalkoDIDStatus.AVAILABLE.value,
             }
         )
         mock_cursor.to_list.assert_awaited_once_with(length=None)
@@ -797,7 +797,7 @@ class TestGetDetailsByDids:
             {"did_number": "67890", "_id": oid2},
         ]
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock(docs))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock(docs))
         _wire(mock_db_manager, col)
 
         result = await did_repository.get_details_by_dids(did_numbers)
@@ -818,7 +818,7 @@ class TestGetDetailsByDids:
     @pytest.mark.asyncio
     async def test_empty_list(self, did_repository, mock_db_manager, mock_logger):
         col = AsyncMock()
-        col.find = Mock(return_value=AsyncIteratorMock([]))
+        col.find = Mock(return_value=TalkoAsyncIteratorMock([]))
         _wire(mock_db_manager, col)
 
         result = await did_repository.get_details_by_dids([])
@@ -827,7 +827,7 @@ class TestGetDetailsByDids:
     @pytest.mark.asyncio
     async def test_failure(self, did_repository, mock_db_manager, mock_logger):
         col = AsyncMock()
-        col.find = Mock(return_value=FailingAsyncIterator())
+        col.find = Mock(return_value=TalkoFailingAsyncIterator())
         _wire(mock_db_manager, col)
 
         with pytest.raises(Exception, match="Database error"):
@@ -1031,7 +1031,7 @@ class TestGetDidsByPartner:
     def _cursor(self, docs):
         items = list(docs)
 
-        class ChainableCursor(AsyncIteratorMock):
+        class ChainableCursor(TalkoAsyncIteratorMock):
             def __init__(self):
                 super().__init__(items)
                 self.sort = Mock(return_value=self)

@@ -3,21 +3,21 @@ from typing import Any, Dict, List, Union
 import grpc
 from grpc.aio import AioRpcError
 
-from src.components.common.responses import InternalServerErrorResponse
-from src.grpc_client.grpc_client import GRPCClient
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.common.responses import TalkoInternalServerErrorResponse
+from src.grpc_client.grpc_client import TalkoGRPCClient
+from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.pub import auth_pb2, auth_pb2_grpc
 
-logger = HollerServiceLogger.get_logger()
+logger = TalkoServiceLogger.get_logger()
 
 
-class AuthServiceClient(GRPCClient):
+class TalkoAuthServiceClient(TalkoGRPCClient):
 
     def __init__(self):
         super().__init__()
         self.stub = auth_pb2_grpc.AuthServiceStub(self.channel)
 
-    @GRPCClient.call_with_retry
+    @TalkoGRPCClient.call_with_retry
     async def validate_token(self, token, correlation_id="12345"):
         logger.info(
             "Sending ValidateToken request for token: {} correlation_id: {}".format(
@@ -43,12 +43,12 @@ class AuthServiceClient(GRPCClient):
         except AioRpcError as exc:
             logger.error("gRPC error during ValidateToken: {}".format(exc))
             if exc.code() == grpc.StatusCode.UNAVAILABLE:
-                return InternalServerErrorResponse(
+                return TalkoInternalServerErrorResponse(
                     detail="Authentication service unavailable"
                 )
             raise
 
-    @GRPCClient.call_with_retry
+    @TalkoGRPCClient.call_with_retry
     async def get_user_child_hierarchy(
         self, user_ids: Union[int, List[int]]
     ) -> Dict[int, Dict[str, Any]]:
@@ -77,7 +77,7 @@ class AuthServiceClient(GRPCClient):
             logger.error(f"Error during GetUserChildHierarchy call: {exc}")
             return {}
 
-    @GRPCClient.call_with_retry
+    @TalkoGRPCClient.call_with_retry
     async def get_user_child_details(self, user_id):
         logger.info(
             "Sending GetUserChildHierarchy request for user_id: {}".format(user_id)
@@ -109,7 +109,7 @@ class AuthServiceClient(GRPCClient):
             logger.error("Error during GetUserChildHierarchy call: {}".format(exc))
             return {}
 
-    @GRPCClient.call_with_retry
+    @TalkoGRPCClient.call_with_retry
     async def get_user_details(self, user_id):
         logger.info("Sending GetUserDetails request for user_id: {}".format(user_id))
 
@@ -137,7 +137,7 @@ class AuthServiceClient(GRPCClient):
             logger.error("Error during GetUserDetails call: {}".format(exc))
             return {}
 
-    @GRPCClient.call_with_retry
+    @TalkoGRPCClient.call_with_retry
     async def get_user_permissions(self, user_id):
         logger.info(
             "Sending GetUserPermissions request for user_id: {}".format(user_id)
@@ -158,7 +158,7 @@ class AuthServiceClient(GRPCClient):
             logger.error("Error during GetUserPermissions call: {}".format(exc))
             return []
 
-    @GRPCClient.call_with_retry
+    @TalkoGRPCClient.call_with_retry
     async def get_user_roles(self, user_id):
         logger.info("Sending GetUserRoles request for user_id: {}".format(user_id))
 
@@ -178,7 +178,7 @@ class AuthServiceClient(GRPCClient):
             logger.error("Error during GetUserRoles call: {}".format(exc))
             return {}
 
-    @GRPCClient.call_with_retry
+    @TalkoGRPCClient.call_with_retry
     async def get_service_board_users_details(self, user_ids):
         user_ids: list = (
             [user_ids]
@@ -213,7 +213,7 @@ class AuthServiceClient(GRPCClient):
             logger.error(f"Error during GetUserChildHierarchy call: {exc}")
             return {}
 
-    @GRPCClient.call_with_retry
+    @TalkoGRPCClient.call_with_retry
     async def get_partner_api_key(self, partner_id):
         logger.info(f"Getting API Key for Partner ID: {partner_id}")
 

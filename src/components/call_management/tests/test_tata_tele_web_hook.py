@@ -8,8 +8,8 @@ from src.components.call_management.messages import (
     CDR_NOT_FOUND,
     FAILED_TO_UPDATE,
 )
-from src.components.call_management.tata_tele.call_webhook import TataTeleWebhookHandler
-from src.exceptions import BadRequestError, ResourceNotFound
+from src.components.call_management.tata_tele.call_webhook import TalkoTataTeleWebhookHandler
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 
 
 @pytest.mark.asyncio
@@ -21,7 +21,7 @@ class TestTataTeleWebhookHandler:
         self.call_repository = AsyncMock()
         self.vendor = "tata_tele"
 
-        self.handler = TataTeleWebhookHandler(
+        self.handler = TalkoTataTeleWebhookHandler(
             self.logger, self.call_repository, self.vendor
         )
         self.handler.datetime_util = MagicMock()
@@ -67,7 +67,7 @@ class TestTataTeleWebhookHandler:
     async def test_webhook_missing_call_id(self):
         payload = {}
 
-        with pytest.raises(BadRequestError) as exc:
+        with pytest.raises(TalkoBadRequestError) as exc:
             await self.handler.process_webhook(payload)
 
         assert str(exc.value) == CALL_ID_MUST_BE_PROVIDED
@@ -77,7 +77,7 @@ class TestTataTeleWebhookHandler:
         payload = {"call_id": "abc123"}
         self.call_repository.get_cdr_by_call_id_or_uuid.return_value = None
 
-        with pytest.raises(ResourceNotFound) as exc:
+        with pytest.raises(TalkoResourceNotFound) as exc:
             await self.handler.process_webhook(payload)
 
         assert str(exc.value) == CDR_NOT_FOUND
@@ -89,7 +89,7 @@ class TestTataTeleWebhookHandler:
         }
         self.call_repository.update_cdr.return_value = False
 
-        with pytest.raises(BadRequestError) as exc:
+        with pytest.raises(TalkoBadRequestError) as exc:
             await self.handler.process_webhook(payload)
 
         assert str(exc.value) == FAILED_TO_UPDATE
@@ -136,7 +136,7 @@ class TestTataTeleWebhookHandler:
     async def test_api_missing_call_id_and_uuid(self):
         payload = {}
 
-        with pytest.raises(BadRequestError):
+        with pytest.raises(TalkoBadRequestError):
             await self.handler.process_cdr_api_payload(payload)
 
     async def test_api_success(self):
@@ -220,7 +220,7 @@ class TestTataTeleWebhookHandler:
 class TestResultsBranch:
 
     async def test_process_payload_with_results_key(self):
-        handler = TataTeleWebhookHandler(MagicMock(), AsyncMock(), "tata_tele")
+        handler = TalkoTataTeleWebhookHandler(MagicMock(), AsyncMock(), "tata_tele")
         handler.datetime_util = MagicMock()
         handler.datetime_util.get_current_time.return_value = "TIME"
 
@@ -239,10 +239,10 @@ class TestResultsBranch:
 @pytest.mark.asyncio
 class TestRelayToMakunai:
     """
-    AI-bridge/campaign calls complete via TataTeleWebhookHandler (Tata's
-    standard call webhook, calling_mode=clicktocall) — NOT DialerWebhookHandler,
+    AI-bridge/campaign calls complete via TalkoTataTeleWebhookHandler (Tata's
+    standard call webhook, calling_mode=clicktocall) — NOT TalkoDialerWebhookHandler,
     which is a different Tata Tele product we don't use for campaigns. The
-    relay (shared via WebhookHandler._relay_to_makunai) must fire from here.
+    relay (shared via TalkoWebhookHandler._relay_to_makunai) must fire from here.
     """
 
     _HTTPX_PATCH_PATH = (
@@ -252,7 +252,7 @@ class TestRelayToMakunai:
     def _make_handler(self):
         logger = MagicMock()
         call_repository = AsyncMock()
-        handler = TataTeleWebhookHandler(logger, call_repository, "tata_tele")
+        handler = TalkoTataTeleWebhookHandler(logger, call_repository, "tata_tele")
         handler.datetime_util = MagicMock()
         handler.datetime_util.get_current_time.return_value = "TIME"
         return handler, call_repository
@@ -305,7 +305,7 @@ class TestRelayToMakunai:
         mock_client.post.assert_not_awaited()
 
     async def test_api_payload_never_relays_even_with_partner_id(self):
-        """process_cdr_api_payload (source=API, CDR polling) is not a live
+        """process_cdr_api_payload (source=API, TalkoCDR polling) is not a live
         webhook delivery — relaying it would be meaningless/duplicative."""
         handler, call_repository = self._make_handler()
         call_repository.get_cdr_by_call_id_or_uuid.return_value = {

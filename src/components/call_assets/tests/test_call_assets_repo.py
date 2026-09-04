@@ -2,11 +2,11 @@ from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 
-from src.components.call_assets.repository import AssetRepository
-from src.components.call_assets.models import AssetsModel
+from src.components.call_assets.repository import TalkoAssetRepository
+from src.components.call_assets.models import TalkoAssetsModel
 from src.components.call_assets.messages import DUPLICATE_ASSET_INSERTION
-from src.exceptions import BadRequestError
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.exceptions import TalkoBadRequestError
+from src.loggers.talko_service_logger import TalkoServiceLogger
 from pymongo.results import InsertOneResult
 
 
@@ -16,8 +16,8 @@ class TestCallAssetsRepository:
     @pytest.fixture
     def setup(self):
         mock_db_manager = MagicMock()
-        mock_logger = MagicMock(spec=HollerServiceLogger)
-        repo = AssetRepository(mock_db_manager, mock_logger)
+        mock_logger = MagicMock(spec=TalkoServiceLogger)
+        repo = TalkoAssetRepository(mock_db_manager, mock_logger)
         return repo, mock_db_manager, mock_logger
 
     async def test_get_digital_asset_by_partner_id_found(self, setup):
@@ -86,7 +86,7 @@ class TestCallAssetsRepository:
             agent_id=agent_id,
         )
 
-        assert isinstance(asset, AssetsModel)
+        assert isinstance(asset, TalkoAssetsModel)
         assert asset.version == 1
         assert asset.name == file_name
         assert asset.partner_id == partner_id
@@ -128,10 +128,10 @@ class TestCallAssetsRepository:
 
         mock_collection = AsyncMock()
         mock_collection.find_one.return_value = None
-        mock_collection.insert_one.side_effect = BadRequestError(DUPLICATE_ASSET_INSERTION)
+        mock_collection.insert_one.side_effect = TalkoBadRequestError(DUPLICATE_ASSET_INSERTION)
         mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
-        with pytest.raises(BadRequestError):
+        with pytest.raises(TalkoBadRequestError):
             await repo.create_digital_asset(
                 partner_id=partner_id,
                 asset_type=asset_type,

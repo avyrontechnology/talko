@@ -18,8 +18,8 @@ UNEXPECTED_ERROR_HANGUP_CALL = "Unexpected error hanging up call"
 # tata tele & acefone webhook
 WEBHOOK_PAYLOAD_MISSING = "Webhook payload missing call_id or uuid."
 CALL_ID_MUST_BE_PROVIDED = "'call_id or uuid' must be provided"
-CDR_NOT_FOUND = "CDR not found"
-FAILED_TO_UPDATE = "Failed to update CDR"
+CDR_NOT_FOUND = "TalkoCDR not found"
+FAILED_TO_UPDATE = "Failed to update TalkoCDR"
 
 # service
 UNSUPPORTED_VENDOR = "Unsupported vendor: {}"

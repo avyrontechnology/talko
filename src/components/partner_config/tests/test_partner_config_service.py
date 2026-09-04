@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from src.components.partner_config.dto import Contract
-from src.components.partner_config.helper import PartnerConfigHelper
-from src.components.partner_config.services import PartnerConfigService
-from src.exceptions import BadRequestError, ResourceNotFound
+from src.components.partner_config.dto import TalkoContract
+from src.components.partner_config.helper import TalkoPartnerConfigHelper
+from src.components.partner_config.services import TalkoPartnerConfigService
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 
 
 @pytest.mark.asyncio
@@ -25,7 +25,7 @@ class TestPartnerConfigService:
         partner_config_validator = AsyncMock()
         did_management_service = AsyncMock()
 
-        self.service = PartnerConfigService(
+        self.service = TalkoPartnerConfigService(
             repository=repository,
             logger=logger,
             datetime_util=datetime_util,
@@ -38,19 +38,19 @@ class TestPartnerConfigService:
         )
 
     async def test_create_partner_config_success(self, monkeypatch):
-        config = Contract.PartnerConfigCreate(
+        config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
         )
 
         # Patch helper methods
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "validate_and_prepare_config",
             AsyncMock(return_value=ObjectId()),
         )
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "handle_did_assignment",
             AsyncMock(
                 return_value={
@@ -79,7 +79,7 @@ class TestPartnerConfigService:
     async def test_create_partner_config_round_robin_and_service_board_error(
         self, monkeypatch
     ):
-        config = Contract.PartnerConfigCreate(
+        config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
             enable_service_board=True,
@@ -90,19 +90,19 @@ class TestPartnerConfigService:
         )
 
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "validate_and_prepare_config",
             AsyncMock(return_value=ObjectId()),
         )
 
         with pytest.raises(
-            BadRequestError, match="Round-robin and service board cannot"
+            TalkoBadRequestError, match="Round-robin and service board cannot"
         ):
             await self.service.create_partner_config(config)
 
     async def test_create_partner_config_missing_required_fields(self, monkeypatch):
         # Missing board_did_counts and service_board_ids
-        config = Contract.PartnerConfigCreate(
+        config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
             enable_service_board=True,
@@ -115,13 +115,13 @@ class TestPartnerConfigService:
         )
 
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "validate_and_prepare_config",
             AsyncMock(return_value=ObjectId()),
         )
 
         with pytest.raises(
-            BadRequestError,
+            TalkoBadRequestError,
             match="Round-robin and service board cannot be enabled simultaneously",
         ):
             await self.service.create_partner_config(config)
@@ -185,7 +185,7 @@ class TestPartnerConfigService:
         obj_id = ObjectId()
         self.service.repository.find_partner_config_by_id.return_value = None
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await self.service.get_partner_config_by_id(str(obj_id))
 
         # Logger is called twice in the service
@@ -196,7 +196,7 @@ class TestPartnerConfigServiceValidation:
 
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.service = PartnerConfigService(
+        self.service = TalkoPartnerConfigService(
             repository=AsyncMock(),
             vendor_config_repository=AsyncMock(),
             vendor_config_service=AsyncMock(),
@@ -210,7 +210,7 @@ class TestPartnerConfigServiceValidation:
 
     @pytest.mark.asyncio
     async def test_missing_service_board_fields_raises(self, monkeypatch):
-        config = Contract.PartnerConfigCreate(
+        config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
             enable_service_board=True,
@@ -223,24 +223,24 @@ class TestPartnerConfigServiceValidation:
         )
 
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "validate_and_prepare_config",
             AsyncMock(return_value=ObjectId()),
         )
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "handle_did_assignment",
             AsyncMock(return_value={"is_active": True}),
         )
 
         with pytest.raises(
-            BadRequestError, match="service_board_ids and board_did_counts are required"
+            TalkoBadRequestError, match="service_board_ids and board_did_counts are required"
         ):
             await self.service.create_partner_config(config)
 
     @pytest.mark.asyncio
     async def test_missing_agent_mapping_fields_raises(self, monkeypatch):
-        config = Contract.PartnerConfigCreate(
+        config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
             enable_service_board=False,
@@ -251,22 +251,22 @@ class TestPartnerConfigServiceValidation:
         )
 
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "validate_and_prepare_config",
             AsyncMock(return_value=ObjectId()),
         )
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "handle_did_assignment",
             AsyncMock(return_value={"is_active": True}),
         )
 
-        with pytest.raises(BadRequestError, match="agent_mapping_ids is required"):
+        with pytest.raises(TalkoBadRequestError, match="agent_mapping_ids is required"):
             await self.service.create_partner_config(config)
 
     @pytest.mark.asyncio
     async def test_missing_round_robin_fields_raises(self, monkeypatch):
-        config = Contract.PartnerConfigCreate(
+        config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
             enable_service_board=False,
@@ -276,29 +276,29 @@ class TestPartnerConfigServiceValidation:
         )
 
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "validate_and_prepare_config",
             AsyncMock(return_value=ObjectId()),
         )
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "handle_did_assignment",
             AsyncMock(return_value={"is_active": True}),
         )
 
-        with pytest.raises(BadRequestError, match="round_robin_did_count is required"):
+        with pytest.raises(TalkoBadRequestError, match="round_robin_did_count is required"):
             await self.service.create_partner_config(config)
 
     @pytest.mark.asyncio
     async def test_exception_logged_and_raised(self, monkeypatch):
-        config = Contract.PartnerConfigCreate(
+        config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
         )
 
         # Force validate_and_prepare_config to raise a generic exception
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "validate_and_prepare_config",
             AsyncMock(side_effect=Exception("Unexpected error")),
         )
@@ -314,7 +314,7 @@ class TestPartnerConfigServiceException:
 
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.service = PartnerConfigService(
+        self.service = TalkoPartnerConfigService(
             repository=AsyncMock(),
             vendor_config_repository=AsyncMock(),
             vendor_config_service=AsyncMock(),
@@ -328,14 +328,14 @@ class TestPartnerConfigServiceException:
 
     @pytest.mark.asyncio
     async def test_generic_exception_is_logged_and_raised(self, monkeypatch):
-        config = Contract.PartnerConfigCreate(
+        config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
         )
 
         # Force validate_and_prepare_config to raise a generic exception
         monkeypatch.setattr(
-            PartnerConfigHelper,
+            TalkoPartnerConfigHelper,
             "validate_and_prepare_config",
             AsyncMock(side_effect=Exception("Unexpected error")),
         )
@@ -353,7 +353,7 @@ class TestPartnerConfigServiceGetAllException:
 
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.service = PartnerConfigService(
+        self.service = TalkoPartnerConfigService(
             repository=AsyncMock(),
             vendor_config_repository=AsyncMock(),
             vendor_config_service=AsyncMock(),

@@ -5,25 +5,25 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Query, Request, status
 
 from src.components.cdr import messages as cdr_messages
-from src.components.cdr.constants import EntityType
-from src.components.cdr.dto import Contract
-from src.components.cdr.services import CDRService
-from src.components.common.constants import CurrentUserMap, PaginationConstants
+from src.components.cdr.constants import TalkoEntityType
+from src.components.cdr.dto import TalkoContract
+from src.components.cdr.services import TalkoCDRService
+from src.components.common.constants import TalkoCurrentUserMap, TalkoPaginationConstants
 from src.components.common.responses import (
-    BadRequestResponse,
-    InternalServerErrorResponse,
-    ResourceNotFoundResponse,
-    SuccessResponse,
+    TalkoBadRequestResponse,
+    TalkoInternalServerErrorResponse,
+    TalkoResourceNotFoundResponse,
+    TalkoSuccessResponse,
 )
-from src.components.rbac.permission_dependency import PermissionDependency
+from src.components.rbac.permission_dependency import TalkoPermissionDependency
 from src.components.rbac.permission_injector import permission_check
-from src.core.container import Container
-from src.exceptions import BadRequestError, ResourceNotFound
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.enums import TimeFilter
+from src.core.container import TalkoContainer
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.enums import TalkoTimeFilter
 
 
-class CDRController:
+class TalkoCDRController:
     cdr_router = APIRouter()
 
     @staticmethod
@@ -72,68 +72,68 @@ class CDRController:
         deduped = list(dict.fromkeys(combined))
         return deduped[0] if len(deduped) == 1 else deduped
 
-    @cdr_router.get("", response_model=list[Contract.CDRResponse])
-    @permission_check(PermissionDependency)
+    @cdr_router.get("", response_model=list[TalkoContract.CDRResponse])
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def get_cdrs(
         request: Request,
         offset: int = Query(
-            PaginationConstants.offset,
-            ge=PaginationConstants.offset,
+            TalkoPaginationConstants.offset,
+            ge=TalkoPaginationConstants.offset,
             description="Page number for pagination",
         ),
         limit: int = Query(
-            PaginationConstants.limit,
-            ge=PaginationConstants.offset,
-            le=PaginationConstants.LIMIT_MAX,
+            TalkoPaginationConstants.limit,
+            ge=TalkoPaginationConstants.offset,
+            le=TalkoPaginationConstants.LIMIT_MAX,
             description="Number of items per page",
         ),
-        cdr_service: CDRService = Depends(Provide[Container.cdr_config_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
-    ) -> list[Contract.CDRResponse]:
+        cdr_service: TalkoCDRService = Depends(Provide[TalkoContainer.cdr_config_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> list[TalkoContract.CDRResponse]:
         try:
-            holler_service_logger.info("Retrieving all CDRs")
+            talko_service_logger.info("Retrieving all CDRs")
             current_user_data: dict = request.state.user
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Current user data: {}, get all cdrs initiated.".format(
                     current_user_data
                 )
             )
-            user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(CurrentUserMap.PARTNER_ID)
-            holler_service_logger.info(
+            user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
+            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+            talko_service_logger.info(
                 "User: {}, partner: {}, limit: {}, offset: {}, get cdr records api initiated.".format(
                     user_id, partner_id, limit, offset
                 )
             )
-            cdrs: list[Contract.CDRResponse] = await cdr_service.get_cdrs(
+            cdrs: list[TalkoContract.CDRResponse] = await cdr_service.get_cdrs(
                 user_id, partner_id, limit, offset
             )
-            holler_service_logger.info("Retrieved {} CDRs".format(len(cdrs)))
-            return SuccessResponse(cdrs)
+            talko_service_logger.info("Retrieved {} CDRs".format(len(cdrs)))
+            return TalkoSuccessResponse(cdrs)
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Unexpected error retrieving CDRs: {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail=str(e))
+            return TalkoInternalServerErrorResponse(detail=str(e))
 
-    @cdr_router.get("/agent_call_logs", response_model=Contract.AgentCallLogResponse)
-    @permission_check(PermissionDependency)
+    @cdr_router.get("/agent_call_logs", response_model=TalkoContract.AgentCallLogResponse)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def get_agent_call_logs(
         request: Request,
         offset: int = Query(
-            PaginationConstants.offset,
-            ge=PaginationConstants.offset,
+            TalkoPaginationConstants.offset,
+            ge=TalkoPaginationConstants.offset,
             description="Page number for pagination",
         ),
         limit: int = Query(
-            PaginationConstants.limit,
-            ge=PaginationConstants.offset,
-            le=PaginationConstants.LIMIT_MAX,
+            TalkoPaginationConstants.limit,
+            ge=TalkoPaginationConstants.offset,
+            le=TalkoPaginationConstants.LIMIT_MAX,
             description="Number of items per page",
         ),
-        entity_type: Optional[EntityType] = Query(
+        entity_type: Optional[TalkoEntityType] = Query(
             None,
             description="Entity type to filter call logs, e.g. Lead or Contact",
         ),
@@ -157,7 +157,7 @@ class CDRController:
             None,
             description="Timestamp to filter call logs",
         ),
-        filter_by: Optional[TimeFilter] = Query(
+        filter_by: Optional[TalkoTimeFilter] = Query(
             None,
             description="Time filter: Today, Last week, or Last month",
         ),
@@ -174,30 +174,30 @@ class CDRController:
                 "more than one entity's call history."
             ),
         ),
-        cdr_service: CDRService = Depends(Provide[Container.cdr_config_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
-    ) -> Contract.AgentCallLogResponse:
+        cdr_service: TalkoCDRService = Depends(Provide[TalkoContainer.cdr_config_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> TalkoContract.AgentCallLogResponse:
         try:
-            holler_service_logger.info("Retrieving Call logs started.")
+            talko_service_logger.info("Retrieving Call logs started.")
             current_user_data: dict = request.state.user
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Current user data: {}, get call logs api initiated.".format(
                     current_user_data
                 )
             )
-            user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(CurrentUserMap.PARTNER_ID)
+            user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
+            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
 
             try:
-                entity_ids_list = CDRController._parse_id_list_param(
+                entity_ids_list = TalkoCDRController._parse_id_list_param(
                     entity_ids, "entity_ids"
                 )
-                lead_ids_list = CDRController._parse_id_list_param(lead_ids, "lead_ids")
+                lead_ids_list = TalkoCDRController._parse_id_list_param(lead_ids, "lead_ids")
             except ValueError as e:
-                return BadRequestResponse(detail=str(e))
+                return TalkoBadRequestResponse(detail=str(e))
 
-            merged_entity_id = CDRController._merge_ids(entity_id, entity_ids_list)
-            merged_lead_id = CDRController._merge_ids(lead_id, lead_ids_list)
+            merged_entity_id = TalkoCDRController._merge_ids(entity_id, entity_ids_list)
+            merged_lead_id = TalkoCDRController._merge_ids(lead_id, lead_ids_list)
 
             normalized_entity_type = entity_type.value if entity_type else None
             normalized_entity_id = merged_entity_id
@@ -205,19 +205,19 @@ class CDRController:
             # Default entity_type to Lead if not passed
             if normalized_entity_type is None:
                 if normalized_entity_id is not None:
-                    normalized_entity_type = EntityType.LEAD.value
+                    normalized_entity_type = TalkoEntityType.LEAD.value
                 elif merged_lead_id is not None:
-                    normalized_entity_type = EntityType.LEAD.value
+                    normalized_entity_type = TalkoEntityType.LEAD.value
                     normalized_entity_id = merged_lead_id
 
             # Backward compatibility for deprecated lead_id/lead_ids
             if normalized_entity_id is None and merged_lead_id is not None:
                 normalized_entity_id = merged_lead_id
                 if normalized_entity_type is None:
-                    normalized_entity_type = EntityType.LEAD.value
+                    normalized_entity_type = TalkoEntityType.LEAD.value
 
             if normalized_entity_id is None:
-                return BadRequestResponse(
+                return TalkoBadRequestResponse(
                     detail="Either entity_id/entity_ids or deprecated lead_id/lead_ids is required"
                 )
 
@@ -226,17 +226,17 @@ class CDRController:
                 try:
                     parsed_custom_fields = json.loads(custom_fields)
                     if not isinstance(parsed_custom_fields, dict):
-                        return BadRequestResponse(
+                        return TalkoBadRequestResponse(
                             detail="custom_fields must be a JSON object, e.g. "
                             '{"lead_source":"Referral"}'
                         )
                 except json.JSONDecodeError:
-                    return BadRequestResponse(
+                    return TalkoBadRequestResponse(
                         detail="custom_fields must be a valid JSON object, e.g. "
                         '{"lead_source":"Referral"}'
                     )
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "User: {}, partner: {}, limit: {}, offset: {}, entity_type: {}, entity_id: {}, lead_created_at: {}, filter_by: {}, is_masking_enabled: {}, get call logs api initiated.".format(
                     user_id,
                     partner_id,
@@ -250,7 +250,7 @@ class CDRController:
                 )
             )
 
-            cdrs: Contract.AgentCallLogResponse = await cdr_service.get_agent_call_logs(
+            cdrs: TalkoContract.AgentCallLogResponse = await cdr_service.get_agent_call_logs(
                 user_id=user_id,
                 partner_id=partner_id,
                 limit=limit,
@@ -263,30 +263,30 @@ class CDRController:
                 entity_id=normalized_entity_id,
                 custom_fields=parsed_custom_fields,
             )
-            holler_service_logger.info("Retrieved {} Call logs response".format(cdrs))
-            return SuccessResponse(cdrs)
+            talko_service_logger.info("Retrieved {} Call logs response".format(cdrs))
+            return TalkoSuccessResponse(cdrs)
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Unexpected error retrieving Call Logs Response: {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail=str(e))
+            return TalkoInternalServerErrorResponse(detail=str(e))
 
     @cdr_router.get(
-        "/call-record-history", response_model=Contract.AgentCallRecordHistoryResponse
+        "/call-record-history", response_model=TalkoContract.AgentCallRecordHistoryResponse
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def get_call_record_history(
         request: Request,
         offset: int = Query(
-            PaginationConstants.offset,
-            ge=PaginationConstants.offset,
+            TalkoPaginationConstants.offset,
+            ge=TalkoPaginationConstants.offset,
             description="Page number for pagination",
         ),
         limit: int = Query(
-            PaginationConstants.limit,
-            ge=PaginationConstants.offset,
-            le=PaginationConstants.LIMIT_MAX,
+            TalkoPaginationConstants.limit,
+            ge=TalkoPaginationConstants.offset,
+            le=TalkoPaginationConstants.LIMIT_MAX,
             description="Number of items per page",
         ),
         payload: str = Query(
@@ -305,20 +305,20 @@ class CDRController:
             },
             description="Filter criteria for call record history",
         ),
-        cdr_service: CDRService = Depends(Provide[Container.cdr_config_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
-    ) -> Contract.AgentCallRecordHistoryResponse:
+        cdr_service: TalkoCDRService = Depends(Provide[TalkoContainer.cdr_config_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> TalkoContract.AgentCallRecordHistoryResponse:
         try:
-            holler_service_logger.info("Retrieving call record history started.")
+            talko_service_logger.info("Retrieving call record history started.")
             current_user_data: dict = request.state.user
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Current user data: {}, get call record history initiated.".format(
                     current_user_data
                 )
             )
-            user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(CurrentUserMap.PARTNER_ID)
-            holler_service_logger.info(
+            user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
+            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+            talko_service_logger.info(
                 "User: {}, partner: {}, limit: {}, offset: {}, payload: {}, get call record history initiated.".format(
                     user_id,
                     partner_id,
@@ -334,7 +334,7 @@ class CDRController:
                 else:
                     data_dict = json.loads(payload)
                     if not isinstance(data_dict, dict):
-                        return BadRequestResponse(
+                        return TalkoBadRequestResponse(
                             detail=cdr_messages.PAYLOAD_MUST_BE_A_JSON_OBJECT
                         )
 
@@ -343,7 +343,7 @@ class CDRController:
                     data_dict.get("entity_type") is None
                     and data_dict.get("entity_id") is not None
                 ):
-                    data_dict["entity_type"] = EntityType.LEAD.value
+                    data_dict["entity_type"] = TalkoEntityType.LEAD.value
 
                 # Backward compatibility for deprecated lead_id
                 if (
@@ -351,16 +351,16 @@ class CDRController:
                     and data_dict.get("entity_id") is None
                     and data_dict.get("lead_id") is not None
                 ):
-                    data_dict["entity_type"] = EntityType.LEAD.value
+                    data_dict["entity_type"] = TalkoEntityType.LEAD.value
                     data_dict["entity_id"] = data_dict["lead_id"]
 
-                Contract.CallRecordHistoryPayload(**data_dict)
+                TalkoContract.CallRecordHistoryPayload(**data_dict)
 
             except json.JSONDecodeError as e:
-                holler_service_logger.error(
+                talko_service_logger.error(
                     "Error in parsing JSON payload: {}".format(str(e))
                 )
-                return BadRequestResponse(
+                return TalkoBadRequestResponse(
                     detail=(
                         "Payload must be a valid JSON string. Example: "
                         '{"entity_type": "Lead", "entity_id": 123, "lead_id": 123, '
@@ -370,12 +370,12 @@ class CDRController:
                     )
                 )
             except ValueError as e:
-                holler_service_logger.error(
+                talko_service_logger.error(
                     "Validation error in payload: {}".format(str(e))
                 )
-                return BadRequestResponse(detail=str(e))
+                return TalkoBadRequestResponse(detail=str(e))
 
-            call_logs: Contract.AgentCallRecordHistoryResponse = (
+            call_logs: TalkoContract.AgentCallRecordHistoryResponse = (
                 await cdr_service.get_call_record_history(
                     user_id,
                     partner_id,
@@ -384,51 +384,51 @@ class CDRController:
                     data_dict,
                 )
             )
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Retrieved {} call records".format(call_logs.total_count)
             )
-            return SuccessResponse(call_logs)
+            return TalkoSuccessResponse(call_logs)
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Unexpected error retrieving call record history: {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail="An unexpected error occurred")
+            return TalkoInternalServerErrorResponse(detail="An unexpected error occurred")
 
     @cdr_router.post(
         "/{call_id}/custom-fields",
-        response_model=Contract.SetCDRCustomFieldsResponse,
+        response_model=TalkoContract.SetCDRCustomFieldsResponse,
         status_code=status.HTTP_200_OK,
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def set_cdr_custom_fields(
         request: Request,
         call_id: str,
-        payload: Contract.SetCDRCustomFieldsRequest,
-        cdr_service: CDRService = Depends(Provide[Container.cdr_config_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
-    ) -> Contract.SetCDRCustomFieldsResponse:
+        payload: TalkoContract.SetCDRCustomFieldsRequest,
+        cdr_service: TalkoCDRService = Depends(Provide[TalkoContainer.cdr_config_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> TalkoContract.SetCDRCustomFieldsResponse:
         try:
             current_user_data: dict = request.state.user
-            user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(CurrentUserMap.PARTNER_ID)
-            holler_service_logger.info(
+            user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
+            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+            talko_service_logger.info(
                 "User: {}, partner: {}, call_id: {}, set cdr custom fields api initiated. payload: {}".format(
                     user_id, partner_id, call_id, payload
                 )
             )
-            response: Contract.SetCDRCustomFieldsResponse = (
+            response: TalkoContract.SetCDRCustomFieldsResponse = (
                 await cdr_service.set_custom_field_values(
                     user_id, partner_id, call_id, payload.custom_fields
                 )
             )
-            return SuccessResponse(data=response)
-        except BadRequestError as e:
-            return BadRequestResponse(detail=str(e))
-        except ResourceNotFound as e:
-            return ResourceNotFoundResponse(detail=str(e))
+            return TalkoSuccessResponse(data=response)
+        except TalkoBadRequestError as e:
+            return TalkoBadRequestResponse(detail=str(e))
+        except TalkoResourceNotFound as e:
+            return TalkoResourceNotFoundResponse(detail=str(e))
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Unexpected error setting cdr custom fields: {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail="An unexpected error occurred")
+            return TalkoInternalServerErrorResponse(detail="An unexpected error occurred")

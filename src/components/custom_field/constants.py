@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class CustomFieldDataType(str, Enum):
+class TalkoCustomFieldDataType(str, Enum):
     STRING = "string"
     NUMBER = "number"
     DATE = "date"
@@ -9,8 +9,8 @@ class CustomFieldDataType(str, Enum):
     CHOICE = "choice"
 
 
-class CustomFieldEntityType(str, Enum):
-    CDR = "CDR"
+class TalkoCustomFieldEntityType(str, Enum):
+    TalkoCDR = "TalkoCDR"
 
 
 SET = "$set"

@@ -4,19 +4,19 @@ from typing import Callable
 from sqlalchemy import delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncResult, AsyncSession
 
-from src.components.digital_assets.logger_adapter import LoggerAdapter
-from src.components.digital_assets.models import DigitalAssets
+from src.components.digital_assets.logger_adapter import TalkoLoggerAdapter
+from src.components.digital_assets.models import TalkoDigitalAssets
 
-logger = LoggerAdapter().get_logger()
+logger = TalkoLoggerAdapter().get_logger()
 
 
-class DigitalAssetRepository:
+class TalkoDigitalAssetRepository:
     def __init__(
         self,
         session_factory: Callable[..., AbstractAsyncContextManager[AsyncSession]],
     ):
         """
-        Initialize the DigitalAssetRepository.
+        Initialize the TalkoDigitalAssetRepository.
 
         Args:
             session_factory (Callable[..., AbstractAsyncContextManager[AsyncSession]]): A callable session factory for creating database sessions.
@@ -26,7 +26,7 @@ class DigitalAssetRepository:
 
     async def get_digital_asset_by_partner_id(
         self, partner_id: int, asset_type: str
-    ) -> DigitalAssets:
+    ) -> TalkoDigitalAssets:
         """
         Fetch a digital asset by its partner ID and type.
 
@@ -38,7 +38,7 @@ class DigitalAssetRepository:
             asset_type (str): The type of the digital asset (e.g., image, video).
 
         Returns:
-            DigitalAssets: The digital asset object, or None if not found.
+            TalkoDigitalAssets: The digital asset object, or None if not found.
 
         Raises:
             Exception: If an unexpected error occurs during the database operation.
@@ -51,12 +51,12 @@ class DigitalAssetRepository:
                     )
                 )
                 get_query = (
-                    select(DigitalAssets)
+                    select(TalkoDigitalAssets)
                     .where(
-                        DigitalAssets.partner_id == partner_id,
-                        DigitalAssets.asset_type == asset_type,
+                        TalkoDigitalAssets.partner_id == partner_id,
+                        TalkoDigitalAssets.asset_type == asset_type,
                     )
-                    .order_by(desc(DigitalAssets.created_at))
+                    .order_by(desc(TalkoDigitalAssets.created_at))
                     .limit(1)
                 )
                 result: AsyncResult = await session.execute(get_query)
@@ -83,7 +83,7 @@ class DigitalAssetRepository:
                 )
                 raise e
 
-    async def get_digital_asset_by_id(self, digital_asset_id: int) -> DigitalAssets:
+    async def get_digital_asset_by_id(self, digital_asset_id: int) -> TalkoDigitalAssets:
         """
         Fetch a digital asset by its ID.
 
@@ -91,7 +91,7 @@ class DigitalAssetRepository:
             digital_asset_id (int): The ID of the digital asset to fetch.
 
         Returns:
-            DigitalAssets: The digital asset object if found, otherwise None.
+            TalkoDigitalAssets: The digital asset object if found, otherwise None.
 
         Raises:
             Exception: For any unexpected database operation errors.
@@ -99,8 +99,8 @@ class DigitalAssetRepository:
         async with self.__session_factory() as session:
             try:
                 logger.info(f"Fetching digital asset with ID: {digital_asset_id}")
-                get_query = select(DigitalAssets).where(
-                    DigitalAssets.id == digital_asset_id
+                get_query = select(TalkoDigitalAssets).where(
+                    TalkoDigitalAssets.id == digital_asset_id
                 )
                 result: AsyncResult = await session.execute(get_query)
                 asset = result.scalars().first()
@@ -118,7 +118,7 @@ class DigitalAssetRepository:
 
     async def create_digital_asset(
         self, partner_id: int, asset_type: str, file_name: str, user_id: int
-    ) -> DigitalAssets:
+    ) -> TalkoDigitalAssets:
         """
         Persist a digital asset record in the database.
 
@@ -129,7 +129,7 @@ class DigitalAssetRepository:
             user_id (int): ID of the user uploading the asset.
 
         Returns:
-            DigitalAssets: The persisted digital asset object.
+            TalkoDigitalAssets: The persisted digital asset object.
 
         Raises:
             Exception: For any unexpected database operation errors.
@@ -145,12 +145,12 @@ class DigitalAssetRepository:
                 )
 
                 fetch_query = (
-                    select(DigitalAssets)
+                    select(TalkoDigitalAssets)
                     .where(
-                        DigitalAssets.partner_id == partner_id,
-                        DigitalAssets.asset_type == asset_type,
+                        TalkoDigitalAssets.partner_id == partner_id,
+                        TalkoDigitalAssets.asset_type == asset_type,
                     )
-                    .order_by(desc(DigitalAssets.created_at))
+                    .order_by(desc(TalkoDigitalAssets.created_at))
                     .limit(1)
                 )
                 result = await session.execute(fetch_query)
@@ -166,7 +166,7 @@ class DigitalAssetRepository:
                     "Determined new version for digital asset: {}".format(new_version)
                 )
 
-                new_asset = DigitalAssets(
+                new_asset = TalkoDigitalAssets(
                     name=file_name,
                     partner_id=partner_id,
                     asset_type=asset_type,
@@ -205,8 +205,8 @@ class DigitalAssetRepository:
         async with self.__session_factory() as session:
             try:
                 logger.info(f"Deleting digital asset with ID: {digital_asset_id}")
-                delete_query = delete(DigitalAssets).where(
-                    DigitalAssets.id == digital_asset_id
+                delete_query = delete(TalkoDigitalAssets).where(
+                    TalkoDigitalAssets.id == digital_asset_id
                 )
                 result = await session.execute(delete_query)
                 await session.commit()
@@ -225,13 +225,13 @@ class DigitalAssetRepository:
                 )
                 raise e
             
-    async def get_digital_assets_by_digital_asset_ids(self, digital_asset_ids: list[int])-> list[DigitalAssets]:
+    async def get_digital_assets_by_digital_asset_ids(self, digital_asset_ids: list[int])-> list[TalkoDigitalAssets]:
         try:
             async with self.__session_factory() as session:
                 logger.info("Fetching digital assets with IDs: {}".format(digital_asset_ids))
                 query = (
-                    select(DigitalAssets)
-                    .where(DigitalAssets.id.in_(digital_asset_ids))
+                    select(TalkoDigitalAssets)
+                    .where(TalkoDigitalAssets.id.in_(digital_asset_ids))
                 )
                 result: AsyncResult = await session.execute(query)
                 assets = result.scalars().all()

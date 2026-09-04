@@ -1,24 +1,24 @@
 from typing import Union
 
-from src.components.partner_config.models import PartnerConfigModel
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.partner_config.models import TalkoPartnerConfigModel
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class PartnerConfigRepository:
+class TalkoPartnerConfigRepository:
     """
     Repository class for managing CRUD operations on Partner Configuration documents.
     """
 
     def __init__(
-        self, db_manager: DocDatabaseSessionManager, logger: HollerServiceLogger
+        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
     ):
         """
         Initialize the repository with a database session manager and logger.
 
         Args:
-            db_manager (DocDatabaseSessionManager): The MongoDB session manager.
-            logger (HollerServiceLogger): Logger instance for logging operations.
+            db_manager (TalkoDocDatabaseSessionManager): The MongoDB session manager.
+            logger (TalkoServiceLogger): Logger instance for logging operations.
         """
         self.db_manager = db_manager
         self.logger = logger
@@ -38,7 +38,7 @@ class PartnerConfigRepository:
         """
         try:
             async with self.db_manager.collection(
-                PartnerConfigModel.CollectionName.PARTNER_CONFIG
+                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
                 result = await collection.insert_one(config_dict)
                 self.logger.info(
@@ -61,7 +61,7 @@ class PartnerConfigRepository:
         """
         try:
             async with self.db_manager.collection(
-                PartnerConfigModel.CollectionName.PARTNER_CONFIG
+                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
                 return await collection.find().to_list(length=None)
         except Exception as e:
@@ -83,7 +83,7 @@ class PartnerConfigRepository:
         """
         try:
             async with self.db_manager.collection(
-                PartnerConfigModel.CollectionName.PARTNER_CONFIG
+                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
                 return await collection.find_one({"_id": id})
         except Exception as e:
@@ -95,7 +95,7 @@ class PartnerConfigRepository:
     async def find_partner_config_by_partner_id(self, id: int) -> Union[dict, None]:
         try:
             async with self.db_manager.collection(
-                PartnerConfigModel.CollectionName.PARTNER_CONFIG
+                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
                 return await collection.find_one({"partner_id": id})
         except Exception as e:
@@ -121,7 +121,7 @@ class PartnerConfigRepository:
         """
         try:
             async with self.db_manager.collection(
-                PartnerConfigModel.CollectionName.PARTNER_CONFIG
+                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
                 result = await collection.find_one_and_update(
                     {"_id": id}, {"$set": update_dict}, return_document=True
@@ -161,7 +161,7 @@ class PartnerConfigRepository:
         """
         try:
             async with self.db_manager.collection(
-                PartnerConfigModel.CollectionName.PARTNER_CONFIG
+                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
                 result = await collection.find_one_and_update(
                     {"_id": id},
@@ -202,7 +202,7 @@ class PartnerConfigRepository:
         """
         try:
             async with self.db_manager.collection(
-                PartnerConfigModel.CollectionName.PARTNER_CONFIG
+                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
                 result = await collection.find_one_and_update(
                     {"_id": id},

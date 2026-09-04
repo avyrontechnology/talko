@@ -3,7 +3,7 @@ from typing import Optional
 
 from redis import asyncio as aioredis
 
-from src.core.environment import ENV
+from src.core.environment import TalkoENV
 
 # Singleton pool — created once, reused across all calls.
 # The old implementation called aioredis.from_url() on every
@@ -33,12 +33,12 @@ async def get_redis_client() -> aioredis.Redis:
             return _redis_pool
 
         url = "{protocol}://{username}:{password}@{host}:{port}/{db}".format(
-            protocol=ENV.CACHE_PROTOCOL,
-            username=ENV.CACHE_USERNAME,
-            password=ENV.CACHE_PASSWORD,
-            host=ENV.CACHE_HOST,
-            port=ENV.CACHE_PORT,
-            db=ENV.CACHE_DB,
+            protocol=TalkoENV.CACHE_PROTOCOL,
+            username=TalkoENV.CACHE_USERNAME,
+            password=TalkoENV.CACHE_PASSWORD,
+            host=TalkoENV.CACHE_HOST,
+            port=TalkoENV.CACHE_PORT,
+            db=TalkoENV.CACHE_DB,
         )
         _redis_pool = aioredis.from_url(
             url,

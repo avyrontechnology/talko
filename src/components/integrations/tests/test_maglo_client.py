@@ -4,15 +4,15 @@ import aiohttp
 import pytest
 import pytest_asyncio
 
-from src.components.integrations.console.maglo_client import MagloClient
-from src.components.integrations.console.maglo_constants import MagloApiConstants
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.integrations.console.maglo_client import TalkoMagloClient
+from src.components.integrations.console.maglo_constants import TalkoMagloApiConstants
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 @pytest.fixture
 def mock_logger():
     """Mock logger"""
-    logger = MagicMock(spec=HollerServiceLogger)
+    logger = MagicMock(spec=TalkoServiceLogger)
     logger.info = MagicMock()
     logger.debug = MagicMock()
     logger.error = MagicMock()
@@ -23,10 +23,10 @@ def mock_logger():
 @pytest_asyncio.fixture
 async def maglo_client(mock_logger):
     """
-    Async fixture: creates MagloClient and cleans up session after test.
+    Async fixture: creates TalkoMagloClient and cleans up session after test.
     Uses pytest_asyncio.fixture for proper async handling.
     """
-    client = MagloClient(logger=mock_logger)
+    client = TalkoMagloClient(logger=mock_logger)
     yield client
     if not client.session.closed:
         await client.close()
@@ -125,13 +125,13 @@ async def test_close_session(maglo_client, mock_logger):
     assert not maglo_client.session.closed
     await maglo_client.close()
     assert maglo_client.session.closed
-    mock_logger.debug.assert_called_with("MagloClient session closed")
+    mock_logger.debug.assert_called_with("TalkoMagloClient session closed")
 
 
 @pytest.mark.asyncio
 async def test_timeout_configuration(maglo_client):
     assert (
-        maglo_client.session.timeout.total == MagloApiConstants.REQUEST_TIMEOUT_SECONDS
+        maglo_client.session.timeout.total == TalkoMagloApiConstants.REQUEST_TIMEOUT_SECONDS
     )
 
 
@@ -145,7 +145,7 @@ async def test_headers_default(maglo_client):
 async def test_base_url_configuration(maglo_client):
     # Verify base URL is properly stripped of trailing slashes
     assert not maglo_client.base_url.endswith("/")
-    assert maglo_client.base_url == MagloApiConstants.MAGLO_BASE_URL.rstrip("/")
+    assert maglo_client.base_url == TalkoMagloApiConstants.MAGLO_BASE_URL.rstrip("/")
 
 
 @pytest.mark.asyncio
@@ -174,9 +174,9 @@ async def test_upsert_ivr_lead_payload_structure(maglo_client, mock_logger):
         # Verify the patch method was called with correct payload
         call_args = mock_patch.call_args
         expected_payload = {
-            MagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: 12,
-            MagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: 70,
-            MagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: "+919876543210",
+            TalkoMagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: 12,
+            TalkoMagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: 70,
+            TalkoMagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: "+919876543210",
         }
         assert call_args[1]["json"] == expected_payload
 
@@ -212,13 +212,13 @@ async def test_reassign_lead_by_phone_payload_structure(maglo_client, mock_logge
         )
 
         call_args = mock_patch.call_args
-        assert call_args[0][0] == MagloApiConstants.reassign_lead_by_phone_url()
+        assert call_args[0][0] == TalkoMagloApiConstants.reassign_lead_by_phone_url()
         expected_payload = {
-            MagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: "+919876543210",
-            MagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: 12,
-            MagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: 70,
-            MagloApiConstants.DEFAULT_AGENT_ID_PARAM: 34,
-            MagloApiConstants.LEAD_PAYLOAD_PERFORMED_BY: 34,
+            TalkoMagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: "+919876543210",
+            TalkoMagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: 12,
+            TalkoMagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: 70,
+            TalkoMagloApiConstants.DEFAULT_AGENT_ID_PARAM: 34,
+            TalkoMagloApiConstants.LEAD_PAYLOAD_PERFORMED_BY: 34,
         }
         assert call_args[1]["json"] == expected_payload
 
@@ -259,7 +259,7 @@ async def test_get_leads_created_today_success(maglo_client, mock_logger):
         assert result == mock_data
         # Verify payload
         call_args = mock_post.call_args
-        assert call_args[1]["json"] == {MagloApiConstants.API_KEY_FIELD: "test_key"}
+        assert call_args[1]["json"] == {TalkoMagloApiConstants.API_KEY_FIELD: "test_key"}
         mock_logger.info.assert_called_with("Fetching leads created today")
 
 

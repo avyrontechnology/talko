@@ -8,7 +8,7 @@ from src.components.call_management.messages import (
     INVALID_PARAMETER,
     UNEXPECTED_API_RESPONSE,
 )
-from src.components.call_management.tata_tele.call_service import TataTeleCallHandler
+from src.components.call_management.tata_tele.call_service import TalkoTataTeleCallHandler
 
 
 @pytest.mark.asyncio
@@ -35,7 +35,7 @@ class TestTataTeleCallHandler:
                 "headers": {"accept": "application/json"},
             },
         }
-        return TataTeleCallHandler(
+        return TalkoTataTeleCallHandler(
             config=config, logger=mock_logger, vendor_type="TATA"
         )
 
@@ -138,7 +138,7 @@ class TestTataTeleCallHandler:
 
     async def test_hangup_call_missing_config(self):
         mock_logger = MagicMock()
-        handler = TataTeleCallHandler(
+        handler = TalkoTataTeleCallHandler(
             config={"generic_url_handler": {"call_api": {}}},
             logger=mock_logger,
             vendor_type="TATA",
@@ -268,7 +268,7 @@ class TestTataTeleCallHandler:
 
     async def test_find_live_call_id_not_configured_skips_http_call(self):
         mock_logger = MagicMock()
-        handler = TataTeleCallHandler(
+        handler = TalkoTataTeleCallHandler(
             config={"generic_url_handler": {"call_api": {}}},
             logger=mock_logger,
             vendor_type="TATA",

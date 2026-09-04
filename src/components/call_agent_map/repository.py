@@ -3,21 +3,21 @@ from typing import Any, Dict, List, Optional
 from pymongo.results import InsertOneResult, UpdateResult
 
 from src.components.call_agent_map.models import (
-    AgentDidMappingModel,
-    AgentServiceBoardMappingModel,
+    TalkoAgentDidMappingModel,
+    TalkoAgentServiceBoardMappingModel,
 )
-from src.core.doc_db import DocDatabaseSessionManager
-from src.exceptions import BadRequestError
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.exceptions import TalkoBadRequestError
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class AgentMappingRepository:
+class TalkoAgentMappingRepository:
     """
     Repository for managing call-related data operations in the database.
     """
 
     def __init__(
-        self, db_manager: DocDatabaseSessionManager, logger: HollerServiceLogger
+        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
     ) -> None:
         """
         Initialize the repository.
@@ -26,8 +26,8 @@ class AgentMappingRepository:
             db_manager: MongoDB session manager.
             logger: Logger for capturing logs.
         """
-        self.db_manager: DocDatabaseSessionManager = db_manager
-        self.logger: HollerServiceLogger = logger
+        self.db_manager: TalkoDocDatabaseSessionManager = db_manager
+        self.logger: TalkoServiceLogger = logger
 
     async def get_all_agent_mapping(self) -> Optional[Dict[str, Any]]:
         """
@@ -37,7 +37,7 @@ class AgentMappingRepository:
         """
         try:
             async with self.db_manager.collection(
-                AgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
+                TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
                 document: Optional[Dict[str, Any]] = await collection.find(
                     {"is_active": True}
@@ -70,7 +70,7 @@ class AgentMappingRepository:
 
             self.logger.debug("Get agent did mapping final query: {}".format(query))
             async with self.db_manager.collection(
-                AgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
+                TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
                 document: Optional[Dict[str, Any]] = await collection.find_one(query)
                 self.logger.debug(
@@ -100,7 +100,7 @@ class AgentMappingRepository:
         try:
             self.logger.debug("Inserting agent did mapping data: ".format(mapping_dict))
             async with self.db_manager.collection(
-                AgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
+                TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
                 result: InsertOneResult = await collection.insert_one(mapping_dict)
                 inserted_id: str = str(result.inserted_id)
@@ -128,7 +128,7 @@ class AgentMappingRepository:
         """
         try:
             async with self.db_manager.collection(
-                AgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
+                TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
                 result: UpdateResult = await collection.update_one(
                     {"agent_id": agent_id, "partner_id": partner_id, "is_active": True},
@@ -163,7 +163,7 @@ class AgentMappingRepository:
         try:
             results: List[Dict[str, Any]] = []
             async with self.db_manager.collection(
-                AgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
+                TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
                 for mapping in mappings:
                     try:
@@ -212,7 +212,7 @@ class AgentMappingRepository:
         """
         try:
             async with self.db_manager.collection(
-                AgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
+                TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
                 count: int = await collection.count_documents(
                     {"partner_id": partner_id, "is_active": True}
@@ -245,11 +245,11 @@ class AgentMappingRepository:
             str: An unassigned DID.
 
         Raises:
-            BadRequestError: If no unassigned DID is available.
+            TalkoBadRequestError: If no unassigned DID is available.
         """
         try:
             async with self.db_manager.collection(
-                AgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
+                TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
                 # Get all currently assigned DIDs for this partner
                 assigned_dids: List[str] = await collection.distinct(
@@ -260,7 +260,7 @@ class AgentMappingRepository:
                     did for did in agent_mapping_dids if did not in assigned_dids
                 ]
                 if not available_dids:
-                    raise BadRequestError("No available DIDs for agent mapping")
+                    raise TalkoBadRequestError("No available DIDs for agent mapping")
                 return available_dids[
                     0
                 ]  # Simple first-available; can be enhanced with round-robin
@@ -285,7 +285,7 @@ class AgentMappingRepository:
         try:
             self.logger.debug("Inserting mapping data: ".format(mapping_dict))
             async with self.db_manager.collection(
-                AgentServiceBoardMappingModel.CollectionName.AGENT_SERVICE_BOARD_MAPPING
+                TalkoAgentServiceBoardMappingModel.CollectionName.AGENT_SERVICE_BOARD_MAPPING
             ) as collection:
                 result: InsertOneResult = await collection.insert_one(mapping_dict)
                 inserted_id: str = str(result.inserted_id)
@@ -303,7 +303,7 @@ class AgentMappingRepository:
         """
         try:
             async with self.db_manager.collection(
-                AgentServiceBoardMappingModel.CollectionName.AGENT_SERVICE_BOARD_MAPPING
+                TalkoAgentServiceBoardMappingModel.CollectionName.AGENT_SERVICE_BOARD_MAPPING
             ) as collection:
                 agents: List[Dict[str, Any]] = await collection.find(
                     {"service_board_id": service_board_id, "partner_id":partner_id, "is_active": True}
@@ -327,7 +327,7 @@ class AgentMappingRepository:
         """
         try:
             async with self.db_manager.collection(
-                AgentServiceBoardMappingModel.CollectionName.AGENT_SERVICE_BOARD_MAPPING
+                TalkoAgentServiceBoardMappingModel.CollectionName.AGENT_SERVICE_BOARD_MAPPING
             ) as collection:
                 result = await collection.update_many(
                     {"service_board_id": service_board_id, "partner_id": partner_id},

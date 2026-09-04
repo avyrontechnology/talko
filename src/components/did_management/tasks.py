@@ -4,11 +4,11 @@ from typing import Any, Dict
 from celery import shared_task
 from pymongo.operations import UpdateOne
 
-from src.components.did_management.constants import DIDStatus
-from src.components.did_management.models import PhoneNumberManagement
-from src.core.container import Container
-from src.loggers.holler_celery_loggers import CeleryLogger
-from src.utils.datetime_util import DateTimeUtil
+from src.components.did_management.constants import TalkoDIDStatus
+from src.components.did_management.models import TalkoPhoneNumberManagement
+from src.core.container import TalkoContainer
+from src.loggers.talko_celery_loggers import TalkoCeleryLogger
+from src.utils.datetime_util import TalkoDateTimeUtil
 
 
 @shared_task(bind=True, max_retries=3, soft_time_limit=300, time_limit=360)
@@ -21,14 +21,14 @@ def process_expired_did_cooldowns(self) -> str:
     Returns:
         str: Completion message with count of updated DIDs
     """
-    logger = CeleryLogger.get_logger()
+    logger = TalkoCeleryLogger.get_logger()
     logger.info("Starting DID cooldown expiry task")
 
     try:
-        container = Container()
+        container = TalkoContainer()
         db = container.db()
 
-        now: int = DateTimeUtil.get_current_time()
+        now: int = TalkoDateTimeUtil.get_current_time()
         updated_count: int = 0
 
         logger.info(
@@ -43,11 +43,11 @@ def process_expired_did_cooldowns(self) -> str:
             # the batch status transition stay consistent with each other.
             async with db.connect() as mongo_db:
                 collection = mongo_db[
-                    PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                    TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
                 ]
 
                 query: Dict[str, Any] = {
-                    "status": DIDStatus.COOLING_PERIOD.value,
+                    "status": TalkoDIDStatus.COOLING_PERIOD.value,
                     "cooldown_until": {"$lte": now},
                 }
 
@@ -75,7 +75,7 @@ def process_expired_did_cooldowns(self) -> str:
                             {"_id": doc["_id"]},
                             {
                                 "$set": {
-                                    "status": DIDStatus.COOLDOWN_COMPLETED.value,
+                                    "status": TalkoDIDStatus.COOLDOWN_COMPLETED.value,
                                     "cooldown_until": None,
                                     "status_changed_at": now,
                                 }

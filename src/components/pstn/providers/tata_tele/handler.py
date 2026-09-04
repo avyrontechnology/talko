@@ -1,16 +1,16 @@
 import base64
 
-from src.components.pstn.constants import CallDirection, PSTNProvider
-from src.components.pstn.dto import CallContext
-from src.components.pstn.providers.base import AbstractPSTNProvider
-from src.components.pstn.providers.tata_tele.events import TataTeleEvents
+from src.components.pstn.constants import TalkoCallDirection, TalkoPSTNProvider
+from src.components.pstn.dto import TalkoCallContext
+from src.components.pstn.providers.base import TalkoAbstractPSTNProvider
+from src.components.pstn.providers.tata_tele.events import TalkoTataTeleEvents
 
 
-class TataTeleProvider(AbstractPSTNProvider):
+class TalkoTataTeleProvider(TalkoAbstractPSTNProvider):
     """
     Tata Tele SmartFlo PSTN provider implementation.
 
-    Implements AbstractPSTNProvider for the Tata SmartFlo bi-directional
+    Implements TalkoAbstractPSTNProvider for the Tata SmartFlo bi-directional
     audio streaming WebSocket protocol.
 
     Key protocol requirements (from Tata SmartFlo docs):
@@ -21,9 +21,9 @@ class TataTeleProvider(AbstractPSTNProvider):
         - Inbound audio format: identical — μ-law 8kHz mono, base64-encoded.
     """
 
-    async def parse_start_event(self, raw_event: dict) -> CallContext:
+    async def parse_start_event(self, raw_event: dict) -> TalkoCallContext:
         """
-        Parse a Tata Tele 'start' WebSocket event into a CallContext.
+        Parse a Tata Tele 'start' WebSocket event into a TalkoCallContext.
 
         Extracts callSid, streamSid, DID, caller number, and direction
         from the event payload. streamSid is required for all subsequent
@@ -33,17 +33,17 @@ class TataTeleProvider(AbstractPSTNProvider):
             raw_event: Raw parsed JSON dict of the start event from Tata.
 
         Returns:
-            Populated CallContext with provider, call_sid, stream_sid,
+            Populated TalkoCallContext with provider, call_sid, stream_sid,
             did_number, caller_number, and direction set.
         """
-        parsed = TataTeleEvents.parse_start(raw_event)
-        return CallContext(
-            provider=PSTNProvider.TATA_TELE,
+        parsed = TalkoTataTeleEvents.parse_start(raw_event)
+        return TalkoCallContext(
+            provider=TalkoPSTNProvider.TATA_TELE,
             call_sid=parsed["call_sid"],
             stream_sid=parsed["stream_sid"],
             did_number=parsed["did_number"],
             caller_number=parsed["caller_number"],
-            direction=CallDirection(parsed["direction"]),
+            direction=TalkoCallDirection(parsed["direction"]),
         )
 
     async def send_audio(
@@ -68,8 +68,8 @@ class TataTeleProvider(AbstractPSTNProvider):
             stream_sid:  streamSid from the start event. Required by Tata.
             chunk:       Monotonically increasing chunk counter. Required by Tata.
         """
-        await ws.send_text(TataTeleEvents.build_media(audio_bytes, stream_sid, chunk))
-        await ws.send_text(TataTeleEvents.build_mark(label, stream_sid))
+        await ws.send_text(TalkoTataTeleEvents.build_media(audio_bytes, stream_sid, chunk))
+        await ws.send_text(TalkoTataTeleEvents.build_mark(label, stream_sid))
 
     async def send_clear(self, ws, stream_sid: str = "") -> None:
         """
@@ -82,7 +82,7 @@ class TataTeleProvider(AbstractPSTNProvider):
             ws:         WebSocket connection to Tata.
             stream_sid: streamSid from the start event. Required by Tata.
         """
-        await ws.send_text(TataTeleEvents.build_clear(stream_sid))
+        await ws.send_text(TalkoTataTeleEvents.build_clear(stream_sid))
 
     def is_media_event(self, event: dict) -> bool:
         """Return True if the event carries inbound audio from the caller."""

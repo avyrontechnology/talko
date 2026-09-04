@@ -2,13 +2,13 @@ import importlib.util
 import logging
 import os
 
-from src.core.environment import ENV
+from src.core.environment import TalkoENV
 
 
-class LoggerAdapter:
-    def __init__(self, config_path: str = ENV.LOGGING_CONFIG_PATH):
+class TalkoLoggerAdapter:
+    def __init__(self, config_path: str = TalkoENV.LOGGING_CONFIG_PATH):
         """
-        Initialize LoggerAdapter with the specified config path.
+        Initialize TalkoLoggerAdapter with the specified config path.
         """
         self.logging_config_path = config_path
         self.logger = self._initialize_logger()

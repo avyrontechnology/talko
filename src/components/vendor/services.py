@@ -2,28 +2,28 @@ import uuid
 
 from bson import ObjectId
 
-from src.components.vendor.dto import Contract
+from src.components.vendor.dto import TalkoContract
 from src.components.vendor.message import (
     VENDOR_ACTIVATED_SUCCESSFULLY,
     VENDOR_CREATED_SUCCESSFULLY,
     VENDOR_DEACTIVATED_SUCCESSFULLY,
 )
-from src.components.vendor.models import VendorModel
-from src.components.vendor.repository import VendorRepository
-from src.components.vendor.validation import VendorValidator
-from src.exceptions import ConflictError, ResourceNotFound
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.vendor.models import TalkoVendorModel
+from src.components.vendor.repository import TalkoVendorRepository
+from src.components.vendor.validation import TalkoVendorValidator
+from src.exceptions import TalkoConflictError, TalkoResourceNotFound
+from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.common_messages import VENDOR_NOT_FOUND
-from src.utils.datetime_util import DateTimeUtil
+from src.utils.datetime_util import TalkoDateTimeUtil
 
 
-class VendorService:
+class TalkoVendorService:
     def __init__(
         self,
-        vendor_repo: VendorRepository,
-        logger: HollerServiceLogger,
-        datetime_util: DateTimeUtil,
-        validator: VendorValidator,
+        vendor_repo: TalkoVendorRepository,
+        logger: TalkoServiceLogger,
+        datetime_util: TalkoDateTimeUtil,
+        validator: TalkoVendorValidator,
     ):
         self.repository = vendor_repo
         self.logger = logger
@@ -31,8 +31,8 @@ class VendorService:
         self.validator = validator
 
     async def create_vendor(
-        self, vendor: Contract.VendorCreate
-    ) -> Contract.VendorResponse:
+        self, vendor: TalkoContract.VendorCreate
+    ) -> TalkoContract.VendorResponse:
         self.logger.info("Creating vendor with name: {}".format(vendor.name))
         try:
             await self.validator.validate_vendor_create(vendor)
@@ -46,7 +46,7 @@ class VendorService:
                 )
             )
 
-            vendor_record = VendorModel(
+            vendor_record = TalkoVendorModel(
                 name=vendor.name,
                 slug=str(uuid.uuid4()),
                 vendor_type=vendor_dict["vendor_type"].value,
@@ -54,7 +54,7 @@ class VendorService:
             ).model_dump(mode="json")
 
             vendor_id = await self.repository.insert_vendor(vendor_record)
-            return Contract.VendorResponse(
+            return TalkoContract.VendorResponse(
                 id=str(vendor_id), message=VENDOR_CREATED_SUCCESSFULLY
             )
 
@@ -62,7 +62,7 @@ class VendorService:
             self.logger.error("Error creating vendor: {}".format(str(e)))
             raise
 
-    async def get_vendors(self) -> list[Contract.GetAllVendorData]:
+    async def get_vendors(self) -> list[TalkoContract.GetAllVendorData]:
         self.logger.info("Get vendor all list started.")
         try:
             vendors = await self.repository.find_all_vendors()
@@ -71,38 +71,38 @@ class VendorService:
                 vendor["id"] = str(vendor["_id"])
                 del vendor["_id"]
                 vendor_responses.append(vendor)
-            return [Contract.GetAllVendorData(**vendor) for vendor in vendor_responses]
+            return [TalkoContract.GetAllVendorData(**vendor) for vendor in vendor_responses]
         except Exception as e:
             self.logger.error("Error fetching vendors: {}".format(str(e)))
             raise
 
     async def get_vendor_by_id(
         self, vendor_id: str
-    ) -> Contract.GetVendorDataOnTheBasisOfId:
+    ) -> TalkoContract.GetVendorDataOnTheBasisOfId:
         self.logger.info("Get vendor by ID started.")
         try:
             object_id = ObjectId(vendor_id)
             vendor = await self.repository.find_vendor_by_id(object_id)
             if not vendor:
-                raise ResourceNotFound(VENDOR_NOT_FOUND.format(vendor_id))
+                raise TalkoResourceNotFound(VENDOR_NOT_FOUND.format(vendor_id))
 
             vendor["id"] = str(vendor["_id"])
             del vendor["_id"]
-            return Contract.GetVendorDataOnTheBasisOfId(**vendor)
+            return TalkoContract.GetVendorDataOnTheBasisOfId(**vendor)
 
         except Exception as e:
             self.logger.error("Error getting vendor by ID: {}".format(str(e)))
             raise
 
-    async def activate_vendor(self, vendor_id: str) -> Contract.VendorResponse:
+    async def activate_vendor(self, vendor_id: str) -> TalkoContract.VendorResponse:
         self.logger.info("Activating vendor with ID: {}".format(vendor_id))
         try:
             object_id = ObjectId(vendor_id)
             vendor = await self.repository.find_vendor_by_id_all(object_id)
             if not vendor:
-                raise ResourceNotFound(VENDOR_NOT_FOUND.format(vendor_id))
+                raise TalkoResourceNotFound(VENDOR_NOT_FOUND.format(vendor_id))
             if vendor["is_active"]:
-                raise ConflictError(
+                raise TalkoConflictError(
                     "Vendor with ID {} is already active.".format(vendor_id)
                 )
 
@@ -111,7 +111,7 @@ class VendorService:
                 object_id, is_active=True, updated_at=updated_timestamp
             )
 
-            return Contract.VendorResponse(
+            return TalkoContract.VendorResponse(
                 id=str(updated_vendor["_id"]), message=VENDOR_ACTIVATED_SUCCESSFULLY
             )
 
@@ -119,15 +119,15 @@ class VendorService:
             self.logger.error("Error activating vendor: {}".format(str(e)))
             raise
 
-    async def deactivate_vendor(self, vendor_id: str) -> Contract.VendorResponse:
+    async def deactivate_vendor(self, vendor_id: str) -> TalkoContract.VendorResponse:
         self.logger.info("Deactivating vendor with ID: {}".format(vendor_id))
         try:
             object_id = ObjectId(vendor_id)
             vendor = await self.repository.find_vendor_by_id_all(object_id)
             if not vendor:
-                raise ResourceNotFound(VENDOR_NOT_FOUND.format(vendor_id))
+                raise TalkoResourceNotFound(VENDOR_NOT_FOUND.format(vendor_id))
             if not vendor["is_active"]:
-                raise ConflictError(
+                raise TalkoConflictError(
                     "Vendor with ID {} is already active.".format(vendor_id)
                 )
 
@@ -136,7 +136,7 @@ class VendorService:
                 object_id, is_active=False, updated_at=updated_timestamp
             )
 
-            return Contract.VendorResponse(
+            return TalkoContract.VendorResponse(
                 id=str(updated_vendor["_id"]), message=VENDOR_DEACTIVATED_SUCCESSFULLY
             )
 

@@ -4,28 +4,28 @@ from typing import Dict, List, Optional
 from fastapi import HTTPException
 
 from src.components.call_assets.messages import INVALID_ASSET_TYPE
-from src.components.call_assets.models import AssetsModel
-from src.components.call_assets.repository import AssetRepository
-from src.components.digital_assets.constants import DigitalAssetEnum
-from src.components.digital_assets.schema import DigitalAssetResponse
-from src.components.digital_assets.storage.helper import StorageHelper
-from src.components.digital_assets.utils import DigitalAssetUtils
-from src.core.environment import ENV
-from src.exceptions import InvalidAssetTypeError, ResourceNotFound
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.call_assets.models import TalkoAssetsModel
+from src.components.call_assets.repository import TalkoAssetRepository
+from src.components.digital_assets.constants import TalkoDigitalAssetEnum
+from src.components.digital_assets.schema import TalkoDigitalAssetResponse
+from src.components.digital_assets.storage.helper import TalkoStorageHelper
+from src.components.digital_assets.utils import TalkoDigitalAssetUtils
+from src.core.environment import TalkoENV
+from src.exceptions import TalkoInvalidAssetTypeError, TalkoResourceNotFound
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class AssetService:
-    def __init__(self, repository: AssetRepository, logger: HollerServiceLogger):
+class TalkoAssetService:
+    def __init__(self, repository: TalkoAssetRepository, logger: TalkoServiceLogger):
         """
-        Initialize the DigitalAssetService.
+        Initialize the TalkoDigitalAssetService.
 
         Args:
-            digital_asset_repository (DigitalAssetRepository): The repository for digital asset operations.
+            digital_asset_repository (TalkoDigitalAssetRepository): The repository for digital asset operations.
             logger: The logger instance for logging service operations.
         """
-        self.__repository: AssetRepository = repository
-        self.__logger: HollerServiceLogger = logger
+        self.__repository: TalkoAssetRepository = repository
+        self.__logger: TalkoServiceLogger = logger
 
     async def get_digital_asset_details(self, partner_id: int, asset_type: str) -> dict:
         """
@@ -36,7 +36,7 @@ class AssetService:
             asset_type (str): The Type of the digital asset to retrieve.
 
         Returns:
-            DigitalAssetResponse: The response schema containing digital asset details.
+            TalkoDigitalAssetResponse: The response schema containing digital asset details.
 
         Raises:
             ValueError: If the digital asset is not found.
@@ -48,8 +48,8 @@ class AssetService:
                     partner_id, asset_type
                 )
             )
-            if not DigitalAssetUtils.is_valid_asset_type(asset_type):
-                raise InvalidAssetTypeError(INVALID_ASSET_TYPE)
+            if not TalkoDigitalAssetUtils.is_valid_asset_type(asset_type):
+                raise TalkoInvalidAssetTypeError(INVALID_ASSET_TYPE)
             asset: Optional[Dict] = (
                 await self.__repository.get_digital_asset_by_partner_id(
                     partner_id, asset_type
@@ -60,18 +60,18 @@ class AssetService:
                 self.__logger.error(
                     "Digital asset not found for partner_id {}".format(partner_id)
                 )
-                raise ResourceNotFound(
+                raise TalkoResourceNotFound(
                     "Digital asset with ID {} not found".format(partner_id)
                 )
 
-            asset_url: str = StorageHelper.get_presigned_url(asset["name"])
+            asset_url: str = TalkoStorageHelper.get_presigned_url(asset["name"])
             result: dict = {
                 "id": asset["id"],
                 "name": asset["name"],
                 "partner_id": asset["partner_id"],
                 "version": asset["version"],
                 "url": asset_url,
-                "asset_type": DigitalAssetEnum[asset["asset_type"]],
+                "asset_type": TalkoDigitalAssetEnum[asset["asset_type"]],
                 "additional_info": asset.get("additional_info"),
                 "created_by": asset.get("created_by"),
                 "updated_by": asset.get("updated_by"),

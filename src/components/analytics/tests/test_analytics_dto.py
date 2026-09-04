@@ -4,19 +4,19 @@ import pytest
 
 from src.components.analytics import messages as analytics_messages
 from src.components.analytics.dto import (
-    AgentCallAnalyticsRequest,
-    AgentTalkTimeDistributionRequest,
-    AnalyticsRequest,
-    AnalyticsResponse,
-    DashboardFollowupTrendsRequest,
-    PartnerServiceBoardRequest,
-    TotalAgentTalkTimeRequest,
+    TalkoAgentCallAnalyticsRequest,
+    TalkoAgentTalkTimeDistributionRequest,
+    TalkoAnalyticsRequest,
+    TalkoAnalyticsResponse,
+    TalkoDashboardFollowupTrendsRequest,
+    TalkoPartnerServiceBoardRequest,
+    TalkoTotalAgentTalkTimeRequest,
 )
-from src.components.analytics.enums import TimeInterval
+from src.components.analytics.enums import TalkoTimeInterval
 
 
 def test_analytics_request_serialization():
-    req = AnalyticsRequest(
+    req = TalkoAnalyticsRequest(
         analytics_type="agent_calls",
         data={"date": datetime(2023, 1, 1, 12, 0, 0)},
     )
@@ -28,9 +28,9 @@ def test_analytics_request_serialization():
 @pytest.mark.parametrize(
     "model_class",
     [
-        AgentCallAnalyticsRequest,
-        TotalAgentTalkTimeRequest,
-        AgentTalkTimeDistributionRequest,
+        TalkoAgentCallAnalyticsRequest,
+        TalkoTotalAgentTalkTimeRequest,
+        TalkoAgentTalkTimeDistributionRequest,
     ],
 )
 def test_agent_related_requests_defaults(model_class):
@@ -46,7 +46,7 @@ def test_agent_related_requests_defaults(model_class):
 
 
 def test_partner_service_board_request_valid():
-    req = PartnerServiceBoardRequest(
+    req = TalkoPartnerServiceBoardRequest(
         time_range="1625097600000-1627689600000",  # 2021-07-01 to 2021-07-31
         service_board_id=[1, 2],
     )
@@ -56,7 +56,7 @@ def test_partner_service_board_request_valid():
 
 def test_partner_service_board_request_invalid_date_range():
     with pytest.raises(ValueError) as excinfo:
-        PartnerServiceBoardRequest(
+        TalkoPartnerServiceBoardRequest(
             time_range="1627689600000-1625097600000",  # end < start
             service_board_id=[1],
         )
@@ -64,17 +64,17 @@ def test_partner_service_board_request_invalid_date_range():
 
 
 def test_analytics_response():
-    resp = AnalyticsResponse(analytics_type="talk_time", data={"total": 100})
+    resp = TalkoAnalyticsResponse(analytics_type="talk_time", data={"total": 100})
     assert resp.analytics_type == "talk_time"
     assert resp.data["total"] == 100
 
 
 def test_dashboard_call_trends_request_valid():
-    req = DashboardFollowupTrendsRequest(
+    req = TalkoDashboardFollowupTrendsRequest(
         time_range="1722470400000-1726444800000",  # 2025-08-01 to 2025-09-15
         service_board_id=[40, 41],
         metric_filter="agent_missed_calls",
-        trend_basis=TimeInterval.WEEKS.value,
+        trend_basis=TalkoTimeInterval.WEEKS.value,
     )
     assert req.time_range == "1722470400000-1726444800000"
     assert req.service_board_id == [40, 41]
@@ -83,7 +83,7 @@ def test_dashboard_call_trends_request_valid():
 
 def test_dashboard_call_trends_request_invalid_metric():
     with pytest.raises(ValueError) as excinfo:
-        DashboardFollowupTrendsRequest(
+        TalkoDashboardFollowupTrendsRequest(
             time_range="1722470400000-1726444800000",
             service_board_id=[40],
             metric_filter="invalid_metric",
@@ -94,7 +94,7 @@ def test_dashboard_call_trends_request_invalid_metric():
 
 def test_dashboard_call_trends_request_invalid_trend_basis():
     with pytest.raises(ValueError) as excinfo:
-        DashboardFollowupTrendsRequest(
+        TalkoDashboardFollowupTrendsRequest(
             time_range="1722470400000-1726444800000",
             service_board_id=[40],
             metric_filter="agent_missed_calls",
@@ -105,7 +105,7 @@ def test_dashboard_call_trends_request_invalid_trend_basis():
 
 def test_dashboard_call_trends_request_invalid_time_range():
     with pytest.raises(ValueError) as excinfo:
-        DashboardFollowupTrendsRequest(
+        TalkoDashboardFollowupTrendsRequest(
             time_range="1726444800000-1722470400000",  # end < start
             service_board_id=[40],
             metric_filter="agent_missed_calls",

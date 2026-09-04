@@ -2,21 +2,21 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.components.call_operation.cdr_update import CDRUpdateTask
-from src.exceptions import BadRequestError, ResourceNotFound
+from src.components.call_operation.cdr_update import TalkoCDRUpdateTask
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 
 
 @pytest.mark.asyncio
 class TestCDRUpdateTask:
 
     def setup_method(self):
-        """Initialize mocks and CDRUpdateTask instance before each test"""
+        """Initialize mocks and TalkoCDRUpdateTask instance before each test"""
         self.mock_cdr_repo = MagicMock()
         self.mock_vendor_repo = MagicMock()
         self.mock_call_repo = MagicMock()
         self.mock_logger = MagicMock()
 
-        self.task = CDRUpdateTask(
+        self.task = TalkoCDRUpdateTask(
             cdr_repository=self.mock_cdr_repo,
             vendor_config_repository=self.mock_vendor_repo,
             call_repository=self.mock_call_repo,
@@ -36,13 +36,13 @@ class TestCDRUpdateTask:
         self.mock_vendor_repo.get_vendor_config_by_vendor_type = AsyncMock(
             return_value=[]
         )
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await self.task.fetch_vendor_config()
         self.mock_logger.error.assert_called()
 
     async def test_fetch_cdr_data_missing_url_or_token(self):
         cdr_config = {"endpoint": None, "auth_credentials": {}}
-        with pytest.raises(BadRequestError):
+        with pytest.raises(TalkoBadRequestError):
             await self.task.fetch_cdr_data("123", cdr_config)
         self.mock_logger.error.assert_called()
 
@@ -74,7 +74,7 @@ class TestCDRUpdateTask:
         self.task.fetch_cdr_data = AsyncMock(return_value={"status": "success"})
 
         with patch(
-            "src.components.call_operation.cdr_update.TataTeleWebhookHandler"
+            "src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler"
         ) as mock_handler_class:
             mock_handler = mock_handler_class.return_value
             mock_handler.process_cdr_api_payload = AsyncMock(
@@ -86,7 +86,7 @@ class TestCDRUpdateTask:
 
     async def test_execute_missing_cdr_config(self):
         self.task.fetch_vendor_config = AsyncMock(return_value={})  # no cdr_url_handler
-        with pytest.raises(BadRequestError):
+        with pytest.raises(TalkoBadRequestError):
             await self.task.execute("tata_tele")
         self.mock_logger.error.assert_called()
 
@@ -100,7 +100,7 @@ class TestCDRUpdateTask:
         self.task.fetch_cdr_data = AsyncMock(return_value={"status": "success"})
 
         with patch(
-            "src.components.call_operation.cdr_update.TataTeleWebhookHandler"
+            "src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler"
         ) as mock_handler_class:
             mock_handler = mock_handler_class.return_value
             mock_handler.process_cdr_api_payload = AsyncMock(
@@ -139,9 +139,9 @@ class TestCDRUpdateTask:
         # Mock fetch_cdr_data
         self.task.fetch_cdr_data = AsyncMock(return_value=mock_payload)
 
-        # Mock TataTeleWebhookHandler
+        # Mock TalkoTataTeleWebhookHandler
         with patch(
-            "src.components.call_operation.cdr_update.TataTeleWebhookHandler"
+            "src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler"
         ) as mock_handler_class:
             mock_handler = mock_handler_class.return_value
             mock_handler.process_cdr_api_payload = AsyncMock(
@@ -156,11 +156,11 @@ class TestCDRUpdateTask:
             assert result["call_id"] == "TT123456789"
             assert result["raw_payload"] == mock_payload
             assert result["processed_result"] == mock_processed_result
-            assert "CDR fetched and processed successfully" in result["message"]
+            assert "TalkoCDR fetched and processed successfully" in result["message"]
 
             # Verify logging
             self.mock_logger.info.assert_any_call(
-                "Fetching single CDR for call_id: TT123456789 using vendor_config_id flow"
+                "Fetching single TalkoCDR for call_id: TT123456789 using vendor_config_id flow"
             )
 
     async def test_fetch_single_cdr_fallback_to_fetch_vendor_config(self):
@@ -173,7 +173,7 @@ class TestCDRUpdateTask:
         self.task.fetch_cdr_data = AsyncMock(return_value=mock_payload)
 
         with patch(
-            "src.components.call_operation.cdr_update.TataTeleWebhookHandler"
+            "src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler"
         ) as mock_handler_class:
             mock_handler = mock_handler_class.return_value
             mock_handler.process_cdr_api_payload = AsyncMock(
@@ -188,8 +188,8 @@ class TestCDRUpdateTask:
             self.task.fetch_vendor_config.assert_called_once()
 
     async def test_fetch_single_cdr_raises_when_cdr_config_missing(self):
-        """Test that BadRequestError is raised when cdr_config is empty"""
-        with pytest.raises(BadRequestError):
+        """Test that TalkoBadRequestError is raised when cdr_config is empty"""
+        with pytest.raises(TalkoBadRequestError):
             await self.task.fetch_single_cdr(
                 call_id="12345", cdr_config={}, vendor_type="tata_tele"  # empty config
             )
@@ -210,7 +210,7 @@ class TestCDRUpdateTask:
         self.mock_logger.error.assert_called()
         # Check error message contains call_id
         error_call = self.mock_logger.error.call_args[0][0]
-        assert "Failed to fetch single CDR for call_id 12345" in error_call
+        assert "Failed to fetch single TalkoCDR for call_id 12345" in error_call
 
     async def test_fetch_cdr_data_success_branch(self):
         """Cover success path in fetch_cdr_data"""
@@ -277,5 +277,5 @@ class TestCDRUpdateTask:
                 pass
 
         with patch("aiohttp.ClientSession", return_value=DummySession()):
-            with pytest.raises(BadRequestError):
+            with pytest.raises(TalkoBadRequestError):
                 await self.task.fetch_cdr_data("dummy_id", cdr_config)

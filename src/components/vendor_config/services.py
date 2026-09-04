@@ -2,26 +2,26 @@ from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
 
-from src.components.did_management.services import DidManagementService
+from src.components.did_management.services import TalkoDidManagementService
 from src.components.vendor.message import INVALID_VENDOR_ID
-from src.components.vendor.repository import VendorRepository
+from src.components.vendor.repository import TalkoVendorRepository
 from src.components.vendor_config.constants import ADD_TO_SET, PULL_ALL, SET
-from src.components.vendor_config.dto import Contract
+from src.components.vendor_config.dto import TalkoContract
 from src.components.vendor_config.message import (
     INVALID_VENDOR_CONFIG_ID,
     NO_FIELDS_PROVIDED_FOR_UPDATE,
     VENDOR_CONFIG_CREATED_SUCCESSFULLY,
     VENDOR_CONFIG_UPDATED_SUCCESSFULLY,
 )
-from src.components.vendor_config.models import VendorConfigModel
-from src.components.vendor_config.repository import VendorConfigRepository
-from src.components.vendor_config.validation import VendorConfigValidator
-from src.exceptions import BadRequestError, ResourceNotFound
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.datetime_util import DateTimeUtil
+from src.components.vendor_config.models import TalkoVendorConfigModel
+from src.components.vendor_config.repository import TalkoVendorConfigRepository
+from src.components.vendor_config.validation import TalkoVendorConfigValidator
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.datetime_util import TalkoDateTimeUtil
 
 
-class VendorConfigService:
+class TalkoVendorConfigService:
     """
     Service class responsible for managing vendor configuration operations,
     including creation, retrieval, and updates.
@@ -29,23 +29,23 @@ class VendorConfigService:
 
     def __init__(
         self,
-        repository: VendorConfigRepository,
-        logger: HollerServiceLogger,
-        datetime_util: DateTimeUtil,
-        validator: VendorConfigValidator,
-        did_management_service: DidManagementService,
-        vendor_repository: VendorRepository,
+        repository: TalkoVendorConfigRepository,
+        logger: TalkoServiceLogger,
+        datetime_util: TalkoDateTimeUtil,
+        validator: TalkoVendorConfigValidator,
+        did_management_service: TalkoDidManagementService,
+        vendor_repository: TalkoVendorRepository,
     ):
-        self.__repository: VendorConfigRepository = repository
-        self.__logger: HollerServiceLogger = logger
-        self.__datetime_util: DateTimeUtil = datetime_util
-        self.__validator: VendorConfigValidator = validator
-        self.__did_management_service: DidManagementService = did_management_service
-        self.__vendor_repository: VendorRepository = vendor_repository
+        self.__repository: TalkoVendorConfigRepository = repository
+        self.__logger: TalkoServiceLogger = logger
+        self.__datetime_util: TalkoDateTimeUtil = datetime_util
+        self.__validator: TalkoVendorConfigValidator = validator
+        self.__did_management_service: TalkoDidManagementService = did_management_service
+        self.__vendor_repository: TalkoVendorRepository = vendor_repository
 
     async def create_vendor_config(
-        self, config: Contract.VendorConfigCreate
-    ) -> Contract.VendorConfigCreationUpdationResponse:
+        self, config: TalkoContract.VendorConfigCreate
+    ) -> TalkoContract.VendorConfigCreationUpdationResponse:
         try:
             self.__logger.info(
                 "Creating vendor config for vendor_id: {}".format(config.vendor_id)
@@ -60,7 +60,7 @@ class VendorConfigService:
                 await self.__vendor_repository.find_vendor_by_id_all(vendor_id)
             )
             if not vendor_doc:
-                raise ResourceNotFound("Vendor not found")
+                raise TalkoResourceNotFound("Vendor not found")
 
             vendor_type: str = vendor_doc.get("vendor_type", "Unknown")
 
@@ -105,7 +105,7 @@ class VendorConfigService:
                 )
             )
 
-            vendor_cfg: VendorConfigModel = VendorConfigModel(**config_dict)
+            vendor_cfg: TalkoVendorConfigModel = TalkoVendorConfigModel(**config_dict)
             config_id: ObjectId = await self.__repository.insert_vendor_config(
                 vendor_cfg.model_dump()
             )
@@ -121,7 +121,7 @@ class VendorConfigService:
 
             self.__logger.info("Vendor config created with ID: {}".format(config_id))
 
-            return Contract.VendorConfigCreationUpdationResponse(
+            return TalkoContract.VendorConfigCreationUpdationResponse(
                 id=str(config_id), message=VENDOR_CONFIG_CREATED_SUCCESSFULLY
             )
         except Exception as e:
@@ -130,7 +130,7 @@ class VendorConfigService:
             )
             raise
 
-    async def get_all_configs(self) -> List[Contract.GetAllVendorConfigData]:
+    async def get_all_configs(self) -> List[TalkoContract.GetAllVendorConfigData]:
         self.__logger.info("Retrieving all vendor configs service started.")
         try:
             configs: List[Dict[str, Any]] = await self.__repository.find_all_configs()
@@ -138,11 +138,11 @@ class VendorConfigService:
                 "Retrieved vendor configs from the database. data: {}".format(configs)
             )
 
-            config_responses: List[Contract.GetAllVendorConfigData] = []
+            config_responses: List[TalkoContract.GetAllVendorConfigData] = []
             for config in configs:
                 config["id"] = str(config["_id"])
                 del config["_id"]
-                config_responses.append(Contract.GetAllVendorConfigData(**config))
+                config_responses.append(TalkoContract.GetAllVendorConfigData(**config))
 
             self.__logger.debug(
                 "Converted vendor configs to response format. data: {}".format(
@@ -155,7 +155,7 @@ class VendorConfigService:
             self.__logger.error("Failed to retrieve vendor configs: {}".format(str(e)))
             raise
 
-    async def get_config_by_id(self, id: str) -> Contract.VendorConfigResponse:
+    async def get_config_by_id(self, id: str) -> TalkoContract.VendorConfigResponse:
         try:
             self.__logger.info("Retrieving vendor config by ID: {}".format(id))
             try:
@@ -174,7 +174,7 @@ class VendorConfigService:
             )
             if not config:
                 self.__logger.error("No config found for id {}".format(id))
-                raise ResourceNotFound("No vendor config found for id {}".format(id))
+                raise TalkoResourceNotFound("No vendor config found for id {}".format(id))
 
             config["id"] = str(config["_id"])
             del config["_id"]
@@ -198,7 +198,7 @@ class VendorConfigService:
             self.__logger.info(
                 "Vendor config retrieved successfully for id: {}".format(id)
             )
-            return Contract.VendorConfigResponse(**config)
+            return TalkoContract.VendorConfigResponse(**config)
         except Exception as e:
             self.__logger.error(
                 "Failed to retrieve vendor config by ID {}: {}".format(id, str(e))
@@ -206,8 +206,8 @@ class VendorConfigService:
             raise
 
     async def update_vendor_config(
-        self, id: str, update: Contract.VendorConfigUpdate
-    ) -> Contract.VendorConfigCreationUpdationResponse:
+        self, id: str, update: TalkoContract.VendorConfigUpdate
+    ) -> TalkoContract.VendorConfigCreationUpdationResponse:
         self.__logger.info("Updating vendor config for id: {}".format(id))
         try:
             try:
@@ -226,7 +226,7 @@ class VendorConfigService:
             }
             if not update_dict:
                 self.__logger.error(NO_FIELDS_PROVIDED_FOR_UPDATE)
-                raise BadRequestError(NO_FIELDS_PROVIDED_FOR_UPDATE)
+                raise TalkoBadRequestError(NO_FIELDS_PROVIDED_FOR_UPDATE)
 
             self.__logger.debug(
                 "Provided updated vendor config data: {}".format(update_dict)
@@ -255,7 +255,7 @@ class VendorConfigService:
             self.__logger.info(
                 "Vendor config updated successfully for id: {}".format(id)
             )
-            return Contract.VendorConfigCreationUpdationResponse(
+            return TalkoContract.VendorConfigCreationUpdationResponse(
                 id=str(updated_config["id"]),
                 message=VENDOR_CONFIG_UPDATED_SUCCESSFULLY,
             )
@@ -270,7 +270,7 @@ class VendorConfigService:
         add_to_available: Optional[List[str]] = None,
         remove_from_assigned: Optional[List[str]] = None,
         add_to_assigned: Optional[List[str]] = None,
-    ) -> Contract.VendorConfigResponse:
+    ) -> TalkoContract.VendorConfigResponse:
         self.__logger.info("In vendor config update did list method started")
         self.__logger.debug(
             "In update did list data received. vendor id: {}, remove from available: {}, "
@@ -303,7 +303,7 @@ class VendorConfigService:
 
         config: Dict[str, Any] = await self.__repository.find_config_by_id(object_id)
         if not config:
-            raise ResourceNotFound("No vendor config found for id {}".format(vendor_id))
+            raise TalkoResourceNotFound("No vendor config found for id {}".format(vendor_id))
 
         config["id"] = str(config["_id"])
         del config["_id"]
@@ -321,4 +321,4 @@ class VendorConfigService:
 
         self.__logger.debug("Updated did lists for vendor config: {}".format(config))
         self.__logger.info("Updated did list for vendor config ended successfully.")
-        return Contract.VendorConfigResponse(**config)
+        return TalkoContract.VendorConfigResponse(**config)

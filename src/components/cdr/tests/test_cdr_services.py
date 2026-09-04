@@ -4,9 +4,9 @@ import pytest
 import pytest_asyncio
 from starlette_context.plugins import RequestIdPlugin
 
-from src.components.cdr.dto import Contract
-from src.components.cdr.services import CDRService
-from src.utils.enums import UserRoleHierarchy
+from src.components.cdr.dto import TalkoContract
+from src.components.cdr.services import TalkoCDRService
+from src.utils.enums import TalkoUserRoleHierarchy
 
 
 def fake_cdr_dict():
@@ -102,7 +102,7 @@ def cdr_service(mock_dependencies):
     repository, logger, datetime_util, analytics_processor, date_range_helper = (
         mock_dependencies
     )
-    service = CDRService(
+    service = TalkoCDRService(
         repository, logger, datetime_util, analytics_processor, date_range_helper
     )
     service.__logger = logger
@@ -123,7 +123,7 @@ class TestCDRService:
         )
 
         assert isinstance(result, list)
-        assert isinstance(result[0], Contract.CDRResponse)
+        assert isinstance(result[0], TalkoContract.CDRResponse)
         assert result[0].id == "12345"
         assert result[0].lead_id == "5"
         logger.info.assert_called()
@@ -172,10 +172,10 @@ class TestCDRService:
 
         logger.error.assert_called()
 
-    @patch("src.components.cdr.helper.CallLogQueryHelper")
-    @patch("src.components.cdr.helper.GetAgentCallLogsHelper")
-    @patch("src.components.cdr.helper.CommonCDRHelper")
-    @patch("src.components.cdr.services.RPCServiceFactory.get_service")
+    @patch("src.components.cdr.helper.TalkoCallLogQueryHelper")
+    @patch("src.components.cdr.helper.TalkoGetAgentCallLogsHelper")
+    @patch("src.components.cdr.helper.TalkoCommonCDRHelper")
+    @patch("src.components.cdr.services.TalkoRPCServiceFactory.get_service")
     async def test_get_agent_call_logs_success(
         self,
         mock_get_service,
@@ -198,11 +198,11 @@ class TestCDRService:
         mock_agent_helper.handle_reason_key.return_value = "BUSY"
         mock_agent_helper.process_cdrs.return_value = (
             [2],
-            [Contract.CallLogResponse(**fake_call_log_dict())],
+            [TalkoContract.CallLogResponse(**fake_call_log_dict())],
         )
         mock_agent_helper.agent_call_log_response.return_value = (
-            Contract.AgentCallLogResponse(
-                call_histories=[Contract.CallLogResponse(**fake_call_log_dict())],
+            TalkoContract.AgentCallLogResponse(
+                call_histories=[TalkoContract.CallLogResponse(**fake_call_log_dict())],
                 total_count=1,
             )
         )
@@ -216,7 +216,7 @@ class TestCDRService:
 
         result = await cdr_service.get_agent_call_logs(1, 2, 10, 0, 5)
 
-        assert isinstance(result, Contract.AgentCallLogResponse)
+        assert isinstance(result, TalkoContract.AgentCallLogResponse)
         assert result.total_count == 1
         assert len(result.call_histories) == 1
 
@@ -227,13 +227,13 @@ class TestCDRService:
         repository.find_all_call_logs_on_the_basis_of_user_id.return_value = ([], 0)
 
         with patch(
-            "src.components.cdr.helper.CallLogQueryHelper.build_call_log_query"
+            "src.components.cdr.helper.TalkoCallLogQueryHelper.build_call_log_query"
         ) as mock_query:
             mock_query.return_value = {"lead_id": 5}
             with patch(
-                "src.components.cdr.helper.GetAgentCallLogsHelper.agent_call_log_response"
+                "src.components.cdr.helper.TalkoGetAgentCallLogsHelper.agent_call_log_response"
             ) as mock_response:
-                mock_response.return_value = Contract.AgentCallLogResponse(
+                mock_response.return_value = TalkoContract.AgentCallLogResponse(
                     call_histories=[], total_count=0
                 )
                 await cdr_service.get_agent_call_logs(1, 2, 10, 0, 5)
@@ -247,7 +247,7 @@ class TestCDRService:
         )
 
         with patch(
-            "src.components.cdr.helper.CallLogQueryHelper.build_call_log_query"
+            "src.components.cdr.helper.TalkoCallLogQueryHelper.build_call_log_query"
         ) as mock_query:
             mock_query.return_value = {"lead_id": 5}
             with pytest.raises(Exception, match="Query failed"):
@@ -262,13 +262,13 @@ class TestCDRService:
         repository.find_all_call_logs_on_the_basis_of_user_id.return_value = ([], 0)
 
         with patch(
-            "src.components.cdr.helper.CallLogQueryHelper.build_call_log_query"
+            "src.components.cdr.helper.TalkoCallLogQueryHelper.build_call_log_query"
         ) as mock_query:
             mock_query.return_value = {}
             with patch(
-                "src.components.cdr.helper.GetAgentCallLogsHelper.agent_call_log_response"
+                "src.components.cdr.helper.TalkoGetAgentCallLogsHelper.agent_call_log_response"
             ) as mock_response:
-                mock_response.return_value = Contract.AgentCallLogResponse(
+                mock_response.return_value = TalkoContract.AgentCallLogResponse(
                     call_histories=[], total_count=0
                 )
                 await cdr_service.get_agent_call_logs(
@@ -279,9 +279,9 @@ class TestCDRService:
                     offset=0,
                 )
 
-    @patch("src.components.cdr.helper.GetCallRecordHistoryHelper")
-    @patch("src.components.cdr.helper.CommonCDRHelper")
-    @patch("src.components.cdr.services.RPCServiceFactory.get_service")
+    @patch("src.components.cdr.helper.TalkoGetCallRecordHistoryHelper")
+    @patch("src.components.cdr.helper.TalkoCommonCDRHelper")
+    @patch("src.components.cdr.services.TalkoRPCServiceFactory.get_service")
     async def test_get_call_record_history_success(
         self,
         mock_get_service,
@@ -305,9 +305,9 @@ class TestCDRService:
         mock_helper.get_call_record_history_projection.return_value = {}
         mock_helper.handle_call_record_history_data.return_value = fake_call_log_dict()
         mock_helper.agent_call_record_history_response.return_value = (
-            Contract.AgentCallRecordHistoryResponse(
+            TalkoContract.AgentCallRecordHistoryResponse(
                 call_record=[
-                    Contract.CallRecordHistoryResponse(**fake_call_log_dict())
+                    TalkoContract.CallRecordHistoryResponse(**fake_call_log_dict())
                 ],
                 total_count=1,
             )
@@ -315,17 +315,17 @@ class TestCDRService:
         mock_common_helper.attach_agent_names.return_value = None
 
     @patch(
-        "src.components.cdr.helper.GetCallRecordHistoryHelper.handle_call_record_history_data"
+        "src.components.cdr.helper.TalkoGetCallRecordHistoryHelper.handle_call_record_history_data"
     )
     @patch(
-        "src.components.cdr.helper.GetCallRecordHistoryHelper.get_call_record_history_projection"
+        "src.components.cdr.helper.TalkoGetCallRecordHistoryHelper.get_call_record_history_projection"
     )
     @patch(
-        "src.components.cdr.helper.GetCallRecordHistoryHelper.build_call_record_history_query"
+        "src.components.cdr.helper.TalkoGetCallRecordHistoryHelper.build_call_record_history_query"
     )
-    @patch("src.components.cdr.helper.GetCallRecordHistoryHelper.validate_call_status")
-    @patch("src.components.cdr.helper.CommonCDRHelper")
-    @patch("src.components.cdr.services.RPCServiceFactory.get_service")
+    @patch("src.components.cdr.helper.TalkoGetCallRecordHistoryHelper.validate_call_status")
+    @patch("src.components.cdr.helper.TalkoCommonCDRHelper")
+    @patch("src.components.cdr.services.TalkoRPCServiceFactory.get_service")
     async def test_get_call_record_history_filter(
         self,
         mock_get_service,
@@ -342,8 +342,8 @@ class TestCDRService:
         analytics_processor.user_hierarchy_data.return_value = ([1, 2], "some_role")
         datetime_util.parse_time_str.return_value = (100, 200)
 
-        cdr_service._CDRService__date_range_helper = MagicMock()
-        cdr_service._CDRService__date_range_helper.get_default_date_range.return_value = (
+        cdr_service._TalkoCDRService__date_range_helper = MagicMock()
+        cdr_service._TalkoCDRService__date_range_helper.get_default_date_range.return_value = (
             100,
             200,
             "last_7_days",
@@ -395,7 +395,7 @@ class TestCDRService:
         assert result.total_count == 1
 
     @patch(
-        "src.components.cdr.helper.GetCallRecordHistoryHelper.handle_call_record_history_data",
+        "src.components.cdr.helper.TalkoGetCallRecordHistoryHelper.handle_call_record_history_data",
         return_value={},
     )
     async def test_get_call_record_history_with_empty_user_hierarchy(
@@ -411,7 +411,7 @@ class TestCDRService:
         assert result.total_count == 0
 
     @patch(
-        "src.components.cdr.helper.GetCallRecordHistoryHelper.handle_call_record_history_data",
+        "src.components.cdr.helper.TalkoGetCallRecordHistoryHelper.handle_call_record_history_data",
         side_effect=Exception("DB error"),
     )
     async def test_get_call_record_history_with_exception(
@@ -427,7 +427,7 @@ class TestCDRService:
             )
 
     @patch(
-        "src.components.cdr.helper.GetCallRecordHistoryHelper.handle_call_record_history_data",
+        "src.components.cdr.helper.TalkoGetCallRecordHistoryHelper.handle_call_record_history_data",
         side_effect=Exception("DB error"),
     )
     async def test_get_call_record_history_exception_logger_called(
@@ -459,7 +459,7 @@ class TestCDRService:
         assert "do_recording_url" in cdr
         assert cdr["do_recording_url"] == "https://test-url"
         logger.info.assert_any_call(
-            "CDR for fetching recording url from path: {'path_for_recording': 'some/path.mp3'}"
+            "TalkoCDR for fetching recording url from path: {'path_for_recording': 'some/path.mp3'}"
         )
         cdr_service.asset_helper.get_recording_url_from_path.assert_awaited_once_with(
             "some/path.mp3"

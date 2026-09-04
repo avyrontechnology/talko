@@ -2,16 +2,16 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-from src.components.digital_assets.constants import DigitalAssetEnum
+from src.components.digital_assets.constants import TalkoDigitalAssetEnum
 
 
-class DigitalAssetResponse(BaseModel):
+class TalkoDigitalAssetResponse(BaseModel):
     id: int
     name: str
     partner_id: int
     version: int
     url: Optional[HttpUrl] = None
-    asset_type: DigitalAssetEnum
+    asset_type: TalkoDigitalAssetEnum
     additional_info: Optional[dict] = None
     created_by: Optional[int] = None
     updated_by: Optional[int] = None
@@ -21,7 +21,7 @@ class DigitalAssetResponse(BaseModel):
     )
 
 
-class UploadDigitalAssetResponse(BaseModel):
+class TalkoUploadDigitalAssetResponse(BaseModel):
     """
     Response schema for uploading a digital asset.
     """

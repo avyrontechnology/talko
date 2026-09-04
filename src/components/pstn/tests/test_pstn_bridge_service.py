@@ -3,13 +3,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.components.pstn.constants import CallDirection, PSTNProvider
-from src.components.pstn.dto import CallContext
-from src.components.pstn.services import PSTNBridgeService
+from src.components.pstn.constants import TalkoCallDirection, TalkoPSTNProvider
+from src.components.pstn.dto import TalkoCallContext
+from src.components.pstn.services import TalkoPSTNBridgeService
 
 
 def make_service(**overrides):
-    """Helper to instantiate PSTNBridgeService with default AsyncMock dependencies."""
+    """Helper to instantiate TalkoPSTNBridgeService with default AsyncMock dependencies."""
     defaults = dict(
         did_repository=AsyncMock(),
         logger=MagicMock(),
@@ -18,20 +18,20 @@ def make_service(**overrides):
         call_repository=AsyncMock(),
     )
     defaults.update(overrides)
-    return PSTNBridgeService(**defaults), defaults
+    return TalkoPSTNBridgeService(**defaults), defaults
 
 
 def make_ctx(**overrides):
     defaults = dict(
-        provider=PSTNProvider.TATA_TELE,
+        provider=TalkoPSTNProvider.TATA_TELE,
         call_sid="call-sid-1",
         did_number="917965802977",
         caller_number="+918103492952",
-        direction=CallDirection.OUTBOUND,
+        direction=TalkoCallDirection.OUTBOUND,
         partner_id=113,
     )
     defaults.update(overrides)
-    return CallContext(**defaults)
+    return TalkoCallContext(**defaults)
 
 
 class TestBackfillRealVendorCallId:
@@ -61,7 +61,7 @@ class TestBackfillRealVendorCallId:
         mock_handler.find_live_call_id = AsyncMock(return_value="CAXX-real-123")
 
         with patch(
-            "src.components.pstn.services.TataTeleCallHandler",
+            "src.components.pstn.services.TalkoTataTeleCallHandler",
             return_value=mock_handler,
         ):
             await service._backfill_real_vendor_call_id(ctx, room)
@@ -96,7 +96,7 @@ class TestBackfillRealVendorCallId:
         mock_handler.find_live_call_id = AsyncMock(return_value="CAXX-real-123")
 
         with patch(
-            "src.components.pstn.services.TataTeleCallHandler",
+            "src.components.pstn.services.TalkoTataTeleCallHandler",
             return_value=mock_handler,
         ):
             await service._backfill_real_vendor_call_id(make_ctx(), room)
@@ -161,7 +161,7 @@ class TestBackfillRealVendorCallId:
         mock_handler.find_live_call_id = AsyncMock(return_value=None)
 
         with patch(
-            "src.components.pstn.services.TataTeleCallHandler",
+            "src.components.pstn.services.TalkoTataTeleCallHandler",
             return_value=mock_handler,
         ):
             await service._backfill_real_vendor_call_id(make_ctx(), room)
@@ -172,7 +172,7 @@ class TestBackfillRealVendorCallId:
     async def test_unresolved_call_id_still_updates_cdr_via_ctx_call_sid(self):
         """The exact case hit live: find_live_call_id comes back empty (call
         already progressed past ringing, or the poll window missed it). The
-        CDR must still get updated — using ctx.call_sid, itself a genuine
+        TalkoCDR must still get updated — using ctx.call_sid, itself a genuine
         Tata call identifier (parsed off the WS start event) — rather than
         being left with call_id="" forever just because this one poll missed."""
         service, deps = make_service()
@@ -193,7 +193,7 @@ class TestBackfillRealVendorCallId:
         mock_handler.find_live_call_id = AsyncMock(return_value=None)
 
         with patch(
-            "src.components.pstn.services.TataTeleCallHandler",
+            "src.components.pstn.services.TalkoTataTeleCallHandler",
             return_value=mock_handler,
         ):
             await service._backfill_real_vendor_call_id(ctx, room)
@@ -205,9 +205,9 @@ class TestBackfillRealVendorCallId:
 
     @pytest.mark.asyncio
     async def test_updates_original_cdr_when_cdr_id_present(self):
-        """cdr_id rides along in ctx.context_data (see CallService's
+        """cdr_id rides along in ctx.context_data (see TalkoCallService's
         _pre_create_session Step 4 / initiate_call's pending_context_payload)
-        — once the real call_id resolves, the original CDR row (inserted at
+        — once the real call_id resolves, the original TalkoCDR row (inserted at
         initiate_call time with call_id="") must be updated in place so
         Tata's later webhook can match it via get_cdr_by_call_id_or_uuid."""
         service, deps = make_service()
@@ -228,7 +228,7 @@ class TestBackfillRealVendorCallId:
         mock_handler.find_live_call_id = AsyncMock(return_value="CAXX-real-123")
 
         with patch(
-            "src.components.pstn.services.TataTeleCallHandler",
+            "src.components.pstn.services.TalkoTataTeleCallHandler",
             return_value=mock_handler,
         ):
             await service._backfill_real_vendor_call_id(ctx, room)
@@ -255,7 +255,7 @@ class TestBackfillRealVendorCallId:
         mock_handler.find_live_call_id = AsyncMock(return_value="CAXX-real-123")
 
         with patch(
-            "src.components.pstn.services.TataTeleCallHandler",
+            "src.components.pstn.services.TalkoTataTeleCallHandler",
             return_value=mock_handler,
         ):
             await service._backfill_real_vendor_call_id(make_ctx(), room)
@@ -264,7 +264,7 @@ class TestBackfillRealVendorCallId:
 
     @pytest.mark.asyncio
     async def test_cdr_update_failure_is_swallowed(self):
-        """Best-effort — a failed CDR update must not prevent the call_id
+        """Best-effort — a failed TalkoCDR update must not prevent the call_id
         publish from having already succeeded, nor raise."""
         service, deps = make_service()
         deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(
@@ -286,7 +286,7 @@ class TestBackfillRealVendorCallId:
         mock_handler.find_live_call_id = AsyncMock(return_value="CAXX-real-123")
 
         with patch(
-            "src.components.pstn.services.TataTeleCallHandler",
+            "src.components.pstn.services.TalkoTataTeleCallHandler",
             return_value=mock_handler,
         ):
             await service._backfill_real_vendor_call_id(ctx, room)

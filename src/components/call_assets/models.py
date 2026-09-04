@@ -4,12 +4,12 @@ from typing import Dict, Optional
 
 from pydantic import ConfigDict, Field
 
-from src.components.digital_assets.constants import DigitalAssetEnum
-from src.utils.timestamped_model import TimestampedModel
+from src.components.digital_assets.constants import TalkoDigitalAssetEnum
+from src.utils.timestamped_model import TalkoTimestampedModel
 
 
 
-class AssetsModel(TimestampedModel):
+class TalkoAssetsModel(TalkoTimestampedModel):
     """
     Represents a digital asset in the database.
 
@@ -17,7 +17,7 @@ class AssetsModel(TimestampedModel):
         unique_id (str): A unique identifier (UUID) for the digital asset.
         partner_id (int): The ID of the partner associated with the asset.
         version (int): The version number of the digital asset.
-        asset_type (DigitalAssetEnum): The type of the asset, determined by the `DigitalAssetEnum` enum.
+        asset_type (TalkoDigitalAssetEnum): The type of the asset, determined by the `TalkoDigitalAssetEnum` enum.
         additional_info (dict, optional): Metadata or additional properties associated with the asset.
         created_by (int, optional): The ID of the user who created the asset.
         updated_by (int, optional): The ID of the user who last updated the asset.

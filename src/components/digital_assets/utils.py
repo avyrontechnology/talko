@@ -1,10 +1,10 @@
-from src.components.digital_assets.constants import DigitalAssetEnum
-from src.components.digital_assets.logger_adapter import LoggerAdapter
+from src.components.digital_assets.constants import TalkoDigitalAssetEnum
+from src.components.digital_assets.logger_adapter import TalkoLoggerAdapter
 
-logger = LoggerAdapter().get_logger()
+logger = TalkoLoggerAdapter().get_logger()
 
 
-class DigitalAssetUtils:
+class TalkoDigitalAssetUtils:
     """
     Utility class for handling operations related to Digital Assets.
     """
@@ -12,7 +12,7 @@ class DigitalAssetUtils:
     @staticmethod
     def is_valid_asset_type(asset_type: str) -> bool:
         """
-        Validates if the given asset type is a valid member of DigitalAssetEnum.
+        Validates if the given asset type is a valid member of TalkoDigitalAssetEnum.
 
         Args:
             asset_type (str): The asset type to validate.
@@ -21,7 +21,7 @@ class DigitalAssetUtils:
             bool: True if the asset type is valid, False otherwise.
         """
 
-        is_valid = asset_type in DigitalAssetEnum.__members__
+        is_valid = asset_type in TalkoDigitalAssetEnum.__members__
         logger.info(
             "Validating asset type: {}. Result: {}".format(asset_type, is_valid)
         )

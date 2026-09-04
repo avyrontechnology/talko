@@ -69,15 +69,15 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_REGISTRY }}/holler-service:integrationlatest
+          tags: ${{ secrets.DOCKER_REGISTRY }}/talko-service:integrationlatest
           cache-from: |
             type=local,src=/tmp/.buildx-cache
-            type=registry,ref=${{ secrets.DOCKER_REGISTRY }}/holler-service:build-cache-${{ github.ref_name }}
+            type=registry,ref=${{ secrets.DOCKER_REGISTRY }}/talko-service:build-cache-${{ github.ref_name }}
           cache-to: |
-            type=registry,ref=${{ secrets.DOCKER_REGISTRY }}/holler-service:build-cache-${{ github.ref_name }},mode=max
+            type=registry,ref=${{ secrets.DOCKER_REGISTRY }}/talko-service:build-cache-${{ github.ref_name }},mode=max
           build-args: |
             VERSION=latest
-          outputs: type=image,name=${{ secrets.DOCKER_REGISTRY }}/holler-service,push=true
+          outputs: type=image,name=${{ secrets.DOCKER_REGISTRY }}/talko-service,push=true
           labels: |
             org.opencontainers.image.version=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}

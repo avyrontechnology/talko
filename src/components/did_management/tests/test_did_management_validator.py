@@ -3,32 +3,32 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from bson import ObjectId
 
-from src.components.did_management.validator import DidValidator
-from src.components.partner_config.repository import PartnerConfigRepository
-from src.components.vendor_config.repository import VendorConfigRepository
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.did_management.validator import TalkoDidValidator
+from src.components.partner_config.repository import TalkoPartnerConfigRepository
+from src.components.vendor_config.repository import TalkoVendorConfigRepository
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 @pytest.fixture
 def mock_vendor_config_repository():
-    return Mock(spec=VendorConfigRepository)
+    return Mock(spec=TalkoVendorConfigRepository)
 
 
 @pytest.fixture
 def mock_partner_config_repository():
-    return Mock(spec=PartnerConfigRepository)
+    return Mock(spec=TalkoPartnerConfigRepository)
 
 
 @pytest.fixture
 def mock_logger():
-    return Mock(spec=HollerServiceLogger)
+    return Mock(spec=TalkoServiceLogger)
 
 
 @pytest.fixture
 def did_validator(
     mock_vendor_config_repository, mock_partner_config_repository, mock_logger
 ):
-    return DidValidator(
+    return TalkoDidValidator(
         vendor_config_repository=mock_vendor_config_repository,
         partner_config_repository=mock_partner_config_repository,
         logger=mock_logger,

@@ -3,133 +3,133 @@ from typing import Any, Dict, List, Optional
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Query, Request
 
-from src.components.common.constants import CurrentUserMap
+from src.components.common.constants import TalkoCurrentUserMap
 from src.components.common.responses import (
-    BadRequestResponse,
-    InternalServerErrorResponse,
-    SuccessResponse,
+    TalkoBadRequestResponse,
+    TalkoInternalServerErrorResponse,
+    TalkoSuccessResponse,
 )
-from src.components.did_management.constants import DIDStatus
-from src.components.did_management.dto import Contract
+from src.components.did_management.constants import TalkoDIDStatus
+from src.components.did_management.dto import TalkoContract
 from src.components.did_management.messages import (
     PARTNER_CONFIG_NOT_FOUND,
     SOMETHING_WENT_WRONG,
 )
-from src.components.did_management.services import DidManagementService
-from src.components.rbac.permission_dependency import PermissionDependency
+from src.components.did_management.services import TalkoDidManagementService
+from src.components.rbac.permission_dependency import TalkoPermissionDependency
 from src.components.rbac.permission_injector import permission_check
-from src.core.container import Container
-from src.exceptions import ResourceNotFound
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.core.container import TalkoContainer
+from src.exceptions import TalkoResourceNotFound
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class DIDController:
+class TalkoDIDController:
     did_router = APIRouter()
 
     @did_router.get(
         "/by-service-board",
-        response_model=List[Contract.DIDResponse],
+        response_model=List[TalkoContract.DIDResponse],
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def get_dids_by_service_board(
         request: Request,
         service_board_id: int = Query(..., description="Service board ID"),
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
-    ) -> List[Contract.DIDResponse]:
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> List[TalkoContract.DIDResponse]:
         try:
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Fetching DIDs for service_board_id {}".format(service_board_id)
             )
             current_user_data: dict = request.state.user
-            user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(CurrentUserMap.PARTNER_ID)
-            holler_service_logger.info(
+            user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
+            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+            talko_service_logger.info(
                 "User: {}, Partner: {}, ServiceBoard: {}, fetching DIDs initiated.".format(
                     user_id, partner_id, service_board_id
                 )
             )
 
-            dids: List[Contract.DIDResponse] = (
+            dids: List[TalkoContract.DIDResponse] = (
                 await did_service.get_dids_by_service_board(service_board_id)
             )
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Retrieved {} DIDs for service_board_id {}".format(
                     len(dids), service_board_id
                 )
             )
-            return SuccessResponse(dids)
+            return TalkoSuccessResponse(dids)
 
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Unexpected error retrieving DIDs for service_board_id {}: {}".format(
                     service_board_id, str(e)
                 )
             )
-            return InternalServerErrorResponse(detail=str(e))
+            return TalkoInternalServerErrorResponse(detail=str(e))
 
     @did_router.get(
         "/available-for-assignment",
-        response_model=List[Contract.DIDSeriesResponse],
+        response_model=List[TalkoContract.DIDSeriesResponse],
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def get_dids_available_for_assignment(
         request: Request,
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
-    ) -> List[Contract.DIDSeriesResponse]:
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> List[TalkoContract.DIDSeriesResponse]:
         try:
-            holler_service_logger.info("Fetching DIDs available to be assigned")
+            talko_service_logger.info("Fetching DIDs available to be assigned")
             current_user_data: dict = request.state.user
-            user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(CurrentUserMap.PARTNER_ID)
-            holler_service_logger.info(
+            user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
+            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+            talko_service_logger.info(
                 "User: {}, Partner: {}".format(user_id, partner_id)
             )
 
-            dids: List[Contract.DIDSeriesResponse] = (
+            dids: List[TalkoContract.DIDSeriesResponse] = (
                 await did_service.get_dids_available_for_assignment(partner_id)
             )
-            holler_service_logger.info("DIDS available to be assigned: {}".format(dids))
+            talko_service_logger.info("DIDS available to be assigned: {}".format(dids))
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Successfully Retrieved DIDs which are available to be assigned"
             )
-            return SuccessResponse(data=dids)
+            return TalkoSuccessResponse(data=dids)
 
         except ValueError as ve:
-            holler_service_logger.error("Partner config not found: {}".format(str(ve)))
-            return BadRequestResponse(detail=PARTNER_CONFIG_NOT_FOUND)
+            talko_service_logger.error("Partner config not found: {}".format(str(ve)))
+            return TalkoBadRequestResponse(detail=PARTNER_CONFIG_NOT_FOUND)
 
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Unexpected error retrieving DIDs availbe for assignment{}".format(
                     str(e)
                 )
             )
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.post(
         "/assign-did-numbers",
-        response_model=List[Contract.DIDSeriesResponse],
+        response_model=List[TalkoContract.DIDSeriesResponse],
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def assign_dids_available_for_assignment(
         request: Request,
-        assign_did_data: Contract.AssignDIDToPartner,
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        assign_did_data: TalkoContract.AssignDIDToPartner,
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
-            holler_service_logger.info("DIDs received to be assigned: ")
+            talko_service_logger.info("DIDs received to be assigned: ")
             current_user_data: dict = request.state.user
-            user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(CurrentUserMap.PARTNER_ID)
-            holler_service_logger.info(
+            user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
+            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+            talko_service_logger.info(
                 "Assign DID Numbers=> User: {}, Partner: {}, Assign_did_Data: {}".format(
                     user_id, partner_id, assign_did_data
                 )
@@ -138,43 +138,43 @@ class DIDController:
             response: dict = await did_service.assign_dids_available_for_assignment(
                 partner_id, assign_did_data
             )
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Assign DID Numbers=> Response: {}".format(response)
             )
 
-            holler_service_logger.info("Successfully assigned DIDs")
-            return SuccessResponse(data=response)
+            talko_service_logger.info("Successfully assigned DIDs")
+            return TalkoSuccessResponse(data=response)
 
         except ValueError as ve:
-            holler_service_logger.error("Partner config not found: {}".format(str(ve)))
-            return BadRequestResponse(detail=PARTNER_CONFIG_NOT_FOUND)
+            talko_service_logger.error("Partner config not found: {}".format(str(ve)))
+            return TalkoBadRequestResponse(detail=PARTNER_CONFIG_NOT_FOUND)
 
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Unexpected error assigning available DIDs {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.post(
         "/unassign-did-numbers",
         response_model=dict,
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def unassign_dids_for_partner(
         request: Request,
-        payload: Contract.UnassignDIDRequest,
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        payload: TalkoContract.UnassignDIDRequest,
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "DIDs received to be unassigned: {}".format(payload.did_numbers)
             )
             current_user_data: dict = request.state.user
-            user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(CurrentUserMap.PARTNER_ID)
-            holler_service_logger.info(
+            user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
+            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+            talko_service_logger.info(
                 "Unassign DID Numbers=> User: {}, Partner: {}".format(
                     user_id, partner_id
                 )
@@ -183,45 +183,45 @@ class DIDController:
             response: dict = await did_service.unassign_dids_for_partner(
                 partner_id, payload.did_numbers
             )
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Unassign DID Numbers=> Response: {}".format(response)
             )
 
-            holler_service_logger.info("Successfully unassigned DIDs")
-            return SuccessResponse(data=response)
+            talko_service_logger.info("Successfully unassigned DIDs")
+            return TalkoSuccessResponse(data=response)
 
         except ValueError as ve:
-            holler_service_logger.error("Partner config not found: {}".format(str(ve)))
-            return BadRequestResponse(detail=PARTNER_CONFIG_NOT_FOUND)
+            talko_service_logger.error("Partner config not found: {}".format(str(ve)))
+            return TalkoBadRequestResponse(detail=PARTNER_CONFIG_NOT_FOUND)
 
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Unexpected error assigning available DIDs {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.patch(
         "/apply-did-status-update",
         response_model=dict,
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def apply_did_status_update(
         request: Request,
-        payload: Contract.AdminDIDAction,
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        payload: TalkoContract.AdminDIDAction,
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Action received to update DID status: {}, for DIDs: {}".format(
                     payload.action, payload.did_numbers
                 )
             )
             current_user = request.state.user
-            user_id = current_user.get(CurrentUserMap.USER_ID)
-            partner_id: int = current_user.get(CurrentUserMap.PARTNER_ID)
-            holler_service_logger.info(
+            user_id = current_user.get(TalkoCurrentUserMap.USER_ID)
+            partner_id: int = current_user.get(TalkoCurrentUserMap.PARTNER_ID)
+            talko_service_logger.info(
                 "Action {} applying DID status update: {} on {} DIDs".format(
                     user_id, payload.action, len(payload.did_numbers)
                 )
@@ -234,7 +234,7 @@ class DIDController:
             succeeded = summary.get("succeeded", 0)
             failed = summary.get("failed", 0)
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Action {} successfully applied DID status update: {} on DIDs: {}, Result: {}".format(
                     user_id, payload.action, payload.did_numbers, result
                 )
@@ -255,23 +255,23 @@ class DIDController:
                 status_label = "partial_success"
                 message = "{} of {} DIDs updated successfully".format(succeeded, total)
 
-            holler_service_logger.info("{} - {}".format(status_label, message))
-            return SuccessResponse(status=status_label, message=message, data=result)
+            talko_service_logger.info("{} - {}".format(status_label, message))
+            return TalkoSuccessResponse(status=status_label, message=message, data=result)
 
         except ValueError as ve:
-            holler_service_logger.error(str(ve))
-            return BadRequestResponse(detail=str(ve))
+            talko_service_logger.error(str(ve))
+            return TalkoBadRequestResponse(detail=str(ve))
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Error in apply_did_status_update: {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.get(
         "/list-dids",
-        response_model=Contract.DIDListResponse,
+        response_model=TalkoContract.DIDListResponse,
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def list_dids(
         request: Request,
@@ -288,14 +288,14 @@ class DIDController:
         ),
         page: int = Query(1, ge=1, description="Page number"),
         limit: int = Query(20, ge=1, le=2000, description="Items per page"),
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
             current_user = request.state.user
-            user_id = current_user.get(CurrentUserMap.USER_ID)
-            partner_id = current_user.get(CurrentUserMap.PARTNER_ID)
-            holler_service_logger.info(
+            user_id = current_user.get(TalkoCurrentUserMap.USER_ID)
+            partner_id = current_user.get(TalkoCurrentUserMap.PARTNER_ID)
+            talko_service_logger.info(
                 "User {} calling list_dids - filters: status={}, ".format(
                     user_id, status
                 )
@@ -304,7 +304,7 @@ class DIDController:
                 )
             )
 
-            result: Contract.DIDListResponse = await did_service.list_dids(
+            result: TalkoContract.DIDListResponse = await did_service.list_dids(
                 status=status,
                 partner_id=partner_id,
                 service_board_id=service_board_id,
@@ -313,27 +313,27 @@ class DIDController:
                 limit=limit,
             )
 
-            return SuccessResponse(data=result)
+            return TalkoSuccessResponse(data=result)
 
         except ValueError as ve:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Validation error in list_dids: {}".format(str(ve))
             )
-            return BadRequestResponse(detail=str(ve))
+            return TalkoBadRequestResponse(detail=str(ve))
         except Exception as e:
-            holler_service_logger.error("Error in list_dids: {}".format(str(e)))
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            talko_service_logger.error("Error in list_dids: {}".format(str(e)))
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.get(
         "/status-metadata",
-        response_model=Contract.StatusMetadataResponse,
+        response_model=TalkoContract.StatusMetadataResponse,
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def get_did_status_transitions(
         request: Request,
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
-    ) -> List[Contract.StatusMetadataResponse]:
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> List[TalkoContract.StatusMetadataResponse]:
         """
         Retrieve the allowed status transitions for DIDs.
 
@@ -343,49 +343,49 @@ class DIDController:
         in the UI.
         """
 
-        holler_service_logger.info("Fetching DID status transition metadata")
+        talko_service_logger.info("Fetching DID status transition metadata")
 
         current_user_data: dict = request.state.user
-        user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
-        partner_id: int = current_user_data.get(CurrentUserMap.PARTNER_ID)
+        user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
+        partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
 
-        holler_service_logger.info(
+        talko_service_logger.info(
             "Processing DID status metadata request for user_id={}, partner_id={}".format(
                 user_id,
                 partner_id,
             )
         )
         transitions = [
-            Contract.StatusTransition(
-                status=DIDStatus.AVAILABLE.value,
-                next_eligible_status=[DIDStatus.MAPPED.value],
+            TalkoContract.StatusTransition(
+                status=TalkoDIDStatus.AVAILABLE.value,
+                next_eligible_status=[TalkoDIDStatus.MAPPED.value],
             ),
-            Contract.StatusTransition(
-                status=DIDStatus.MAPPED.value,
+            TalkoContract.StatusTransition(
+                status=TalkoDIDStatus.MAPPED.value,
                 next_eligible_status=[
-                    DIDStatus.AVAILABLE.value,
-                    DIDStatus.COOLING_PERIOD.value,
+                    TalkoDIDStatus.AVAILABLE.value,
+                    TalkoDIDStatus.COOLING_PERIOD.value,
                 ],
             ),
-            Contract.StatusTransition(
-                status=DIDStatus.COOLING_PERIOD.value,
+            TalkoContract.StatusTransition(
+                status=TalkoDIDStatus.COOLING_PERIOD.value,
                 next_eligible_status=[],
             ),
-            Contract.StatusTransition(
-                status=DIDStatus.COOLDOWN_COMPLETED.value,
+            TalkoContract.StatusTransition(
+                status=TalkoDIDStatus.COOLDOWN_COMPLETED.value,
                 next_eligible_status=[
-                    DIDStatus.AVAILABLE.value,
-                    DIDStatus.MAPPED.value,
+                    TalkoDIDStatus.AVAILABLE.value,
+                    TalkoDIDStatus.MAPPED.value,
                 ],
             ),
         ]
 
-        return Contract.StatusMetadataResponse(
+        return TalkoContract.StatusMetadataResponse(
             data=transitions,
             metadata={
                 "total_statuses": len(transitions),
-                "default_status": DIDStatus.AVAILABLE.value,
-                "cooldown_status": [DIDStatus.COOLING_PERIOD.value],
+                "default_status": TalkoDIDStatus.AVAILABLE.value,
+                "cooldown_status": [TalkoDIDStatus.COOLING_PERIOD.value],
             },
         )
 
@@ -393,26 +393,26 @@ class DIDController:
         "/assign-ai-agent",
         response_model=dict,
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def assign_ai_agent_did(
         request: Request,
-        assign_data: Contract.AssignAIAgentDIDRequest,
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        assign_data: TalkoContract.AssignAIAgentDIDRequest,
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "assign-ai-agent called. partner_id={}, agent_bot_id={}".format(
                     assign_data.partner_id, assign_data.agent_bot_id
                 )
             )
 
             current_user_data: dict = request.state.user
-            user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(CurrentUserMap.PARTNER_ID)
+            user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
+            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "User: {}, Partner: {}, assigning AI agent DID".format(
                     user_id, partner_id
                 )
@@ -425,38 +425,38 @@ class DIDController:
                 did_number=assign_data.did_number,
             )
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "AI agent DID assigned: {}".format(did_record["did_number"])
             )
-            return SuccessResponse(data=did_record)
+            return TalkoSuccessResponse(data=did_record)
 
-        except ResourceNotFound:
-            holler_service_logger.error(
+        except TalkoResourceNotFound:
+            talko_service_logger.error(
                 "No available ai_agent DIDs for partner {}".format(
                     assign_data.partner_id
                 )
             )
-            return BadRequestResponse(detail="No available ai_agent DIDs")
+            return TalkoBadRequestResponse(detail="No available ai_agent DIDs")
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Error assigning AI agent DID: {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.post(
         "/release-ai-agent",
         response_model=dict,
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def release_ai_agent_did(
         request: Request,
-        release_data: Contract.ReleaseAIAgentDIDRequest,
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        release_data: TalkoContract.ReleaseAIAgentDIDRequest,
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "release-ai-agent called. partner_id={}, agent_bot_id={}".format(
                     release_data.partner_id, release_data.agent_bot_id
                 )
@@ -467,44 +467,44 @@ class DIDController:
                 agent_bot_id=release_data.agent_bot_id,
             )
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Released {} AI agent DIDs".format(len(released_dids))
             )
-            return SuccessResponse(
+            return TalkoSuccessResponse(
                 data={"released_dids": released_dids, "count": len(released_dids)}
             )
 
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Error releasing AI agent DIDs: {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.post(
         "/campaign-claim",
         response_model=dict,
     )
     # No @permission_check for now — its permission slug is derived from
-    # the route name (holler:claim_campaign_did) and has never been granted
+    # the route name (talko:claim_campaign_did) and has never been granted
     # to any role, so every caller 403s until RBAC is set up for it. Add it
     # back once that's done; this route is otherwise a live-session-only
     # call from makun-ai (still authenticated, just not permission-gated).
     @inject
     async def claim_campaign_did(
         request: Request,
-        claim_data: Contract.ClaimCampaignDIDRequest,
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        claim_data: TalkoContract.ClaimCampaignDIDRequest,
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         """
         Marks a DID as Mapped and binds it to the campaign's own
-        agent_bot_id (required so holler's own AI-bridge session resolution,
+        agent_bot_id (required so talko's own AI-bridge session resolution,
         which reads agent_bot_id straight off the DID, can find an agent) —
         called by makun-ai when a DID is added to a campaign's did_selection.
-        See DidManagementService.claim_did_for_campaign.
+        See TalkoDidManagementService.claim_did_for_campaign.
         """
         try:
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "campaign-claim called. partner_id={}, did_number={}, agent_bot_id={}".format(
                     claim_data.partner_id, claim_data.did_number, claim_data.agent_bot_id
                 )
@@ -514,16 +514,16 @@ class DIDController:
                 did_number=claim_data.did_number,
                 agent_bot_id=claim_data.agent_bot_id,
             )
-            return SuccessResponse(data=result)
-        except ResourceNotFound as e:
-            return BadRequestResponse(detail=str(e))
+            return TalkoSuccessResponse(data=result)
+        except TalkoResourceNotFound as e:
+            return TalkoBadRequestResponse(detail=str(e))
         except ValueError as e:
-            return BadRequestResponse(detail=str(e))
+            return TalkoBadRequestResponse(detail=str(e))
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Error claiming campaign DID: {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.post(
         "/campaign-release",
@@ -533,19 +533,19 @@ class DIDController:
     @inject
     async def release_campaign_did(
         request: Request,
-        release_data: Contract.ReleaseCampaignDIDRequest,
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        release_data: TalkoContract.ReleaseCampaignDIDRequest,
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         """
         Reverts a campaign-claimed DID back to Available and clears its
         agent_bot_id — called by makun-ai when a DID is removed from a
         campaign's did_selection, or the campaign is deleted/stopped. Only
         acts if the DID is currently bound to exactly this agent_bot_id. See
-        DidManagementService.release_campaign_did.
+        TalkoDidManagementService.release_campaign_did.
         """
         try:
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "campaign-release called. partner_id={}, did_number={}, agent_bot_id={}".format(
                     release_data.partner_id, release_data.did_number, release_data.agent_bot_id
                 )
@@ -555,41 +555,41 @@ class DIDController:
                 did_number=release_data.did_number,
                 agent_bot_id=release_data.agent_bot_id,
             )
-            return SuccessResponse(data=result)
-        except ResourceNotFound as e:
-            return BadRequestResponse(detail=str(e))
+            return TalkoSuccessResponse(data=result)
+        except TalkoResourceNotFound as e:
+            return TalkoBadRequestResponse(detail=str(e))
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Error releasing campaign DID: {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.get(
         "/ai-agent/available",
         response_model=dict,
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def get_unassigned_available_ai_agent_dids(
         request: Request,
         partner_id: int = Query(..., description="Partner ID to filter DIDs"),
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         """
         List ai_agent DIDs that are free (partner_id=0) and status=AVAILABLE
         for the given partner.
         """
         try:
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "get_unassigned_available_ai_agent_dids called. partner_id={}".format(
                     partner_id
                 )
             )
             current_user_data: dict = request.state.user
-            user_id: int = current_user_data.get(CurrentUserMap.USER_ID)
+            user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "User {} requesting unassigned available ai_agent DIDs for partner_id={}".format(
                     user_id, partner_id
                 )
@@ -599,41 +599,41 @@ class DIDController:
                 partner_id=partner_id,
             )
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Found {} unassigned available ai_agent DIDs for partner_id={}".format(
                     len(dids), partner_id
                 )
             )
-            return SuccessResponse(data={"dids": dids})
+            return TalkoSuccessResponse(data={"dids": dids})
 
         except ValueError as ve:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Validation error in get_unassigned_available_ai_agent_dids: {}".format(
                     str(ve)
                 )
             )
-            return BadRequestResponse(detail=str(ve))
+            return TalkoBadRequestResponse(detail=str(ve))
 
         except Exception as e:
             error_msg = f"Error fetching unassigned available ai_agent DIDs: {str(e)}"
-            holler_service_logger.error(error_msg)
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            talko_service_logger.error(error_msg)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.get(
         "/partner-ai-agent-dids",
         response_model=dict,
     )
-    @permission_check(PermissionDependency)
+    @permission_check(TalkoPermissionDependency)
     @inject
     async def get_ai_agent_dids(
         request: Request,
         agent_bot_id: int,
         partner_id: int = Query(..., description="Partner ID"),
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "get-ai-agent-dids called. agent_bot_id={}, partner_id={}".format(
                     agent_bot_id, partner_id
                 )
@@ -651,16 +651,16 @@ class DIDController:
                 "count": len(dids),
             }
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Found {} DIDs for AI agent {}".format(len(dids), agent_bot_id)
             )
-            return SuccessResponse(data=data)
+            return TalkoSuccessResponse(data=data)
 
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Error fetching AI agent DIDs: {}".format(str(e))
             )
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.get(
         "/list-ai-agent-dids",
@@ -670,17 +670,17 @@ class DIDController:
     async def list_ai_agent_dids(
         request: Request,
         partner_id: int = Query(..., description="Partner ID"),
-        did_service: DidManagementService = Depends(Provide[Container.did_service]),
-        holler_service_logger: HollerServiceLogger = Depends(Provide[Container.logger]),
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         """
         Internal service-to-service endpoint — returns every ai_agent-type DID
         for a partner (assigned or not). Called by makun-ai to enrich its
         agent list response. Not JWT-authenticated (see excluded_paths in
-        AuthMiddleware) since it's called server-to-server, not by a user.
+        TalkoAuthMiddleware) since it's called server-to-server, not by a user.
         """
         try:
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "list-ai-agent-dids called. partner_id={}".format(partner_id)
             )
 
@@ -688,17 +688,17 @@ class DIDController:
                 partner_id
             )
 
-            holler_service_logger.info(
+            talko_service_logger.info(
                 "Found {} ai_agent DIDs for partner_id={}".format(
                     len(dids), partner_id
                 )
             )
-            return SuccessResponse(data={"dids": dids})
+            return TalkoSuccessResponse(data={"dids": dids})
 
         except Exception as e:
-            holler_service_logger.error(
+            talko_service_logger.error(
                 "Error listing ai_agent DIDs for partner_id={}: {}".format(
                     partner_id, str(e)
                 )
             )
-            return InternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)

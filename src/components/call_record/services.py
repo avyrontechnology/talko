@@ -1,25 +1,25 @@
 from datetime import datetime, timezone
 from typing import Optional
-from src.components.call_record.models import CallRecordModel
-from src.components.call_record.dto import Contract
-from src.components.call_record.repositories import CallRecordRepository
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.call_record.models import TalkoCallRecordModel
+from src.components.call_record.dto import TalkoContract
+from src.components.call_record.repositories import TalkoCallRecordRepository
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class CallRecordService:
+class TalkoCallRecordService:
 
     def __init__(
-        self, call_record_repo: CallRecordRepository, logger: HollerServiceLogger
+        self, call_record_repo: TalkoCallRecordRepository, logger: TalkoServiceLogger
     ):
         self.__call_record_repo = call_record_repo
         self.__logger = logger
 
     async def create_call_record(
-        self, data: Contract.CreateCallRecordReq, partner_id: int, user_id: int
-    ) -> Contract.CreateCallRecordResp:
+        self, data: TalkoContract.CreateCallRecordReq, partner_id: int, user_id: int
+    ) -> TalkoContract.CreateCallRecordResp:
         try:
             self.__logger.info("Started adding call recod: {}".format(data))
-            call_record = CallRecordModel(
+            call_record = TalkoCallRecordModel(
                 caller=data.caller,
                 receiver=data.receiver,
                 duration=data.duration,
@@ -30,7 +30,7 @@ class CallRecordService:
             ).model_dump(mode="json")
             record_id = await self.__call_record_repo.add_call_record(call_record)
             self.__logger.info("Call record added by : {}".format(user_id))
-            return Contract.CreateCallRecordResp(
+            return TalkoContract.CreateCallRecordResp(
                 record_id=record_id, message="Call record created successfully"
             )
         except Exception as e:
@@ -39,7 +39,7 @@ class CallRecordService:
 
     async def get_call_record(
         self, record_id: str, partner_id: int
-    ) -> Optional[CallRecordModel]:
+    ) -> Optional[TalkoCallRecordModel]:
         try:
             self.__logger.info(
                 "Fetching call record for record_id: {}".format(record_id)
@@ -53,7 +53,7 @@ class CallRecordService:
             self.__logger.error(f"Error fetching call record: {e}")
             raise e
 
-    async def get_all_call_records(self, partner_id: int) -> list[CallRecordModel]:
+    async def get_all_call_records(self, partner_id: int) -> list[TalkoCallRecordModel]:
         try:
             self.__logger.info(
                 "Getting all call record of partner_id: {}".format(partner_id)
@@ -68,8 +68,8 @@ class CallRecordService:
             raise e
 
     async def update_call_record(
-        self, record_id: str, partner_id: int, data: Contract.UpdateCallRecordReq
-    ) -> Contract.UpdateCallRecordResp:
+        self, record_id: str, partner_id: int, data: TalkoContract.UpdateCallRecordReq
+    ) -> TalkoContract.UpdateCallRecordResp:
         try:
             self.__logger.info(
                 "Updatind call record of record_id: {}".format(record_id)
@@ -86,7 +86,7 @@ class CallRecordService:
                 record_id, partner_id, update_data
             )
             self.__logger.info("Call record updated of record_id: {}".format(record_id))
-            return Contract.UpdateCallRecordResp(
+            return TalkoContract.UpdateCallRecordResp(
                 record_id=record_id, message="Call record updated successfully"
             )
         except Exception as e:

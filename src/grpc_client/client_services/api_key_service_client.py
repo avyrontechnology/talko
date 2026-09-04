@@ -1,19 +1,19 @@
 from grpc.aio import AioRpcError
 
-from src.grpc_client.grpc_client import GRPCClient
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.grpc_client.grpc_client import TalkoGRPCClient
+from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.pub import api_key_service_pb2, api_key_service_pb2_grpc
 
-logger = HollerServiceLogger.get_logger()
+logger = TalkoServiceLogger.get_logger()
 
 
-class ApiKeyServiceClient(GRPCClient):
+class TalkoApiKeyServiceClient(TalkoGRPCClient):
 
     def __init__(self):
         super().__init__()
         self.stub = api_key_service_pb2_grpc.ApiKeyServiceStub(self.channel)
 
-    @GRPCClient.call_with_retry
+    @TalkoGRPCClient.call_with_retry
     async def validate_api_key(self, api_key: str):
         logger.info("Sending ValidateApiKey request")
         request = api_key_service_pb2.ValidateApiKeyRequest(key=api_key)

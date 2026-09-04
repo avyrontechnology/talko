@@ -1,9 +1,9 @@
 from celery import Celery
 from celery.schedules import crontab
 
-from src.loggers.holler_celery_loggers import CeleryLogger
+from src.loggers.talko_celery_loggers import TalkoCeleryLogger
 
-celery_logger = CeleryLogger.get_logger()
+celery_logger = TalkoCeleryLogger.get_logger()
 
 
 def create_celery(

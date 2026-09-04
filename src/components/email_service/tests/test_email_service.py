@@ -4,11 +4,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from requests.exceptions import HTTPError, Timeout
 
-from src.components.email_service.services import EmailService
+from src.components.email_service.services import TalkoEmailService
 
 
 def make_service(**overrides):
-    """Return an EmailService with safe defaults and a mock logger."""
+    """Return an TalkoEmailService with safe defaults and a mock logger."""
     logger = MagicMock()
     template_env = MagicMock()
     defaults = dict(
@@ -19,7 +19,7 @@ def make_service(**overrides):
         template_env=template_env,
     )
     defaults.update(overrides)
-    svc = EmailService(**defaults)
+    svc = TalkoEmailService(**defaults)
     return svc, logger, template_env
 
 

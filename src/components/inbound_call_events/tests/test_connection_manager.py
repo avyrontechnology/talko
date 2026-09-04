@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.components.inbound_call_events.connection_manager import InboundCallEventBroker
+from src.components.inbound_call_events.connection_manager import TalkoInboundCallEventBroker
 from src.components.inbound_call_events.constants import INBOUND_CALL_EVENTS_CHANNEL
 
 
@@ -12,7 +12,7 @@ def make_broker():
     redis_pool = MagicMock()
     logger = MagicMock()
     return (
-        InboundCallEventBroker(redis_pool=redis_pool, logger=logger),
+        TalkoInboundCallEventBroker(redis_pool=redis_pool, logger=logger),
         redis_pool,
         logger,
     )
@@ -26,7 +26,7 @@ class TestInboundCallEventBrokerRegistration:
 
         await broker.register(100, websocket)
 
-        assert websocket in broker._InboundCallEventBroker__connections[100]
+        assert websocket in broker._TalkoInboundCallEventBroker__connections[100]
 
     @pytest.mark.asyncio
     async def test_unregister_removes_websocket(self):
@@ -36,7 +36,7 @@ class TestInboundCallEventBrokerRegistration:
 
         broker.unregister(100, websocket)
 
-        assert websocket not in broker._InboundCallEventBroker__connections[100]
+        assert websocket not in broker._TalkoInboundCallEventBroker__connections[100]
 
     def test_unregister_unknown_partner_is_noop(self):
         broker, _, _ = make_broker()
@@ -75,7 +75,7 @@ class TestInboundCallEventBrokerDispatch:
         await broker.register(200, ws_partner_200)
 
         message = json.dumps({"partner_id": 100, "agent_id": 50})
-        await broker._InboundCallEventBroker__dispatch(message)
+        await broker._TalkoInboundCallEventBroker__dispatch(message)
 
         ws_partner_100.send_json.assert_called_once_with(
             {"partner_id": 100, "agent_id": 50}
@@ -90,7 +90,7 @@ class TestInboundCallEventBrokerDispatch:
         await broker.register(100, websocket)
 
         message = json.dumps({"partner_id": 100}).encode("utf-8")
-        await broker._InboundCallEventBroker__dispatch(message)
+        await broker._TalkoInboundCallEventBroker__dispatch(message)
 
         websocket.send_json.assert_called_once_with({"partner_id": 100})
 
@@ -101,16 +101,16 @@ class TestInboundCallEventBrokerDispatch:
         websocket.send_json = AsyncMock(side_effect=Exception("connection closed"))
         await broker.register(100, websocket)
 
-        await broker._InboundCallEventBroker__dispatch(json.dumps({"partner_id": 100}))
+        await broker._TalkoInboundCallEventBroker__dispatch(json.dumps({"partner_id": 100}))
 
-        assert websocket not in broker._InboundCallEventBroker__connections[100]
+        assert websocket not in broker._TalkoInboundCallEventBroker__connections[100]
 
     @pytest.mark.asyncio
     async def test_dispatch_logs_and_ignores_malformed_message(self):
         broker, _, logger = make_broker()
 
         # Must not raise on garbage input from the channel.
-        await broker._InboundCallEventBroker__dispatch("not-json")
+        await broker._TalkoInboundCallEventBroker__dispatch("not-json")
 
         logger.error.assert_called_once()
 
@@ -119,7 +119,7 @@ class TestInboundCallEventBrokerDispatch:
         broker, _, _ = make_broker()
 
         # No one registered for partner 100 — should be a no-op, not an error.
-        await broker._InboundCallEventBroker__dispatch(json.dumps({"partner_id": 100}))
+        await broker._TalkoInboundCallEventBroker__dispatch(json.dumps({"partner_id": 100}))
 
 
 class TestInboundCallEventBrokerLifecycle:
@@ -143,7 +143,7 @@ class TestInboundCallEventBrokerLifecycle:
         pubsub.subscribe.assert_called_once_with(INBOUND_CALL_EVENTS_CHANNEL)
 
         await broker.stop()
-        assert broker._InboundCallEventBroker__listener_task is None
+        assert broker._TalkoInboundCallEventBroker__listener_task is None
 
     @pytest.mark.asyncio
     async def test_start_is_idempotent(self):
@@ -160,9 +160,9 @@ class TestInboundCallEventBrokerLifecycle:
         redis_pool.pubsub = MagicMock(return_value=pubsub)
 
         await broker.start()
-        first_task = broker._InboundCallEventBroker__listener_task
+        first_task = broker._TalkoInboundCallEventBroker__listener_task
         await broker.start()
 
-        assert broker._InboundCallEventBroker__listener_task is first_task
+        assert broker._TalkoInboundCallEventBroker__listener_task is first_task
 
         await broker.stop()

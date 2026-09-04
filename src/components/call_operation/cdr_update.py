@@ -3,43 +3,43 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 from bson import ObjectId
 
-from src.components.call_management.repository import CallRepository
-from src.components.call_management.tata_tele.call_webhook import TataTeleWebhookHandler
-from src.components.cdr.repository import CDRRepository
-from src.components.vendor_config.repository import VendorConfigRepository
-from src.exceptions import BadRequestError, ResourceNotFound
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.datetime_util import DateTimeUtil
+from src.components.call_management.repository import TalkoCallRepository
+from src.components.call_management.tata_tele.call_webhook import TalkoTataTeleWebhookHandler
+from src.components.cdr.repository import TalkoCDRRepository
+from src.components.vendor_config.repository import TalkoVendorConfigRepository
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.datetime_util import TalkoDateTimeUtil
 
 
-class CDRUpdateTask:
+class TalkoCDRUpdateTask:
     """
     Encapsulates logic for updating incomplete CDRs for a specific vendor.
     """
 
     def __init__(
         self,
-        cdr_repository: CDRRepository,
-        vendor_config_repository: VendorConfigRepository,
-        call_repository: CallRepository,
-        logger: HollerServiceLogger,
+        cdr_repository: TalkoCDRRepository,
+        vendor_config_repository: TalkoVendorConfigRepository,
+        call_repository: TalkoCallRepository,
+        logger: TalkoServiceLogger,
     ) -> None:
         """
-        Initialize the CDR update task.
+        Initialize the TalkoCDR update task.
 
         Args:
-            cdr_repository: Repository for accessing CDR records.
+            cdr_repository: Repository for accessing TalkoCDR records.
             vendor_config_repository: Repository for accessing vendor config.
             call_repository: Repository for accessing call records.
             logger: Logger instance for logging task details.
         """
-        self.__cdr_repository: CDRRepository = cdr_repository
-        self.__vendor_config_repository: VendorConfigRepository = (
+        self.__cdr_repository: TalkoCDRRepository = cdr_repository
+        self.__vendor_config_repository: TalkoVendorConfigRepository = (
             vendor_config_repository
         )
-        self.__call_repository: CallRepository = call_repository
-        self.__logger: HollerServiceLogger = logger
-        self.__datetime_util: DateTimeUtil = DateTimeUtil
+        self.__call_repository: TalkoCallRepository = call_repository
+        self.__logger: TalkoServiceLogger = logger
+        self.__datetime_util: TalkoDateTimeUtil = TalkoDateTimeUtil
         self.__vendor_type: str = ""
 
     # Config fetching
@@ -52,7 +52,7 @@ class CDRUpdateTask:
             Dict[str, Any]: The first matching vendor configuration document.
 
         Raises:
-            ResourceNotFound: If no vendor config is found.
+            TalkoResourceNotFound: If no vendor config is found.
         """
         self.__logger.info(
             "Fetching vendor config for cdr update task: {}".format(self.__vendor_type)
@@ -69,7 +69,7 @@ class CDRUpdateTask:
             self.__logger.error(
                 "Vendor config not found for vendor_type: {}".format(self.__vendor_type)
             )
-            raise ResourceNotFound(
+            raise TalkoResourceNotFound(
                 "Vendor config not found for vendor_type: {}".format(self.__vendor_type)
             )
         return vendor_config[0]
@@ -85,7 +85,7 @@ class CDRUpdateTask:
             Dict[str, Any]: The vendor configuration document.
 
         Raises:
-            ResourceNotFound: If the vendor config is not found.
+            TalkoResourceNotFound: If the vendor config is not found.
         """
         self.__logger.info("Fetching vendor config by id: {}".format(vendor_config_id))
         vendor_config: Optional[Dict[str, Any]] = (
@@ -97,27 +97,27 @@ class CDRUpdateTask:
             self.__logger.error(
                 "Vendor config not found for id: {}".format(vendor_config_id)
             )
-            raise ResourceNotFound(
+            raise TalkoResourceNotFound(
                 "Vendor config not found for id: {}".format(vendor_config_id)
             )
         return vendor_config
 
-    # CDR fetching (from vendor API)
+    # TalkoCDR fetching (from vendor API)
     async def fetch_cdr_data(
         self, identifier: str, cdr_config: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Fetch CDR data from the vendor's API.
+        Fetch TalkoCDR data from the vendor's API.
 
         Args:
-            identifier: Call ID or UUID for the CDR.
-            cdr_config: CDR API configuration from vendor_config.
+            identifier: Call ID or UUID for the TalkoCDR.
+            cdr_config: TalkoCDR API configuration from vendor_config.
 
         Returns:
             Dict[str, Any]: API response payload.
 
         Raises:
-            BadRequestError: If the API request fails or config is invalid.
+            TalkoBadRequestError: If the API request fails or config is invalid.
         """
         self.__logger.info(
             "Fetch cdr data in task started for identifier: {}".format(identifier)
@@ -129,8 +129,8 @@ class CDRUpdateTask:
         param_key: str = cdr_config.get("param_key", "call_id")
 
         if not cdr_api_url or not auth_credentials.get("token"):
-            self.__logger.error("Missing CDR API URL or auth token in vendor config")
-            raise BadRequestError("Invalid vendor config")
+            self.__logger.error("Missing TalkoCDR API URL or auth token in vendor config")
+            raise TalkoBadRequestError("Invalid vendor config")
 
         if auth_type == "bearer":
             headers["Authorization"] = f"Bearer {auth_credentials['token']}"
@@ -148,16 +148,16 @@ class CDRUpdateTask:
                             identifier, response.status
                         )
                     )
-                    raise BadRequestError(
-                        "Failed to fetch CDR for {}".format(identifier)
+                    raise TalkoBadRequestError(
+                        "Failed to fetch TalkoCDR for {}".format(identifier)
                     )
                 payload: Dict[str, Any] = await response.json()
                 self.__logger.info(
-                    "Fetched CDR data for {}: {}".format(identifier, response)
+                    "Fetched TalkoCDR data for {}: {}".format(identifier, response)
                 )
                 return payload
 
-    # CDR DB queries
+    # TalkoCDR DB queries
     async def get_incomplete_cdrs(self, vendor_type: str) -> List[Dict[str, Any]]:
         """
         Fetch incomplete CDRs across all configs for a vendor_type.
@@ -166,7 +166,7 @@ class CDRUpdateTask:
             vendor_type: Vendor identifier (e.g., 'tata_tele').
 
         Returns:
-            List[Dict[str, Any]]: List of incomplete CDR documents.
+            List[Dict[str, Any]]: List of incomplete TalkoCDR documents.
         """
         self.__logger.info(
             "Get incomplete cdr records for vendor_type: {}".format(vendor_type)
@@ -192,7 +192,7 @@ class CDRUpdateTask:
             vendor_config_id: The specific vendor config document ID.
 
         Returns:
-            List[Dict[str, Any]]: List of incomplete CDR documents for this config.
+            List[Dict[str, Any]]: List of incomplete TalkoCDR documents for this config.
         """
         self.__logger.info(
             "Get incomplete cdrs for vendor_config_id: {}".format(vendor_config_id)
@@ -230,7 +230,7 @@ class CDRUpdateTask:
             chunk_size: Number of CDRs to process per iteration.
 
         Returns:
-            str: Summary of updated CDR count vs total.
+            str: Summary of updated TalkoCDR count vs total.
         """
         self.__vendor_type = vendor_type
         self.__logger.info(
@@ -249,12 +249,12 @@ class CDRUpdateTask:
             self.__logger.error(
                 "cdr_url_handler missing in vendor_config: {}".format(vendor_config_id)
             )
-            raise BadRequestError(
-                "CDR config missing in vendor_config: {}".format(vendor_config_id)
+            raise TalkoBadRequestError(
+                "TalkoCDR config missing in vendor_config: {}".format(vendor_config_id)
             )
 
         self.__logger.debug(
-            "CDR config for vendor_config_id {}: {}".format(
+            "TalkoCDR config for vendor_config_id {}: {}".format(
                 vendor_config_id, cdr_config
             )
         )
@@ -271,12 +271,12 @@ class CDRUpdateTask:
 
         total: int = len(cdrs)
         self.__logger.info(
-            "Found {} incomplete CDR(s) for vendor_config_id: {}".format(
+            "Found {} incomplete TalkoCDR(s) for vendor_config_id: {}".format(
                 total, vendor_config_id
             )
         )
 
-        handler: TataTeleWebhookHandler = TataTeleWebhookHandler(
+        handler: TalkoTataTeleWebhookHandler = TalkoTataTeleWebhookHandler(
             logger=self.__logger,
             call_repository=self.__call_repository,
             vendor_type=vendor_type,
@@ -300,7 +300,7 @@ class CDRUpdateTask:
 
                 if not call_id:
                     self.__logger.warning(
-                        "Skipping CDR with no call_id: {}".format(cdr)
+                        "Skipping TalkoCDR with no call_id: {}".format(cdr)
                     )
                     continue
 
@@ -317,11 +317,11 @@ class CDRUpdateTask:
                     if result.get("status") == "success":
                         updated_count += 1
                         self.__logger.info(
-                            "Updated CDR for call_id: {}".format(result.get("call_id"))
+                            "Updated TalkoCDR for call_id: {}".format(result.get("call_id"))
                         )
                 except Exception as e:
                     self.__logger.error(
-                        "Failed to update CDR for call_id {}: {}".format(
+                        "Failed to update TalkoCDR for call_id {}: {}".format(
                             call_id, str(e)
                         )
                     )
@@ -335,7 +335,7 @@ class CDRUpdateTask:
 
     async def execute(self, vendor_type: str) -> str:
         """
-        Execute the CDR update task for the specified vendor.
+        Execute the TalkoCDR update task for the specified vendor.
 
         Args:
             vendor_type: Vendor identifier (e.g., 'tata_tele').
@@ -346,7 +346,7 @@ class CDRUpdateTask:
         try:
             self.__vendor_type = vendor_type
             self.__logger.info(
-                "Starting CDR update task (legacy execute) for vendor_type: {}".format(
+                "Starting TalkoCDR update task (legacy execute) for vendor_type: {}".format(
                     self.__vendor_type
                 )
             )
@@ -358,17 +358,17 @@ class CDRUpdateTask:
 
             if not cdr_config:
                 self.__logger.error(
-                    "CDR config missing in vendor config for vendor_type: {}".format(
+                    "TalkoCDR config missing in vendor config for vendor_type: {}".format(
                         self.__vendor_type
                     )
                 )
-                raise BadRequestError(
-                    "CDR config missing in vendor config for vendor_type: {}".format(
+                raise TalkoBadRequestError(
+                    "TalkoCDR config missing in vendor config for vendor_type: {}".format(
                         self.__vendor_type
                     )
                 )
 
-            self.__logger.debug("CDR Config cdr update task: {}".format(cdr_config))
+            self.__logger.debug("TalkoCDR Config cdr update task: {}".format(cdr_config))
 
             # Fetch incomplete CDRs (unscoped — all configs for this vendor_type)
             cdrs: List[Dict[str, Any]] = await self.get_incomplete_cdrs(vendor_type)
@@ -378,7 +378,7 @@ class CDRUpdateTask:
 
             self.__logger.debug("Incomplete CDRs found: {}".format(len(cdrs)))
 
-            handler: TataTeleWebhookHandler = TataTeleWebhookHandler(
+            handler: TalkoTataTeleWebhookHandler = TalkoTataTeleWebhookHandler(
                 logger=self.__logger,
                 call_repository=self.__call_repository,
                 vendor_type=vendor_type,
@@ -386,7 +386,7 @@ class CDRUpdateTask:
             updated_count: int = 0
 
             for cdr in cdrs:
-                self.__logger.debug("Processing CDR: {}".format(cdr))
+                self.__logger.debug("Processing TalkoCDR: {}".format(cdr))
                 call_id: Optional[str] = cdr.get("call_id")
                 uuid_val: Optional[str] = cdr.get("call_uuid")
                 identifier: Optional[str] = call_id if call_id else None
@@ -395,7 +395,7 @@ class CDRUpdateTask:
                         identifier, cdr_config
                     )
                     self.__logger.debug(
-                        "Payload for processing CDR: {}".format(payload)
+                        "Payload for processing TalkoCDR: {}".format(payload)
                     )
                     result: Dict[str, Any] = await handler.process_cdr_api_payload(
                         payload, call_id, uuid_val
@@ -403,11 +403,11 @@ class CDRUpdateTask:
                     if result.get("status") == "success":
                         updated_count += 1
                         self.__logger.info(
-                            "Updated CDR for call_id: {}".format(result.get("call_id"))
+                            "Updated TalkoCDR for call_id: {}".format(result.get("call_id"))
                         )
                 except Exception as e:
                     self.__logger.error(
-                        "Failed to update CDR {}: {}".format(identifier, str(e))
+                        "Failed to update TalkoCDR {}: {}".format(identifier, str(e))
                     )
 
             self.__logger.info(
@@ -417,13 +417,13 @@ class CDRUpdateTask:
 
         except Exception as e:
             self.__logger.error(
-                "Error in CDR update task for vendor_type {}: {}".format(
+                "Error in TalkoCDR update task for vendor_type {}: {}".format(
                     self.__vendor_type, str(e)
                 )
             )
             raise
 
-    # Single CDR fetch (API path)
+    # Single TalkoCDR fetch (API path)
     async def fetch_single_cdr(
         self,
         call_id: Optional[str] = None,
@@ -432,7 +432,7 @@ class CDRUpdateTask:
         vendor_type: str = "tata_tele",
     ) -> Dict[str, Any]:
         """
-        Fetch and process a single CDR by call_id, call_uuid.
+        Fetch and process a single TalkoCDR by call_id, call_uuid.
 
         Designed for the API path (using vendor_config_id lookup) while
         maintaining full backward compatibility with the cron job path.
@@ -442,7 +442,7 @@ class CDRUpdateTask:
 
         Args:
             call_id: The call ID to fetch and process.
-            cdr_config: Optional pre-fetched CDR config from vendor_config_id
+            cdr_config: Optional pre-fetched TalkoCDR config from vendor_config_id
                         lookup. If None, config is fetched by vendor_type.
             vendor_type: Vendor identifier, used when cdr_config is None and
                          for handler initialization.
@@ -452,7 +452,7 @@ class CDRUpdateTask:
         """
         try:
             self.__logger.info(
-                "Fetch single CDR called with call_id: {}, call_uuid: {}, vendor_type: {}".format(
+                "Fetch single TalkoCDR called with call_id: {}, call_uuid: {}, vendor_type: {}".format(
                     call_id, call_uuid, vendor_type
                 )
             )
@@ -460,7 +460,7 @@ class CDRUpdateTask:
             if cdr_config is None:
                 self.__vendor_type = vendor_type
                 self.__logger.info(
-                    "Fetching vendor config for single CDR (vendor_type: {})".format(
+                    "Fetching vendor config for single TalkoCDR (vendor_type: {})".format(
                         vendor_type
                     )
                 )
@@ -468,14 +468,14 @@ class CDRUpdateTask:
                 cdr_config = vendor_config.get("cdr_url_handler", {})
 
             if not cdr_config:
-                self.__logger.error("CDR config missing in vendor config")
-                raise BadRequestError("CDR config missing in vendor config")
+                self.__logger.error("TalkoCDR config missing in vendor config")
+                raise TalkoBadRequestError("TalkoCDR config missing in vendor config")
 
             identifier: str = call_uuid if call_uuid is not None else call_id
             identifier_type: str = "call_uuid" if call_uuid is not None else "call_id"
 
             self.__logger.info(
-                "Fetching single CDR using {}: {}".format(identifier_type, identifier)
+                "Fetching single TalkoCDR using {}: {}".format(identifier_type, identifier)
             )
 
             payload: Dict[str, Any] = await self.fetch_cdr_data(
@@ -485,10 +485,10 @@ class CDRUpdateTask:
                     "param_key": identifier_type,
                 },
             )
-            self.__logger.debug("Raw CDR payload received: {}".format(payload))
+            self.__logger.debug("Raw TalkoCDR payload received: {}".format(payload))
 
             # Process using the same handler as the cron job
-            handler: TataTeleWebhookHandler = TataTeleWebhookHandler(
+            handler: TalkoTataTeleWebhookHandler = TalkoTataTeleWebhookHandler(
                 logger=self.__logger,
                 call_repository=self.__call_repository,
                 vendor_type=vendor_type,
@@ -505,12 +505,12 @@ class CDRUpdateTask:
                 "lookup_by": identifier_type,
                 "raw_payload": payload,
                 "processed_result": result,
-                "message": "CDR fetched and processed successfully",
+                "message": "TalkoCDR fetched and processed successfully",
             }
 
         except Exception as e:
             self.__logger.error(
-                "Failed to fetch single CDR for call_id {}, call_uuid {}: {}".format(
+                "Failed to fetch single TalkoCDR for call_id {}, call_uuid {}: {}".format(
                     call_id, call_uuid, str(e)
                 )
             )

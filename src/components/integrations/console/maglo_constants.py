@@ -1,19 +1,19 @@
 import os
 from typing import Dict
 
-from src.core.environment import ENV
+from src.core.environment import TalkoENV
 
 
-class MagloApiConstants:
+class TalkoMagloApiConstants:
     """
     Centralized constants for Maglo API integration.
     All values can be overridden via environment variables.
-    Use these in MagloClient or any service that calls Maglo APIs.
+    Use these in TalkoMagloClient or any service that calls Maglo APIs.
     """
 
     # Base URL – different environments
-    MAGLO_BASE_URL: str = ENV.MAGLO_BASE_URL or (
-        "https://int-maglo-service.makunaiglobal.ai/maglo-service"  # fallback if not set in ENV
+    MAGLO_BASE_URL: str = TalkoENV.MAGLO_BASE_URL or (
+        "https://int-maglo-service.makunaiglobal.ai/maglo-service"  # fallback if not set in TalkoENV
     )
     MAGLO_API_TOKEN: str = ""
 

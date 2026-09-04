@@ -1,10 +1,10 @@
 FROM python:3.11.8-slim
 
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/holler-service
+ENV PYTHONPATH=/talko-service
 
 EXPOSE 8003
-WORKDIR /holler-service
+WORKDIR /talko-service
 
 # Copy Poetry configuration files
 COPY poetry.lock pyproject.toml ./

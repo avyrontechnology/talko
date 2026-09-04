@@ -3,13 +3,13 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.components.inbound_call_events.constants import INBOUND_CALL_EVENT_TYPE
-from src.components.inbound_call_events.publisher import InboundCallEventPublisher
+from src.components.inbound_call_events.publisher import TalkoInboundCallEventPublisher
 
 
 def make_publisher():
     broker = AsyncMock()
     logger = MagicMock()
-    return InboundCallEventPublisher(broker=broker, logger=logger), broker, logger
+    return TalkoInboundCallEventPublisher(broker=broker, logger=logger), broker, logger
 
 
 class TestInboundCallEventPublisher:

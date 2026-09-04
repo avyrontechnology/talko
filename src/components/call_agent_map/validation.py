@@ -1,21 +1,21 @@
-from src.components.call_agent_map.dto import Contract
-from src.components.call_agent_map.repository import AgentMappingRepository
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.call_agent_map.dto import TalkoContract
+from src.components.call_agent_map.repository import TalkoAgentMappingRepository
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class AgentMapperValidator:
+class TalkoAgentMapperValidator:
     """
     Validator class for checking agent mapping constraints,
     such as ensuring an agent is not already mapped to another partner.
     """
 
-    def __init__(self, repository: AgentMappingRepository, logger: HollerServiceLogger):
+    def __init__(self, repository: TalkoAgentMappingRepository, logger: TalkoServiceLogger):
         """
-        Initialize the AgentMapperValidator.
+        Initialize the TalkoAgentMapperValidator.
 
         Args:
-            repository (AgentMappingRepository): Repository for accessing agent mapping records.
-            logger (HollerServiceLogger): Logger instance for logging validation activities.
+            repository (TalkoAgentMappingRepository): Repository for accessing agent mapping records.
+            logger (TalkoServiceLogger): Logger instance for logging validation activities.
         """
         self.repository = repository
         self.logger = logger
@@ -25,7 +25,7 @@ class AgentMapperValidator:
         Validates whether the agent is already mapped to another partner and is active.
 
         Args:
-            agent (Contract.AgentDidMappingCreate): Agent mapping input data.
+            agent (TalkoContract.AgentDidMappingCreate): Agent mapping input data.
 
         Raises:
             ValueError: If the agent is already mapped to another partner.

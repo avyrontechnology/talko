@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional, Union
 
 
-class DateTimeUtil:
+class TalkoDateTimeUtil:
     @staticmethod
     def get_current_time() -> int:
         """Get the current time in milliseconds."""

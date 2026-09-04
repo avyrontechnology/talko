@@ -5,24 +5,24 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from src.components.integrations.console.maglo_client import MagloClient
+from src.components.integrations.console.maglo_client import TalkoMagloClient
 from src.components.reports.daily_lead_report.lead_connection_service import (
-    LeadConnectionReportService,
+    TalkoLeadConnectionReportService,
 )
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 
 @router.get("/daily-lead-connection-csv")
 async def daily_lead_connection_csv(api_key: str = Query(...)):
-    logger = HollerServiceLogger()
+    logger = TalkoServiceLogger()
     logger.info("Daily lead connection CSV request received")
 
-    db = DocDatabaseSessionManager(logger=logger)
-    maglo = MagloClient(logger=logger)
-    service = LeadConnectionReportService(maglo, db, logger)
+    db = TalkoDocDatabaseSessionManager(logger=logger)
+    maglo = TalkoMagloClient(logger=logger)
+    service = TalkoLeadConnectionReportService(maglo, db, logger)
 
     try:
         logger.debug("Starting daily lead connection report generation")

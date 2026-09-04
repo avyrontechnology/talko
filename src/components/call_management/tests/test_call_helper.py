@@ -5,15 +5,15 @@ import pytest
 from pydantic import ValidationError
 
 from src.components.call_management import messages as call_messages
-from src.components.call_management.dto import Contract
-from src.components.call_management.helper import CallProcessorHelper
-from src.exceptions import BadRequestError, ResourceNotFound
-from src.utils.crypto_utils import RSAKeyHandler
-from src.utils.enums import NumberType, VendorType
+from src.components.call_management.dto import TalkoContract
+from src.components.call_management.helper import TalkoCallProcessorHelper
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
+from src.utils.crypto_utils import TalkoRSAKeyHandler
+from src.utils.enums import TalkoNumberType, TalkoVendorType
 
 
 class TestCallProcessorHelperCompleteCoverage:
-    """Comprehensive tests CallProcessorHelper"""
+    """Comprehensive tests TalkoCallProcessorHelper"""
 
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -26,7 +26,7 @@ class TestCallProcessorHelperCompleteCoverage:
         self.agent_mapping_repository = AsyncMock()
         self.did_management_service = AsyncMock()
 
-        self.helper = CallProcessorHelper(
+        self.helper = TalkoCallProcessorHelper(
             repository=self.repository,
             logger=self.logger,
             datetime_util=self.datetime_util,
@@ -45,7 +45,7 @@ class TestCallProcessorHelperCompleteCoverage:
         logger_mock.info.side_effect = Exception("Init failed")
 
         with pytest.raises(Exception, match="Init failed"):
-            CallProcessorHelper(
+            TalkoCallProcessorHelper(
                 repository=self.repository,
                 logger=logger_mock,
                 datetime_util=self.datetime_util,
@@ -115,7 +115,7 @@ class TestCallProcessorHelperCompleteCoverage:
             "status": "Cooling Period",
         }
 
-        with pytest.raises(BadRequestError, match="cannot be used for calls"):
+        with pytest.raises(TalkoBadRequestError, match="cannot be used for calls"):
             await self.helper.validate_given_did(
                 did="911111111111", partner_id=123, service_board_id=1
             )
@@ -125,7 +125,7 @@ class TestCallProcessorHelperCompleteCoverage:
         """Test validation when DID doesn't exist"""
         self.did_management_service.get_dids_by_number.return_value = None
 
-        with pytest.raises(ResourceNotFound, match="does not exist"):
+        with pytest.raises(TalkoResourceNotFound, match="does not exist"):
             await self.helper.validate_given_did(did="911111111111", partner_id=123)
 
     @pytest.mark.asyncio
@@ -136,7 +136,7 @@ class TestCallProcessorHelperCompleteCoverage:
             "partner_id": 123,
         }
 
-        with pytest.raises(BadRequestError, match="is not active"):
+        with pytest.raises(TalkoBadRequestError, match="is not active"):
             await self.helper.validate_given_did(did="911111111111", partner_id=123)
 
     @pytest.mark.asyncio
@@ -148,7 +148,7 @@ class TestCallProcessorHelperCompleteCoverage:
         }
 
         # Use a shorter, unique substring or the exact message from your constants
-        with pytest.raises(BadRequestError, match="not assigned to your partner"):
+        with pytest.raises(TalkoBadRequestError, match="not assigned to your partner"):
             await self.helper.validate_given_did(did="911111111111", partner_id=123)
 
     @pytest.mark.asyncio
@@ -162,7 +162,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
         # If the message is "DID is restricted to service board 99"
         # This regex "restricted to service board" should match unless the wording is different
-        with pytest.raises(BadRequestError, match="restricted to service board"):
+        with pytest.raises(TalkoBadRequestError, match="restricted to service board"):
             await self.helper.validate_given_did(
                 did="911111111111", partner_id=123, service_board_id=1
             )
@@ -187,7 +187,7 @@ class TestCallProcessorHelperCompleteCoverage:
         """Test when service board is enabled but no service_board_id provided"""
         partner_config = {"enable_service_board": True, "vendor_id": "v1"}
 
-        with pytest.raises(BadRequestError, match="Service board ID is required"):
+        with pytest.raises(TalkoBadRequestError, match="Service board ID is required"):
             await self.helper.select_did(
                 partner_config=partner_config,
                 partner_id=123,
@@ -262,14 +262,14 @@ class TestCallProcessorHelperCompleteCoverage:
         # Update fails
         self.repository.update_partner_config_did_indices.return_value = None
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await self.helper.select_did(
                 partner_config=partner_config, partner_id=123, user_id=456
             )
 
     def test_prepare_cdr_exception(self):
         """Test prepare_cdr exception handling"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             lead_id=None,
@@ -277,11 +277,11 @@ class TestCallProcessorHelperCompleteCoverage:
             to_number="919876543210",
         )
 
-        # Mock CDR model_dump to raise exception
-        with patch("src.components.call_management.helper.CDR") as mock_cdr:
-            mock_cdr.return_value.model_dump.side_effect = Exception("CDR error")
+        # Mock TalkoCDR model_dump to raise exception
+        with patch("src.components.call_management.helper.TalkoCDR") as mock_cdr:
+            mock_cdr.return_value.model_dump.side_effect = Exception("TalkoCDR error")
 
-            with pytest.raises(Exception, match="CDR error"):
+            with pytest.raises(Exception, match="TalkoCDR error"):
                 self.helper.prepare_cdr(
                     call_data=call_data,
                     call_id="call123",
@@ -296,10 +296,10 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_extract_to_number_primary(self):
         """Test extracting primary number"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
-            number_type=NumberType.PRIMARY_NUMBER.value,
+            number_type=TalkoNumberType.PRIMARY_NUMBER.value,
             encryption_enabled=False,
             to_number="919876543210",
         )
@@ -311,10 +311,10 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_extract_to_number_additional(self):
         """Test extracting additional number"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
-            number_type=NumberType.ADDITIONAL_NUMBER.value,
+            number_type=TalkoNumberType.ADDITIONAL_NUMBER.value,
             encryption_enabled=False,
             to_number="919876543210",
         )
@@ -326,10 +326,10 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_extract_to_number_whatsapp(self):
         """Test extracting WhatsApp number"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
-            number_type=NumberType.WHATSAPP_NUMBER.value,
+            number_type=TalkoNumberType.WHATSAPP_NUMBER.value,
             encryption_enabled=False,
             to_number="919876543210",
         )
@@ -341,10 +341,10 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_extract_to_number_not_found(self):
         """Test when no valid number is found"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
-            number_type=NumberType.PRIMARY_NUMBER.value,
+            number_type=TalkoNumberType.PRIMARY_NUMBER.value,
             encryption_enabled=False,
             to_number="919876543210",
         )
@@ -356,7 +356,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_extract_to_number_exception_handling(self):
         """Test exception handling in extract_to_number"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             number_type="invalid_type",  # Invalid type
@@ -371,7 +371,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     @pytest.mark.asyncio
     async def test_create_incoming_cdr_with_none_values(self):
-        """Test creating incoming CDR with None values"""
+        """Test creating incoming TalkoCDR with None values"""
         request_data = {
             "uuid": "test-uuid",
             "call_id": "call-123",
@@ -405,7 +405,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     @pytest.mark.asyncio
     async def test_create_incoming_cdr_lead_id_zero(self):
-        """Test creating incoming CDR when lead_id is 0 (falsy but valid)"""
+        """Test creating incoming TalkoCDR when lead_id is 0 (falsy but valid)"""
         request_data = {
             "uuid": "test-uuid",
             "call_id": "call-123",
@@ -432,7 +432,7 @@ class TestCallProcessorHelperCompleteCoverage:
     async def test_get_vendor_handler_with_vendor_config_id(self):
         """Test getting vendor handler with vendor_config_id"""
         self.repository.get_vendor_config.return_value = {
-            "vendor_type": VendorType.ACEFHONE.value
+            "vendor_type": TalkoVendorType.ACEFHONE.value
         }
 
         handler = await self.helper.get_vendor_handler("v1", "config123")
@@ -476,14 +476,14 @@ class TestCallProcessorHelperCompleteCoverage:
 
         self.did_management_service.get_dids_by_partner_and_vendor.return_value = []
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await self.helper.select_did(
                 partner_config=partner_config, partner_id=123, user_id=456
             )
 
     def test_prepare_cdr_with_all_fields(self):
         """Test prepare_cdr with all optional fields"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             lead_id=100,
@@ -577,7 +577,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_prepare_cdr_with_none_lead_name(self):
         """Test prepare_cdr when lead_name is None"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             lead_id=100,
@@ -604,7 +604,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_prepare_cdr_with_empty_lead_name(self):
         """Test prepare_cdr when lead_name is empty string"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             lead_id=100,
@@ -629,7 +629,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_decrypt_lead_data_no_secret(self):
         """Test decrypt_lead_data when lead_secret is None"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             encryption_enabled=False,
@@ -640,14 +640,14 @@ class TestCallProcessorHelperCompleteCoverage:
 
         assert result == None
 
-    @patch.object(RSAKeyHandler, "load_private_key")
-    @patch.object(RSAKeyHandler, "decrypt_with_private_key")
+    @patch.object(TalkoRSAKeyHandler, "load_private_key")
+    @patch.object(TalkoRSAKeyHandler, "decrypt_with_private_key")
     def test_decrypt_lead_data_value_error_with_logging(self, mock_decrypt, mock_load):
         """Test ValueError handling in decrypt_lead_data"""
         mock_load.return_value = MagicMock()
         mock_decrypt.side_effect = ValueError("Decryption failed")
 
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             encryption_enabled=True,
@@ -825,21 +825,21 @@ class TestCallProcessorHelperCompleteCoverage:
     async def test_select_did_missing_service_board_error(self):
         """Covers lines 255-261: Validation error when service board is required."""
         partner_config = {"enable_service_board": True, "vendor_id": "v1"}
-        with pytest.raises(BadRequestError, match="Service board ID is required"):
+        with pytest.raises(TalkoBadRequestError, match="Service board ID is required"):
             await self.helper.select_did(
                 partner_config, 123, 456, service_board_id=None
             )
 
     @pytest.mark.asyncio
     async def test_select_did_no_dids_available_error(self):
-        """Covers lines 283-289: ResourceNotFound when DID pool is empty."""
+        """Covers lines 283-289: TalkoResourceNotFound when DID pool is empty."""
         self.did_management_service.get_dids_by_partner_and_vendor.return_value = []
         partner_config = {
             "enable_round_robin": True,
             "vendor_id": "v1",
             "did_indices": {},
         }
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await self.helper.select_did(partner_config, 123, 456)
 
     @pytest.mark.asyncio
@@ -868,9 +868,9 @@ class TestCallProcessorHelperCompleteCoverage:
     @pytest.mark.parametrize(
         "num_type, key",
         [
-            (NumberType.PRIMARY_NUMBER.value, "phone_number"),
-            (NumberType.ADDITIONAL_NUMBER.value, "additional_number"),
-            (NumberType.WHATSAPP_NUMBER.value, "whatsapp_number"),
+            (TalkoNumberType.PRIMARY_NUMBER.value, "phone_number"),
+            (TalkoNumberType.ADDITIONAL_NUMBER.value, "additional_number"),
+            (TalkoNumberType.WHATSAPP_NUMBER.value, "whatsapp_number"),
         ],
     )
     def test_extract_to_number_types(self, num_type, key):
@@ -881,7 +881,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     @pytest.mark.asyncio
     async def test_create_incoming_cdr_full_flow(self):
-        """Covers the entirety of the CDR creation for incoming calls."""
+        """Covers the entirety of the TalkoCDR creation for incoming calls."""
         request_data = {
             "uuid": "test-uuid",
             "call_id": "cid-1",
@@ -905,10 +905,10 @@ class TestCallProcessorHelperCompleteCoverage:
 
     @pytest.mark.asyncio
     async def test_get_partner_config_not_found_raises_resource_not_found(self):
-        """Test get_partner_config raises ResourceNotFound when config doesn't exist"""
+        """Test get_partner_config raises TalkoResourceNotFound when config doesn't exist"""
         self.repository.get_partner_config_by_partner_id.return_value = None
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await self.helper.get_partner_config(999)
 
         assert any(
@@ -953,8 +953,8 @@ class TestCallProcessorHelperCompleteCoverage:
         assert "Error getting DID mapping for agent 123" in error_msg
 
     def test_prepare_cdr_lead_name_none_becomes_empty_string(self):
-        """Test that None lead_name becomes empty string in CDR"""
-        call_data = Contract.CallCreate(
+        """Test that None lead_name becomes empty string in TalkoCDR"""
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             lead_id=100,
@@ -980,7 +980,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_prepare_cdr_lead_name_empty_string(self):
         """Test that empty string lead_name stays empty string"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             lead_id=100,
@@ -1005,7 +1005,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_decrypt_lead_data_returns_empty_dict_when_no_secret(self):
         """Test decrypt_lead_data returns empty dict when lead_secret is not provided"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             encryption_enabled=False,
@@ -1017,8 +1017,8 @@ class TestCallProcessorHelperCompleteCoverage:
 
         assert result == None
 
-    @patch.object(RSAKeyHandler, "load_private_key")
-    @patch.object(RSAKeyHandler, "decrypt_with_private_key")
+    @patch.object(TalkoRSAKeyHandler, "load_private_key")
+    @patch.object(TalkoRSAKeyHandler, "decrypt_with_private_key")
     def test_decrypt_lead_data_value_error_logs_and_raises(
         self, mock_decrypt, mock_load
     ):
@@ -1026,7 +1026,7 @@ class TestCallProcessorHelperCompleteCoverage:
         mock_load.return_value = MagicMock()
         mock_decrypt.side_effect = ValueError("Hex decryption failed")
 
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             encryption_enabled=True,
@@ -1042,8 +1042,8 @@ class TestCallProcessorHelperCompleteCoverage:
         assert any("Hex decryption failed" in msg for msg in debug_calls)
         assert any("Failed to decrypt lead_secret" in msg for msg in error_calls)
 
-    @patch.object(RSAKeyHandler, "load_private_key")
-    @patch.object(RSAKeyHandler, "decrypt_with_private_key")
+    @patch.object(TalkoRSAKeyHandler, "load_private_key")
+    @patch.object(TalkoRSAKeyHandler, "decrypt_with_private_key")
     def test_decrypt_lead_data_general_exception_logs_and_raises(
         self, mock_decrypt, mock_load
     ):
@@ -1051,7 +1051,7 @@ class TestCallProcessorHelperCompleteCoverage:
         mock_load.return_value = MagicMock()
         mock_decrypt.side_effect = RuntimeError("Unexpected crypto error")
 
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             encryption_enabled=True,
@@ -1162,7 +1162,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     def test_prepare_cdr_with_actual_lead_name(self):
         """Test prepare_cdr with actual non-empty lead_name"""
-        call_data = Contract.CallCreate(
+        call_data = TalkoContract.CallCreate(
             service_board_id=1,
             agent_number="9123456789",
             lead_id=100,
@@ -1190,7 +1190,7 @@ class TestCallProcessorHelperCompleteCoverage:
         """Complete test with all assertions"""
         self.repository.get_partner_config_by_partner_id.return_value = None
 
-        with pytest.raises(ResourceNotFound) as exc_info:
+        with pytest.raises(TalkoResourceNotFound) as exc_info:
             await self.helper.get_partner_config(999)
 
         assert "PARTNER_CONFIG_NOT_FOUND" in str(exc_info.value) or True

@@ -1,24 +1,24 @@
 from fastapi import APIRouter, Depends, WebSocket
 
-from src.components.pstn.providers.tata_tele.handler import TataTeleProvider
-from src.components.pstn.services import PSTNBridgeService
-from src.core.container import Container
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.pstn.providers.tata_tele.handler import TalkoTataTeleProvider
+from src.components.pstn.services import TalkoPSTNBridgeService
+from src.core.container import TalkoContainer
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
-logger = HollerServiceLogger.get_logger()
+logger = TalkoServiceLogger.get_logger()
 
-_tata_provider: TataTeleProvider = TataTeleProvider()
+_tata_provider: TalkoTataTeleProvider = TalkoTataTeleProvider()
 router: APIRouter = APIRouter()
 
 
-def _get_bridge() -> PSTNBridgeService:
-    return Container.pstn_bridge_service()
+def _get_bridge() -> TalkoPSTNBridgeService:
+    return TalkoContainer.pstn_bridge_service()
 
 
 @router.websocket("/tata/stream")
 async def tata_stream(
     ws: WebSocket,
-    bridge: PSTNBridgeService = Depends(_get_bridge),
+    bridge: TalkoPSTNBridgeService = Depends(_get_bridge),
 ) -> None:
     await ws.accept()
     logger.info("[PSTN] websocket accepted")
@@ -37,5 +37,5 @@ async def tata_stream(
     await bridge.handle_call(ws, _tata_provider, raw_events())
 
 
-class PSTNAgentController:
+class TalkoPSTNAgentController:
     router: APIRouter = router

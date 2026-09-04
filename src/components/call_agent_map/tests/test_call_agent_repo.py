@@ -2,10 +2,10 @@ from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 
-from src.components.call_agent_map.repository import AgentMappingRepository
-from src.components.call_agent_map.services import AgentMappingService
-from src.exceptions import BadRequestError
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.call_agent_map.repository import TalkoAgentMappingRepository
+from src.components.call_agent_map.services import TalkoAgentMappingService
+from src.exceptions import TalkoBadRequestError
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 @pytest.mark.asyncio
@@ -14,8 +14,8 @@ class TestAgentMappingRepository:
     @pytest.fixture
     def setup(self):
         mock_db_manager = MagicMock()
-        mock_logger = MagicMock(spec=HollerServiceLogger)
-        repo = AgentMappingRepository(mock_db_manager, mock_logger)
+        mock_logger = MagicMock(spec=TalkoServiceLogger)
+        repo = TalkoAgentMappingRepository(mock_db_manager, mock_logger)
         return repo, mock_db_manager, mock_logger
 
     async def test_get_agent_did_mapping_success(self, setup):
@@ -165,7 +165,7 @@ class TestAgentMappingRepository:
         mock_db_manager.collection.return_value = mock_cm
 
         with pytest.raises(
-            BadRequestError, match="No available DIDs for agent mapping"
+            TalkoBadRequestError, match="No available DIDs for agent mapping"
         ):
             await repo.get_unassigned_did(123, ["1001", "1002"])
 
@@ -325,7 +325,7 @@ class TestAgentMappingCheckRepository:
     def setup_method(self):
         self.db_manager = MagicMock()
         self.logger = MagicMock()
-        self.repository = AgentMappingRepository(self.db_manager, self.logger)
+        self.repository = TalkoAgentMappingRepository(self.db_manager, self.logger)
 
         self.collection_mock = MagicMock()
         self.db_manager.collection.return_value.__aenter__ = AsyncMock(

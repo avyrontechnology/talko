@@ -1,9 +1,9 @@
-class HollerErrorPrompt:
+class TalkoErrorPrompt:
     TOKEN_REQUIRED: str = "Token required"
     UNAUTHORIZED_HEADER: str = "Unauthorized Header"
 
 
-class CurrentUserMap:
+class TalkoCurrentUserMap:
     USER_ID: str = "user_id"
     USER_ROLE: str = "user_role"
     PARTNER_ID: str = "partner_id"
@@ -16,7 +16,7 @@ class CurrentUserMap:
     TEAM_LEAD_ROLE_HIERARCHY_LEVEL: int
 
 
-class PaginationConstants:
+class TalkoPaginationConstants:
     offset: int = 1
     limit: int = 10
     LIMIT_MAX: int = 500

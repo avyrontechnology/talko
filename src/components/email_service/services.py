@@ -5,26 +5,26 @@ import requests
 from pydantic import BaseModel, EmailStr, ValidationError
 
 from src.components.email_service import messages as email_messages
-from src.core.environment import ENV
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.core.environment import TalkoENV
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class ValidateEmail(BaseModel):
+class TalkoValidateEmail(BaseModel):
     email: EmailStr
 
 
-class EmailService:
+class TalkoEmailService:
     """Service class for handling email operations with SMTP server and API."""
 
     def __init__(
         self,
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
         api_url: str,
         channel_key: str,
         sender_email: str,
-        template_env: ENV,
+        template_env: TalkoENV,
     ):
-        """Initialize EmailService with configurations and logging."""
+        """Initialize TalkoEmailService with configurations and logging."""
         self.logger = logger
         self.api_url = api_url
         self.channel_key = channel_key
@@ -39,7 +39,7 @@ class EmailService:
 
         for email in emails:
             try:
-                ValidateEmail(email=email)
+                TalkoValidateEmail(email=email)
             except ValidationError:
                 self.logger.error("Invalid {} email: {}".format(label, email))
                 raise ValueError(email_messages.INVALID_EMAIL.format(label, email))

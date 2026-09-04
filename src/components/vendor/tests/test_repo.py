@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from bson import ObjectId
 
-from src.components.vendor.models import VendorModel
-from src.components.vendor.repository import VendorRepository
+from src.components.vendor.models import TalkoVendorModel
+from src.components.vendor.repository import TalkoVendorRepository
 
 
 @pytest.mark.asyncio
@@ -13,8 +13,8 @@ class TestVendorRepository:
     def setup_class(cls):
         cls.mock_db_manager = MagicMock()
         cls.mock_logger = MagicMock()
-        cls.repository = VendorRepository(cls.mock_db_manager, cls.mock_logger)
-        cls.collection_name = VendorModel.CollectionName.VENDOR
+        cls.repository = TalkoVendorRepository(cls.mock_db_manager, cls.mock_logger)
+        cls.collection_name = TalkoVendorModel.CollectionName.VENDOR
 
     def setup_method(self):
         self.collection_mock = AsyncMock()
@@ -123,7 +123,7 @@ class TestVendorRepo:
     def setup_method(self):
         self.db_manager = MagicMock()
         self.logger = MagicMock()
-        self.repository = VendorRepository(self.db_manager, self.logger)
+        self.repository = TalkoVendorRepository(self.db_manager, self.logger)
 
         self.collection_mock = MagicMock()
         self.db_manager.collection.return_value.__aenter__ = AsyncMock(

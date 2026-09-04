@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.components.integrations.console.console_client import ConsoleClient
+from src.components.integrations.console.console_client import TalkoConsoleClient
 
 
 class TestConsoleClient:
@@ -28,10 +28,10 @@ class TestConsoleClient:
             mock_session.get.return_value.__aenter__.return_value = mock_resp
             # Re-patch API key to ensure it's present
             with patch(
-                "src.components.integrations.console.console_constants.ConsoleApiConstants.CONSOLE_API_KEY",
+                "src.components.integrations.console.console_constants.TalkoConsoleApiConstants.CONSOLE_API_KEY",
                 "test-key",
             ):
-                client = ConsoleClient(mock_logger)
+                client = TalkoConsoleClient(mock_logger)
                 result = await client.get_agent_by_ivr_phone(100, "+919988776655")
 
                 assert result["id"] == 101
@@ -41,7 +41,7 @@ class TestConsoleClient:
     @pytest.mark.asyncio
     async def test_get_agent_by_ivr_phone_empty_input(self, mock_logger):
         """Verify early return when phone number is empty/whitespace."""
-        client = ConsoleClient(mock_logger)
+        client = TalkoConsoleClient(mock_logger)
         result = await client.get_agent_by_ivr_phone(100, "   ")
 
         assert result == {}
@@ -53,10 +53,10 @@ class TestConsoleClient:
     async def test_get_agent_by_ivr_phone_api_key_missing(self, mock_logger):
         """Verify behavior when API key is not configured."""
         with patch(
-            "src.components.integrations.console.console_constants.ConsoleApiConstants.CONSOLE_API_KEY",
+            "src.components.integrations.console.console_constants.TalkoConsoleApiConstants.CONSOLE_API_KEY",
             "",
         ):
-            client = ConsoleClient(mock_logger)
+            client = TalkoConsoleClient(mock_logger)
             client.api_key = None  # Ensure it's None
             result = await client.get_agent_by_ivr_phone(100, "+919988776655")
 
@@ -77,7 +77,7 @@ class TestConsoleClient:
             mock_resp.text.return_value = "Not Found"
             mock_session.get.return_value.__aenter__.return_value = mock_resp
 
-            client = ConsoleClient(mock_logger)
+            client = TalkoConsoleClient(mock_logger)
             client.api_key = "valid-key"
             result = await client.get_agent_by_ivr_phone(100, "+919988776655")
 
@@ -93,7 +93,7 @@ class TestConsoleClient:
             mock_session = mock_session_cls.return_value
             mock_session.get.side_effect = Exception("Connection Timeout")
 
-            client = ConsoleClient(mock_logger)
+            client = TalkoConsoleClient(mock_logger)
             client.api_key = "valid-key"
             result = await client.get_agent_by_ivr_phone(100, "+919988776655")
 
@@ -110,7 +110,7 @@ class TestConsoleClient:
             mock_session.closed = False
             mock_session.close = AsyncMock()
 
-            client = ConsoleClient(mock_logger)
+            client = TalkoConsoleClient(mock_logger)
             await client.close()
 
             mock_session.close.assert_called_once()

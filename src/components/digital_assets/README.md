@@ -40,7 +40,7 @@ Update the Poetry lock file to ensure all dependencies are properly tracked:
 poetry lock
 ```
 
-### 5. Container Setup
+### 5. TalkoContainer Setup
 Build and start the Docker container:
 ```bash
 docker compose up --build

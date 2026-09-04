@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, Response
 
 
-class RobotsController:
+class TalkoRobotsController:
 
     robot_router = APIRouter()
 

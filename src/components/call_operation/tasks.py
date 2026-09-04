@@ -2,11 +2,11 @@ import asyncio
 
 from celery import group, shared_task
 
-from src.components.call_operation.cdr_update import CDRUpdateTask
-from src.core.container import Container
-from src.loggers.holler_celery_loggers import CeleryLogger
+from src.components.call_operation.cdr_update import TalkoCDRUpdateTask
+from src.core.container import TalkoContainer
+from src.loggers.talko_celery_loggers import TalkoCeleryLogger
 
-CHUNK_SIZE = 20  # tune based on average CDR processing time
+CHUNK_SIZE = 20  # tune based on average TalkoCDR processing time
 
 # Slightly above process_vendor_config's hard time_limit (360s) so the lock
 # always outlives a legitimate run, but still self-expires if a release is
@@ -29,11 +29,11 @@ def check_incomplete_cdrs_coordinator(self, vendor_type: str) -> str:
     Returns:
         str: Summary of how many worker tasks were dispatched.
     """
-    logger = CeleryLogger.get_logger()
+    logger = TalkoCeleryLogger.get_logger()
     logger.info("Coordinator starting for vendor_type: {}".format(vendor_type))
 
     try:
-        container = Container()
+        container = TalkoContainer()
         vendor_config_repo = container.vendor_config_repo()
 
         # Fetch ALL configs for this vendor_type — no [0] truncation
@@ -88,8 +88,8 @@ def process_vendor_config(self, vendor_config_id: str, vendor_type: str) -> str:
     Returns:
         str: Summary of how many CDRs were updated.
     """
-    logger = CeleryLogger.get_logger()
-    lock_key = "holler:process_vendor_config_lock:{}".format(vendor_config_id)
+    logger = TalkoCeleryLogger.get_logger()
+    lock_key = "talko:process_vendor_config_lock:{}".format(vendor_config_id)
 
     # Everything below runs inside ONE asyncio.run() call. A prior version
     # made three separate asyncio.run() calls (acquire lock, do the work,
@@ -108,7 +108,7 @@ def process_vendor_config(self, vendor_config_id: str, vendor_type: str) -> str:
 
     async def _run() -> str:
         nonlocal acquired
-        container = Container()
+        container = TalkoContainer()
         container.reset_singletons()
         await container.init_resources()
         try:
@@ -134,7 +134,7 @@ def process_vendor_config(self, vendor_config_id: str, vendor_type: str) -> str:
                 )
             )
 
-            cdr_update_task: CDRUpdateTask = container.cdr_update_task()
+            cdr_update_task: TalkoCDRUpdateTask = container.cdr_update_task()
             result = await cdr_update_task.execute_for_config(
                 vendor_config_id=vendor_config_id,
                 vendor_type=vendor_type,
@@ -190,7 +190,7 @@ def check_incomplete_cdrs(self, vendor_type: str) -> str:
     Returns:
         str: Confirmation that the coordinator was dispatched.
     """
-    logger = CeleryLogger.get_logger()
+    logger = TalkoCeleryLogger.get_logger()
     logger.info(
         "check_incomplete_cdrs (legacy) delegating to coordinator for vendor_type: {}".format(
             vendor_type

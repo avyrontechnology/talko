@@ -1,70 +1,70 @@
 import asyncio
 from typing import Any, Dict, List, Optional, Union
 
-from src.components.analytics.date_range_helper import DateRangeHelper
-from src.components.analytics.processor import AnalyticsProcessor
-from src.components.call_assets.helper import AssetsHelper
-from src.components.cdr.constants import EntityType
-from src.components.cdr.dto import Contract
+from src.components.analytics.date_range_helper import TalkoDateRangeHelper
+from src.components.analytics.processor import TalkoAnalyticsProcessor
+from src.components.call_assets.helper import TalkoAssetsHelper
+from src.components.cdr.constants import TalkoEntityType
+from src.components.cdr.dto import TalkoContract
 from src.components.cdr.helper import (
-    CallLogQueryHelper,
-    CommonCDRHelper,
-    GetAgentCallLogsHelper,
-    GetCallRecordHistoryHelper,
-    GetCDRsHelper,
+    TalkoCallLogQueryHelper,
+    TalkoCommonCDRHelper,
+    TalkoGetAgentCallLogsHelper,
+    TalkoGetCallRecordHistoryHelper,
+    TalkoGetCDRsHelper,
 )
 from src.components.cdr.messages import CDR_NOT_FOUND_FOR_CALL_ID
-from src.components.cdr.repository import CDRRepository
-from src.components.custom_field.constants import CustomFieldEntityType
-from src.components.custom_field.validation import CustomFieldValidator
-from src.components.did_management.repositories import DidRepository
-from src.exceptions import ResourceNotFound
-from src.grpc_client.constants import GrpcServices
-from src.grpc_client.rpc_service_factory import RPCServiceFactory
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.datetime_util import DateTimeUtil
-from src.utils.enums import TimeFilter, UserRoleHierarchy
+from src.components.cdr.repository import TalkoCDRRepository
+from src.components.custom_field.constants import TalkoCustomFieldEntityType
+from src.components.custom_field.validation import TalkoCustomFieldValidator
+from src.components.did_management.repositories import TalkoDidRepository
+from src.exceptions import TalkoResourceNotFound
+from src.grpc_client.constants import TalkoGrpcServices
+from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.datetime_util import TalkoDateTimeUtil
+from src.utils.enums import TalkoTimeFilter, TalkoUserRoleHierarchy
 
 
-class CDRService:
+class TalkoCDRService:
     """
-    Service to handle Call Detail Record (CDR) operations.
+    Service to handle Call Detail Record (TalkoCDR) operations.
     """
 
     def __init__(
         self,
-        repository: CDRRepository,
-        logger: HollerServiceLogger,
-        datetime_util: DateTimeUtil,
-        analytics_processor: AnalyticsProcessor,
-        date_range_helper: DateRangeHelper,
-        did_repository: DidRepository,
-        custom_field_validator: CustomFieldValidator,
+        repository: TalkoCDRRepository,
+        logger: TalkoServiceLogger,
+        datetime_util: TalkoDateTimeUtil,
+        analytics_processor: TalkoAnalyticsProcessor,
+        date_range_helper: TalkoDateRangeHelper,
+        did_repository: TalkoDidRepository,
+        custom_field_validator: TalkoCustomFieldValidator,
     ):
         """
-        Initialize CDRService with repository, logger, and datetime utility.
+        Initialize TalkoCDRService with repository, logger, and datetime utility.
         """
-        self.__repository: CDRRepository = repository
-        self.__logger: HollerServiceLogger = logger
-        self.__datetime_util: DateTimeUtil = datetime_util
-        self.__analytics_processor: AnalyticsProcessor = analytics_processor
-        self.__date_range_helper: DateRangeHelper = date_range_helper
-        self.__asset_helper: AssetsHelper = AssetsHelper(self.__logger)
-        self.__did_repository: DidRepository = did_repository
-        self.__custom_field_validator: CustomFieldValidator = custom_field_validator
+        self.__repository: TalkoCDRRepository = repository
+        self.__logger: TalkoServiceLogger = logger
+        self.__datetime_util: TalkoDateTimeUtil = datetime_util
+        self.__analytics_processor: TalkoAnalyticsProcessor = analytics_processor
+        self.__date_range_helper: TalkoDateRangeHelper = date_range_helper
+        self.__asset_helper: TalkoAssetsHelper = TalkoAssetsHelper(self.__logger)
+        self.__did_repository: TalkoDidRepository = did_repository
+        self.__custom_field_validator: TalkoCustomFieldValidator = custom_field_validator
 
     async def get_cdrs(
         self, user_id: int, partner_id: int, limit: int, offset: int
-    ) -> list[Contract.CDRResponse]:
+    ) -> list[TalkoContract.CDRResponse]:
         """
         Fetch CDRs by partner ID.
 
         Args:
             user_id (int): Requesting user's ID.
-            partner_id (int): Partner ID for CDR fetch.
+            partner_id (int): Partner ID for TalkoCDR fetch.
 
         Returns:
-            list[Contract.CDRResponse]: List of CDRs.
+            list[TalkoContract.CDRResponse]: List of CDRs.
         """
         try:
             self.__logger.info(
@@ -82,7 +82,7 @@ class CDRService:
                     user_id, cdrs
                 )
             )
-            cdr_responses = GetCDRsHelper.process_cdrs(cdrs, self.__logger)
+            cdr_responses = TalkoGetCDRsHelper.process_cdrs(cdrs, self.__logger)
 
             self.__logger.info(
                 "Get all cdrs on the basis of partner id fetched all data successfully."
@@ -101,12 +101,12 @@ class CDRService:
         offset: int,
         lead_id: Optional[Union[int, List[int]]] = None,
         created_at: Optional[int] = None,
-        filter_by: Optional[TimeFilter] = None,
+        filter_by: Optional[TalkoTimeFilter] = None,
         is_masking_enabled: Optional[bool] = True,
         entity_type: Optional[str] = None,
         entity_id: Optional[Union[int, List[int]]] = None,
         custom_fields: Optional[Dict[str, Any]] = None,
-    ) -> Contract.AgentCallLogResponse:
+    ) -> TalkoContract.AgentCallLogResponse:
         try:
             self.__logger.info(
                 "User: {}, partner: {}, get agent call logs service started.".format(
@@ -122,12 +122,12 @@ class CDRService:
                 and normalized_entity_id is None
                 and lead_id is not None
             ):
-                normalized_entity_type = EntityType.LEAD.value
+                normalized_entity_type = TalkoEntityType.LEAD.value
                 normalized_entity_id = lead_id
 
             derived_lead_id = (
                 normalized_entity_id
-                if normalized_entity_type == EntityType.LEAD.value
+                if normalized_entity_type == TalkoEntityType.LEAD.value
                 else None
             )
 
@@ -142,7 +142,7 @@ class CDRService:
                 )
             )
 
-            query = CallLogQueryHelper.build_call_log_query(
+            query = TalkoCallLogQueryHelper.build_call_log_query(
                 lead_id=derived_lead_id,
                 created_at=created_at,
                 filter_by=filter_by,
@@ -165,7 +165,7 @@ class CDRService:
             self.__logger.debug("User: {}, retrieved CDRs: {}".format(user_id, cdrs))
 
             if not cdrs:
-                return Contract.AgentCallLogResponse(
+                return TalkoContract.AgentCallLogResponse(
                     call_histories=[],
                     total_count=total_count,
                 )
@@ -176,13 +176,13 @@ class CDRService:
                 self.__logger.info("Generated recording url for agent_call_logs")
 
             agent_ids: list[int]
-            cdr_responses: list[Contract.CallLogResponse]
-            agent_ids, cdr_responses = GetAgentCallLogsHelper.process_cdrs(
+            cdr_responses: list[TalkoContract.CallLogResponse]
+            agent_ids, cdr_responses = TalkoGetAgentCallLogsHelper.process_cdrs(
                 cdrs, is_masking_enabled, self.__logger
             )
 
             self.__logger.debug(
-                "Processed CDR responses in agent call logs: {}".format(cdr_responses)
+                "Processed TalkoCDR responses in agent call logs: {}".format(cdr_responses)
             )
             self.__logger.debug(
                 "Agent IDs to fetch agent call logs: {}".format(agent_ids)
@@ -192,7 +192,7 @@ class CDRService:
                 {cdr.did_number for cdr in cdr_responses if cdr.did_number}
             )
 
-            grpc_client = RPCServiceFactory.get_service(GrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
 
             # These two lookups are independent of each other — run them
             # concurrently so the display_name lookup adds ~0ms to the
@@ -202,8 +202,8 @@ class CDRService:
                 self.__did_repository.get_display_names_by_dids(did_numbers),
             )
 
-            CommonCDRHelper.attach_agent_names(cdr_responses, agent_data, self.__logger)
-            CommonCDRHelper.attach_display_names(
+            TalkoCommonCDRHelper.attach_agent_names(cdr_responses, agent_data, self.__logger)
+            TalkoCommonCDRHelper.attach_display_names(
                 cdr_responses, display_name_map, self.__logger
             )
 
@@ -211,7 +211,7 @@ class CDRService:
                 "Fetched all CDRs successfully for partner {}.".format(partner_id)
             )
 
-            finally_response: dict = GetAgentCallLogsHelper.agent_call_log_response(
+            finally_response: dict = TalkoGetAgentCallLogsHelper.agent_call_log_response(
                 cdr_responses, total_count, self.__logger
             )
 
@@ -220,7 +220,7 @@ class CDRService:
                     user_id, finally_response
                 )
             )
-            return Contract.AgentCallLogResponse(**finally_response)
+            return TalkoContract.AgentCallLogResponse(**finally_response)
 
         except Exception as e:
             self.__logger.error("Failed to retrieve CDRs: {}.".format(str(e)))
@@ -233,7 +233,7 @@ class CDRService:
         limit: int,
         offset: int,
         payload: dict,
-    ) -> Contract.AgentCallRecordHistoryResponse:
+    ) -> TalkoContract.AgentCallRecordHistoryResponse:
         try:
             self.__logger.info(
                 "User: {}, partner: {}, get call record history service started.".format(
@@ -243,7 +243,7 @@ class CDRService:
             self.__logger.debug("Payload received: {}".format(payload))
 
             call_status: str = payload.get("call_status")
-            GetCallRecordHistoryHelper.validate_call_status(call_status, self.__logger)
+            TalkoGetCallRecordHistoryHelper.validate_call_status(call_status, self.__logger)
 
             board_agent_ids = [user_id]
 
@@ -253,7 +253,7 @@ class CDRService:
                 )
             )
             if not board_agent_ids:
-                return Contract.AgentCallRecordHistoryResponse(
+                return TalkoContract.AgentCallRecordHistoryResponse(
                     call_record=[],
                     total_count=0,
                 )
@@ -265,11 +265,11 @@ class CDRService:
             entity_id: Optional[int] = payload.get("entity_id")
 
             if entity_type is None and entity_id is None and lead_id is not None:
-                entity_type = EntityType.LEAD.value
+                entity_type = TalkoEntityType.LEAD.value
                 entity_id = lead_id
 
             derived_lead_id = (
-                entity_id if entity_type == EntityType.LEAD.value else None
+                entity_id if entity_type == TalkoEntityType.LEAD.value else None
             )
 
             service_board_id: int = payload.get("service_board_id")
@@ -286,7 +286,7 @@ class CDRService:
             if agents:
                 board_agent_ids = agents
 
-            if user_role == UserRoleHierarchy.MAINTAINER.value and not agents:
+            if user_role == TalkoUserRoleHierarchy.MAINTAINER.value and not agents:
                 board_agent_ids = []
 
             start_time: int = 0
@@ -315,7 +315,7 @@ class CDRService:
                 )
             )
 
-            query: dict = GetCallRecordHistoryHelper.build_call_record_history_query(
+            query: dict = TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
                 lead_id=derived_lead_id,
                 service_board_id=service_board_id,
                 call_status=call_status,
@@ -336,7 +336,7 @@ class CDRService:
             self.__logger.debug("Constructed query: {}".format(query))
 
             status_match: Optional[dict] = (
-                GetCallRecordHistoryHelper.build_status_match(
+                TalkoGetCallRecordHistoryHelper.build_status_match(
                     call_status, self.__logger
                 )
             )
@@ -346,7 +346,7 @@ class CDRService:
             )
 
             projection: dict = (
-                GetCallRecordHistoryHelper.get_call_record_history_projection()
+                TalkoGetCallRecordHistoryHelper.get_call_record_history_projection()
             )
             cdrs, total_count = (
                 await self.__repository.find_all_call_logs_on_the_basis_of_user_id(
@@ -356,7 +356,7 @@ class CDRService:
             self.__logger.debug("User: {}, retrieved CDRs: {}".format(user_id, cdrs))
 
             if not cdrs:
-                return Contract.AgentCallRecordHistoryResponse(
+                return TalkoContract.AgentCallRecordHistoryResponse(
                     call_record=[],
                     total_count=0,
                 )
@@ -369,24 +369,24 @@ class CDRService:
                 self.__logger.info("Generated recording url for call_record_history")
 
                 filtered_cdr = (
-                    GetCallRecordHistoryHelper.handle_call_record_history_data(
+                    TalkoGetCallRecordHistoryHelper.handle_call_record_history_data(
                         cdr, call_status, is_masking_enabled, self.__logger
                     )
                 )
                 if filtered_cdr:
                     cdr_responses.append(
-                        Contract.CallRecordHistoryResponse(**filtered_cdr)
+                        TalkoContract.CallRecordHistoryResponse(**filtered_cdr)
                     )
                     agent_ids.append(cdr.get("agent"))
 
-            self.__logger.debug("Processed CDR responses: {}".format(cdr_responses))
+            self.__logger.debug("Processed TalkoCDR responses: {}".format(cdr_responses))
             self.__logger.debug("Agent IDs to fetch: {}".format(agent_ids))
 
             did_numbers: list[str] = list(
                 {cdr.did_number for cdr in cdr_responses if cdr.did_number}
             )
 
-            grpc_client = RPCServiceFactory.get_service(GrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
 
             # Independent lookups — run concurrently instead of sequentially
             # so the display_name lookup doesn't add latency on top of the
@@ -397,14 +397,14 @@ class CDRService:
             )
 
             self.__logger.debug("Fetched agent data: {}".format(agent_data))
-            self.__logger.debug("CDR responses data: {}".format(cdr_responses))
-            CommonCDRHelper.attach_agent_names(cdr_responses, agent_data, self.__logger)
-            CommonCDRHelper.attach_display_names(
+            self.__logger.debug("TalkoCDR responses data: {}".format(cdr_responses))
+            TalkoCommonCDRHelper.attach_agent_names(cdr_responses, agent_data, self.__logger)
+            TalkoCommonCDRHelper.attach_display_names(
                 cdr_responses, display_name_map, self.__logger
             )
 
             finally_response = (
-                GetCallRecordHistoryHelper.agent_call_record_history_response(
+                TalkoGetCallRecordHistoryHelper.agent_call_record_history_response(
                     cdr_responses, total_count, self.__logger
                 )
             )
@@ -414,7 +414,7 @@ class CDRService:
                     partner_id
                 )
             )
-            return Contract.AgentCallRecordHistoryResponse(**finally_response)
+            return TalkoContract.AgentCallRecordHistoryResponse(**finally_response)
         except Exception as e:
             self.__logger.error("Failed to retrieve call records: {}.".format(str(e)))
             raise
@@ -425,7 +425,7 @@ class CDRService:
         partner_id: int,
         call_id: str,
         values: Dict[str, Any],
-    ) -> Contract.SetCDRCustomFieldsResponse:
+    ) -> TalkoContract.SetCDRCustomFieldsResponse:
         try:
             self.__logger.info(
                 "User: {}, partner: {}, call_id: {}, set cdr custom field values started.".format(
@@ -438,15 +438,15 @@ class CDRService:
             )
             if not cdr or cdr.get("partner_id") != partner_id:
                 self.__logger.error(
-                    "CDR not found for call_id {} and partner {}.".format(
+                    "TalkoCDR not found for call_id {} and partner {}.".format(
                         call_id, partner_id
                     )
                 )
-                raise ResourceNotFound(CDR_NOT_FOUND_FOR_CALL_ID.format(call_id))
+                raise TalkoResourceNotFound(CDR_NOT_FOUND_FOR_CALL_ID.format(call_id))
 
             normalized_values: Dict[str, Any] = (
                 await self.__custom_field_validator.validate_and_normalize_values(
-                    partner_id, CustomFieldEntityType.CDR.value, values
+                    partner_id, TalkoCustomFieldEntityType.TalkoCDR.value, values
                 )
             )
 
@@ -460,7 +460,7 @@ class CDRService:
             self.__logger.info(
                 "Set custom field values for call_id {} successfully.".format(call_id)
             )
-            return Contract.SetCDRCustomFieldsResponse(
+            return TalkoContract.SetCDRCustomFieldsResponse(
                 call_id=call_id,
                 custom_fields=(updated_cdr or {}).get("custom_fields") or {},
                 message="Custom field values updated successfully.",
@@ -476,7 +476,7 @@ class CDRService:
     async def get_url_from_path(self, cdr: dict):
         try:
             self.__logger.info(
-                "CDR for fetching recording url from path: {}".format(cdr)
+                "TalkoCDR for fetching recording url from path: {}".format(cdr)
             )
             if cdr.get("path_for_recording"):
                 cdr["do_recording_url"] = (

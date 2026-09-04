@@ -3,24 +3,24 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 from bson import ObjectId
 from pymongo.results import DeleteResult, InsertOneResult, UpdateResult
 
-from src.components.did_management.constants import DIDStatus, DIDType
-from src.components.did_management.models import DidHistoryModel, PhoneNumberManagement
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.datetime_util import DateTimeUtil
+from src.components.did_management.constants import TalkoDIDStatus, TalkoDIDType
+from src.components.did_management.models import TalkoDidHistoryModel, TalkoPhoneNumberManagement
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.datetime_util import TalkoDateTimeUtil
 from src.utils.phone_number_utils import normalize_phone_number
 
 
-class DidRepository:
+class TalkoDidRepository:
     """
     Repository class for handling DID-related database operations.
     """
 
     def __init__(
-        self, db_manager: DocDatabaseSessionManager, logger: HollerServiceLogger
+        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
     ) -> None:
-        self.__db_manager: DocDatabaseSessionManager = db_manager
-        self.__logger: HollerServiceLogger = logger
+        self.__db_manager: TalkoDocDatabaseSessionManager = db_manager
+        self.__logger: TalkoServiceLogger = logger
 
     async def insert_did_default_attendance(
         self, did_data: Dict[str, Any]
@@ -39,7 +39,7 @@ class DidRepository:
         """
         try:
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 result: InsertOneResult = await collection.insert_one(did_data)
                 return {**did_data, "_id": result.inserted_id}
@@ -62,7 +62,7 @@ class DidRepository:
         """
         try:
             async with self.__db_manager.collection(
-                DidHistoryModel.CollectionName.DID_HISTORY
+                TalkoDidHistoryModel.CollectionName.DID_HISTORY
             ) as collection:
                 result: InsertOneResult = await collection.insert_one(history_data)
                 return {**history_data, "_id": result.inserted_id}
@@ -88,7 +88,7 @@ class DidRepository:
         """
         try:
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 return await collection.find_one(
                     {"did_number": did_number, "partner_id": partner_id}
@@ -115,7 +115,7 @@ class DidRepository:
         """
         try:
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 result: DeleteResult = await collection.delete_one(
                     {"did_number": did_number, "partner_id": partner_id}
@@ -144,7 +144,7 @@ class DidRepository:
         """
         try:
             async with self.__db_manager.collection(
-                DidHistoryModel.CollectionName.DID_HISTORY
+                TalkoDidHistoryModel.CollectionName.DID_HISTORY
             ) as collection:
                 result: UpdateResult = await collection.find_one_and_update(
                     {"did_number": did_number, "partner_id": partner_id},
@@ -172,13 +172,13 @@ class DidRepository:
         try:
             self.__logger.info("Fetching assigned DIDs for vendor {}".format(vendor_id))
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
                     {
                         "vendor_id": vendor_id,
                         "partner_id": {"$ne": 0},
-                        "did_type": DIDType.NORMAL.value,
+                        "did_type": TalkoDIDType.NORMAL.value,
                         "is_active": True,
                     }
                 )
@@ -209,15 +209,15 @@ class DidRepository:
                 "Fetching available DIDs for vendor {}".format(vendor_id)
             )
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
                     {
                         "vendor_id": vendor_id,
                         "partner_id": 0,
                         "vendor_config_id": vendor_config_id,
-                        "status": DIDStatus.AVAILABLE.value,
-                        "did_type": DIDType.NORMAL.value,
+                        "status": TalkoDIDStatus.AVAILABLE.value,
+                        "did_type": TalkoDIDType.NORMAL.value,
                         "is_active": True,
                     }
                 )
@@ -249,7 +249,7 @@ class DidRepository:
                 "Searching for DID {} with vendor_id {}".format(did_number, vendor_id)
             )
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 query = {"did_number": did_number, "vendor_id": vendor_id}
                 self.__logger.debug("Executing query: {}".format(query))
@@ -300,7 +300,7 @@ class DidRepository:
             # callers racing for the same DID.
             async with self.__db_manager.connect() as db:
                 collection = db[
-                    PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                    TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
                 ]
                 query = {"did_number": did_number, "partner_id": 0}
                 self.__logger.debug("Executing initial query: {}".format(query))
@@ -315,7 +315,7 @@ class DidRepository:
 
                 update_query: Dict[str, Any] = {"did_number": did_number}
                 update_data["partner_id"] = partner_id
-                update_data["status_changed_at"] = DateTimeUtil().get_current_time()
+                update_data["status_changed_at"] = TalkoDateTimeUtil().get_current_time()
                 self.__logger.debug(
                     "Executing update query: {} with data {}".format(
                         update_query, update_data
@@ -366,13 +366,13 @@ class DidRepository:
                 )
             )
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
                     {
                         "partner_id": partner_id,
                         "vendor_id": vendor_id,
-                        "did_type": DIDType.NORMAL.value,
+                        "did_type": TalkoDIDType.NORMAL.value,
                         "is_active": True,
                     }
                 )
@@ -417,8 +417,8 @@ class DidRepository:
                 "partner_id": partner_id,
                 "service_board_id": service_board_id,
                 "vendor_id": vendor_id,
-                "status": DIDStatus.MAPPED.value,
-                "did_type": DIDType.NORMAL.value,
+                "status": TalkoDIDStatus.MAPPED.value,
+                "did_type": TalkoDIDType.NORMAL.value,
                 "is_active": True,
             }
 
@@ -429,7 +429,7 @@ class DidRepository:
             self.__logger.info("Executing query: {}".format(query))
 
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(query)
                 dids: List[str] = [doc["did_number"] async for doc in cursor]
@@ -470,7 +470,7 @@ class DidRepository:
                 )
             )
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
                     {
@@ -478,7 +478,7 @@ class DidRepository:
                         "agent_id": user_id,
                         "service_board_id": service_board_id,
                         "vendor_id": vendor_id,
-                        "did_type": DIDType.NORMAL.value,
+                        "did_type": TalkoDIDType.NORMAL.value,
                         "is_active": True,
                     }
                 )
@@ -522,7 +522,7 @@ class DidRepository:
             )
 
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 query: dict = {"did_number": candidates, "is_active": True}
                 if partner_id is not None:
@@ -549,13 +549,13 @@ class DidRepository:
                 "Fetching DIDs for service_board_id={}".format(service_board_id)
             )
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
                     {
                         "service_board_id": service_board_id,
-                        "status": DIDStatus.MAPPED.value,
-                        "did_type": DIDType.NORMAL.value,
+                        "status": TalkoDIDStatus.MAPPED.value,
+                        "did_type": TalkoDIDType.NORMAL.value,
                         "is_active": True,
                     }
                 )
@@ -583,7 +583,7 @@ class DidRepository:
             self.__logger.info(f"Fetching instance IDs for DIDs: {did_numbers}")
 
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
                     {"did_number": {"$in": did_numbers}}, {"did_number": 1}
@@ -620,7 +620,7 @@ class DidRepository:
             )
 
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 result: UpdateResult = await collection.update_one(
                     {"did_number": did_number},
@@ -675,7 +675,7 @@ class DidRepository:
             # why this needs connect()'s transaction rather than collection().
             async with self.__db_manager.connect() as db:
                 collection = db[
-                    PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                    TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
                 ]
                 candidates: List[str] = normalize_phone_number(
                     did_number, with_plus=False
@@ -700,7 +700,7 @@ class DidRepository:
 
                 update_query = {"did_number": did_number}
                 update_data["partner_id"] = partner_id
-                update_data["status_changed_at"] = DateTimeUtil().get_current_time()
+                update_data["status_changed_at"] = TalkoDateTimeUtil().get_current_time()
                 self.__logger.debug(
                     "Executing update query: {} with data {}".format(
                         update_query, update_data
@@ -747,7 +747,7 @@ class DidRepository:
             )
 
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 result: UpdateResult = await collection.update_one(
                     {"did_number": did_number}, {"$inc": {"spam_count": 1}}
@@ -809,7 +809,7 @@ class DidRepository:
             query: Dict[str, Any] = {
                 "partner_id": partner_id,
                 "is_active": True,
-                "did_type": DIDType.NORMAL.value,
+                "did_type": TalkoDIDType.NORMAL.value,
             }
 
             # Optional filters mapping
@@ -834,7 +834,7 @@ class DidRepository:
             self.__logger.debug("Executing query: {}".format(query))
 
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 total: int = await collection.count_documents(query)
 
@@ -884,14 +884,14 @@ class DidRepository:
             )
             query: Dict[str, Any] = {
                 "partner_id": partner_id,
-                "did_type": DIDType.AI_AGENT.value,
+                "did_type": TalkoDIDType.AI_AGENT.value,
                 "is_active": True,
             }
             if agent_bot_id is not None:
                 query["agent_bot_id"] = agent_bot_id
 
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(query)
                 return [doc async for doc in cursor]
@@ -918,14 +918,14 @@ class DidRepository:
                 )
             )
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
                     {
                         "partner_id": partner_id,
-                        "did_type": DIDType.AI_AGENT.value,
+                        "did_type": TalkoDIDType.AI_AGENT.value,
                         "agent_bot_id": agent_bot_id,
-                        "status": DIDStatus.MAPPED.value,
+                        "status": TalkoDIDStatus.MAPPED.value,
                         "is_active": True,
                     }
                 )
@@ -951,12 +951,12 @@ class DidRepository:
                 "Fetching available ai_agent DIDs for partner_id={}".format(partner_id)
             )
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 query: Dict[str, Any] = {
                     "partner_id": partner_id,
-                    "status": DIDStatus.AVAILABLE.value,
-                    "did_type": DIDType.AI_AGENT.value,
+                    "status": TalkoDIDStatus.AVAILABLE.value,
+                    "did_type": TalkoDIDType.AI_AGENT.value,
                     "is_active": True,
                 }
 
@@ -995,7 +995,7 @@ class DidRepository:
             # why this needs connect()'s transaction rather than collection().
             async with self.__db_manager.connect() as db:
                 collection = db[
-                    PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                    TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
                 ]
 
                 # === Build Find Query ===
@@ -1020,7 +1020,7 @@ class DidRepository:
 
                 # === Prepare Update Payload ===
                 update_payload = update_data.copy()
-                update_payload["status_changed_at"] = DateTimeUtil().get_current_time()
+                update_payload["status_changed_at"] = TalkoDateTimeUtil().get_current_time()
 
                 # Ensure partner_id is set in update if provided
                 if partner_id is not None:
@@ -1049,7 +1049,7 @@ class DidRepository:
         """
         Fetch display_name for a list of DID numbers, keyed by the *normalized*
         did_number (no leading '+'), since phone_number_management stores
-        did_number without '+' while CDR documents may store it with '+'.
+        did_number without '+' while TalkoCDR documents may store it with '+'.
         Callers must look up using the same normalized form.
         """
         if not did_numbers:
@@ -1064,7 +1064,7 @@ class DidRepository:
                 )
             )
             async with self.__db_manager.collection(
-                PhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
                     {"did_number": {"$in": normalized_numbers}},

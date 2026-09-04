@@ -4,21 +4,21 @@ from typing import Any, Dict, Optional
 from bson import ObjectId
 from pymongo.results import InsertOneResult, UpdateResult
 
-from src.components.cdr.models import CDR
-from src.components.partner_config.models import PartnerConfigModel
-from src.components.vendor.models import VendorModel
-from src.components.vendor_config.models import VendorConfigModel
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.cdr.models import TalkoCDR
+from src.components.partner_config.models import TalkoPartnerConfigModel
+from src.components.vendor.models import TalkoVendorModel
+from src.components.vendor_config.models import TalkoVendorConfigModel
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class CallRepository:
+class TalkoCallRepository:
     """
     Repository for managing call-related data operations in the database.
     """
 
     def __init__(
-        self, db_manager: DocDatabaseSessionManager, logger: HollerServiceLogger
+        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
     ):
         """
         Initialize the repository.
@@ -27,8 +27,8 @@ class CallRepository:
             db_manager: MongoDB session manager.
             logger: Logger for capturing logs.
         """
-        self.__db_manager: DocDatabaseSessionManager = db_manager
-        self.__logger: HollerServiceLogger = logger
+        self.__db_manager: TalkoDocDatabaseSessionManager = db_manager
+        self.__logger: TalkoServiceLogger = logger
 
     async def get_vendor_config(
         self, vendor_id: str, vendor_config_id: Optional[str] = None
@@ -44,7 +44,7 @@ class CallRepository:
         """
         try:
             async with self.__db_manager.collection(
-                VendorConfigModel.CollectionName.VENDOR_CONFIG
+                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
             ) as collection:
                 self.__logger.debug("Get vendor config: {}".format(vendor_config_id))
                 vendor_config: Optional[Dict[str, Any]] = await collection.find_one(
@@ -60,7 +60,7 @@ class CallRepository:
 
                 # Fetch vendor_type from vendors collection
                 async with self.__db_manager.collection(
-                    VendorModel.CollectionName.VENDOR
+                    TalkoVendorModel.CollectionName.VENDOR
                 ) as vendor_collection:
                     vendor: Optional[Dict[str, Any]] = await vendor_collection.find_one(
                         {"_id": ObjectId(vendor_id)}
@@ -96,7 +96,7 @@ class CallRepository:
         """
         try:
             async with self.__db_manager.collection(
-                PartnerConfigModel.CollectionName.PARTNER_CONFIG
+                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
                 return await collection.find_one({"partner_id": partner_id})
         except Exception as e:
@@ -126,7 +126,7 @@ class CallRepository:
         """
         try:
             async with self.__db_manager.collection(
-                PartnerConfigModel.CollectionName.PARTNER_CONFIG
+                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
                 # Convert integer keys to strings
                 did_indices_converted = {str(k): v for k, v in did_indices.items()}
@@ -180,7 +180,7 @@ class CallRepository:
         """
         try:
             async with self.__db_manager.collection(
-                PartnerConfigModel.CollectionName.PARTNER_CONFIG
+                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
                 result: Optional[Dict[str, Any]] = await collection.find_one_and_update(
                     {"partner_id": partner_id},
@@ -215,42 +215,42 @@ class CallRepository:
 
     async def insert_cdr(self, cdr_dict: dict) -> str:
         """
-        Insert a new CDR record.
+        Insert a new TalkoCDR record.
 
         Args:
-            cdr_dict: CDR data to insert.
+            cdr_dict: TalkoCDR data to insert.
 
         Returns:
-            str: Inserted CDR ID.
+            str: Inserted TalkoCDR ID.
         """
         try:
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 result: InsertOneResult = await collection.insert_one(cdr_dict)
                 self.__logger.info(
-                    "Inserted CDR with ID: {}".format(result.inserted_id)
+                    "Inserted TalkoCDR with ID: {}".format(result.inserted_id)
                 )
                 return str(result.inserted_id)
         except Exception as e:
-            self.__logger.error("Failed to insert CDR: {}".format(str(e)))
+            self.__logger.error("Failed to insert TalkoCDR: {}".format(str(e)))
             raise
 
     async def get_cdr_by_call_id_or_uuid(
         self, call_id: Optional[str], uuid_value: Optional[str]
     ) -> Optional[Dict[str, Any]]:
         """
-        Get a CDR by call_id (or uuid if supported later).
+        Get a TalkoCDR by call_id (or uuid if supported later).
 
         Args:
             call_id: Call identifier.
 
         Returns:
-            dict or None: CDR record.
+            dict or None: TalkoCDR record.
         """
         try:
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 query: Dict[str, Any] = {}
                 if uuid_value and uuid_value != "None":
@@ -262,15 +262,15 @@ class CallRepository:
 
                 return await collection.find_one(query)
         except Exception as e:
-            self.__logger.error("Failed to get CDR by call id: {}".format(str(e)))
+            self.__logger.error("Failed to get TalkoCDR by call id: {}".format(str(e)))
             raise
 
     async def update_cdr(self, cdr_id: str, updates: dict) -> bool:
         """
-        Update a CDR by its ObjectId.
+        Update a TalkoCDR by its ObjectId.
 
         Args:
-            cdr_id: CDR ID.
+            cdr_id: TalkoCDR ID.
             updates: Fields to update.
 
         Returns:
@@ -278,21 +278,21 @@ class CallRepository:
         """
         try:
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 result: UpdateResult = await collection.update_one(
                     {"_id": ObjectId(cdr_id)}, {"$set": updates}
                 )
                 return result.modified_count > 0
         except Exception as e:
-            self.__logger.error("Failed to update CDR: {}".format(str(e)))
+            self.__logger.error("Failed to update TalkoCDR: {}".format(str(e)))
             raise
 
     async def find_callback_by_parent_uuid(
         self, call_uuid: str
     ) -> Optional[Dict[str, Any]]:
         """
-        Find an outbound auto-callback CDR placed for a missed inbound call.
+        Find an outbound auto-callback TalkoCDR placed for a missed inbound call.
 
         Used as the exactly-once guard for the missed-call callback flow:
         the Celery ETA task, the beat sweeper, and manual re-dispatches all
@@ -302,7 +302,7 @@ class CallRepository:
         """
         try:
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 return await collection.find_one(
                     {"callback_for_call_uuid": call_uuid}
@@ -324,7 +324,7 @@ class CallRepository:
 
         Window semantics (all ms epoch), gated on immutable created_at
         (call start, seconds before the miss) — deliberately NOT updated_at:
-        the 5-min CDR reconciler rewrites updated_at on every pass, which
+        the 5-min TalkoCDR reconciler rewrites updated_at on every pass, which
         would keep refreshing a row's age and let it dodge the sweeper
         forever (observed on QA: updated_at marched forward every 5 min,
         age never exceeded the gate).
@@ -338,7 +338,7 @@ class CallRepository:
         """
         try:
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 cursor = (
                     collection.find(
@@ -390,7 +390,7 @@ class CallRepository:
     ) -> Optional[Dict]:
         try:
             self.__logger.debug(
-                "Searching CDR for numbers: {}, {}".format(
+                "Searching TalkoCDR for numbers: {}, {}".format(
                     caller_id_number, call_to_number
                 )
             )
@@ -417,19 +417,19 @@ class CallRepository:
             }
 
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 cursor = collection.find(query).sort("created_at", -1).limit(1)
                 cdr_list = await cursor.to_list(length=1)
 
             if cdr_list:
                 cdr = cdr_list[0]
-                self.__logger.debug(f"Found latest CDR record: {cdr}")
+                self.__logger.debug(f"Found latest TalkoCDR record: {cdr}")
                 return cdr
 
-            self.__logger.debug("No CDR found for given numbers")
+            self.__logger.debug("No TalkoCDR found for given numbers")
             return None
 
         except Exception as e:
-            self.__logger.error(f"Error finding CDR by numbers: {str(e)}")
+            self.__logger.error(f"Error finding TalkoCDR by numbers: {str(e)}")
             raise

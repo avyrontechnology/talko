@@ -2,10 +2,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.components.analytics.dto import AnalyticsResponse
-from src.components.analytics.enums import AnalyticsType
-from src.components.analytics.services import AnalyticsService
-from src.grpc_client.constants import GrpcServices
+from src.components.analytics.dto import TalkoAnalyticsResponse
+from src.components.analytics.enums import TalkoAnalyticsType
+from src.components.analytics.services import TalkoAnalyticsService
+from src.grpc_client.constants import TalkoGrpcServices
 
 
 @pytest.mark.asyncio
@@ -17,7 +17,7 @@ class TestAnalyticsService:
         mock_analytics_base = MagicMock()
         mock_logger = MagicMock()
 
-        fake_response = AnalyticsResponse(
+        fake_response = TalkoAnalyticsResponse(
             status="success",
             message="ok",
             analytics_type="generic_type",
@@ -25,7 +25,7 @@ class TestAnalyticsService:
         )
         mock_analytics_base.process_analytics = AsyncMock(return_value=fake_response)
 
-        service = AnalyticsService(
+        service = TalkoAnalyticsService(
             analytics_base=mock_analytics_base,
             logger=mock_logger,
         )
@@ -62,10 +62,10 @@ class TestAnalyticsService:
         mock_analytics_base = MagicMock()
         mock_logger = MagicMock()
 
-        fake_response = AnalyticsResponse(
+        fake_response = TalkoAnalyticsResponse(
             status="success",
             message="ok",
-            analytics_type=AnalyticsType.AGENT_CALL_ANALYTICS.value,
+            analytics_type=TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value,
             data={
                 "agents": [
                     {
@@ -92,14 +92,14 @@ class TestAnalyticsService:
         )
         mock_analytics_base.process_analytics = AsyncMock(return_value=fake_response)
 
-        service = AnalyticsService(
+        service = TalkoAnalyticsService(
             analytics_base=mock_analytics_base,
             logger=mock_logger,
         )
 
         # Patch gRPC client
         with patch(
-            "src.components.analytics.services.RPCServiceFactory.get_service"
+            "src.components.analytics.services.TalkoRPCServiceFactory.get_service"
         ) as mock_get_service:
             mock_grpc_client = AsyncMock()
             mock_grpc_client.get_service_board_users_details = AsyncMock(
@@ -112,7 +112,7 @@ class TestAnalyticsService:
                 current_user_id=1,
                 partner_id=123,
                 analytics_request={
-                    "analytics_type": AnalyticsType.AGENT_CALL_ANALYTICS.value
+                    "analytics_type": TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value
                 },
                 limit=10,
                 offset=1,
@@ -142,7 +142,7 @@ class TestAnalyticsService:
                 current_user_id=1,
                 partner_id=123,
                 analytics_request={
-                    "analytics_type": AnalyticsType.AGENT_CALL_ANALYTICS.value
+                    "analytics_type": TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value
                 },
                 limit=10,
                 offset=1,
@@ -155,7 +155,7 @@ class TestAnalyticsService:
         mock_logger = MagicMock()
         mock_analytics_base.process_analytics = AsyncMock(side_effect=Exception("boom"))
 
-        service = AnalyticsService(
+        service = TalkoAnalyticsService(
             analytics_base=mock_analytics_base,
             logger=mock_logger,
         )

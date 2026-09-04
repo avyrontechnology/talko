@@ -96,7 +96,7 @@ jobs:
   #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   #       with:
   #         args: |
-  #           -Dsonar.projectKey=MakunaiGlobal_holler-service
+  #           -Dsonar.projectKey=MakunaiGlobal_talko-service
   #           -Dsonar.organization=makunaiglobal
   #           -Dsonar.python.coverage.reportPaths=coverage.xml
   #           -Dsonar.inclusions=src/**/*.py

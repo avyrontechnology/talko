@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class DigitalAssetEnum(Enum):
+class TalkoDigitalAssetEnum(Enum):
     CONSOLE_PARTNER_GST = 1
     CONSOLE_PARTNER_LOGO = 2
     GLOBAL_MEDIA_CONSTANT = 3
@@ -10,7 +10,7 @@ class DigitalAssetEnum(Enum):
     OTHER = 100  # For uncategorized assets; allows adding new categories above without renumbering.
 
 
-class StorageProvidersEnum(Enum):
+class TalkoStorageProvidersEnum(Enum):
     AWS = 1
     AZURE = 2
     DIGITAL_OCEAN = 3

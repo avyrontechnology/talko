@@ -11,14 +11,14 @@ import pytest
 from grpc.aio import UnaryUnaryClientInterceptor
 from starlette_context import context
 
-from src.components.common.responses import InternalServerErrorResponse
+from src.components.common.responses import TalkoInternalServerErrorResponse
 from src.grpc_client.client_services.auth_service_client import (
-    AuthServiceClient,
+    TalkoAuthServiceClient,
     logger,
 )
 
 
-class DummyAioRpcError(grpc.aio.AioRpcError):
+class TalkoDummyAioRpcError(grpc.aio.AioRpcError):
     def __init__(self, message="Simulated error"):
         self._message = message
 
@@ -32,7 +32,7 @@ class DummyAioRpcError(grpc.aio.AioRpcError):
         return self._message
 
 
-class MockInterceptor(UnaryUnaryClientInterceptor):
+class TalkoMockInterceptor(UnaryUnaryClientInterceptor):
     """Mock interceptor that inherits from UnaryUnaryClientInterceptor."""
 
     def __init__(self, api_key):
@@ -102,7 +102,7 @@ class TestAuthServiceClient:
             print(
                 f"Mocked os.getenv: CONSOLE_GRPC_HOST={mock_getenv('CONSOLE_GRPC_HOST')}"
             )
-            client = AuthServiceClient()
+            client = TalkoAuthServiceClient()
             print(f"Client initialized with server address: {client.server_address}")
             yield client
 
@@ -138,7 +138,7 @@ class TestAuthServiceClient:
     async def test_validate_token_failure(self, client, mock_logger, mock_auth_stub):
         token = "test-token"
         correlation_id = "test-corr-id"
-        mock_auth_stub.ValidateToken = AsyncMock(side_effect=DummyAioRpcError())
+        mock_auth_stub.ValidateToken = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         await client.validate_token(token, correlation_id)
 
@@ -179,7 +179,7 @@ class TestAuthServiceClient:
         self, client, mock_logger, mock_auth_stub
     ):
         user_id = 123
-        mock_auth_stub.GetUserChildHierarchy = AsyncMock(side_effect=DummyAioRpcError())
+        mock_auth_stub.GetUserChildHierarchy = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_user_child_hierarchy(user_id)
 
@@ -227,7 +227,7 @@ class TestAuthServiceClient:
         self, client, mock_logger, mock_auth_stub
     ):
         user_id = 123  # Integer
-        mock_auth_stub.GetUserChildDetails = AsyncMock(side_effect=DummyAioRpcError())
+        mock_auth_stub.GetUserChildDetails = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_user_child_details(user_id)
 
@@ -270,7 +270,7 @@ class TestAuthServiceClient:
 
     async def test_get_user_details_failure(self, client, mock_logger, mock_auth_stub):
         user_id = 123  # Integer
-        mock_auth_stub.GetUserDetails = AsyncMock(side_effect=DummyAioRpcError())
+        mock_auth_stub.GetUserDetails = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_user_details(user_id)
 
@@ -308,7 +308,7 @@ class TestAuthServiceClient:
         self, client, mock_logger, mock_auth_stub
     ):
         user_id = 123  # Integer
-        mock_auth_stub.GetUserPermissions = AsyncMock(side_effect=DummyAioRpcError())
+        mock_auth_stub.GetUserPermissions = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_user_permissions(user_id)
 
@@ -346,7 +346,7 @@ class TestAuthServiceClient:
 
     async def test_get_user_roles_failure(self, client, mock_logger, mock_auth_stub):
         user_id = 123  # Integer
-        mock_auth_stub.GetUserRole = AsyncMock(side_effect=DummyAioRpcError())
+        mock_auth_stub.GetUserRole = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_user_roles(user_id)
 
@@ -405,7 +405,7 @@ class TestAuthServiceClient:
     ):
         user_ids = [1, 2]  # Integer list
         mock_auth_stub.GetServiceBoardUsersDetails = AsyncMock(
-            side_effect=DummyAioRpcError()
+            side_effect=TalkoDummyAioRpcError()
         )
 
         result = await client.get_service_board_users_details(user_ids)

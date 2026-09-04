@@ -2,24 +2,24 @@ from datetime import datetime
 from typing import Any, Dict, List, Set
 from zoneinfo import ZoneInfo
 
-from src.components.cdr.models import CDR
-from src.components.integrations.console.maglo_client import MagloClient
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.cdr.models import TalkoCDR
+from src.components.integrations.console.maglo_client import TalkoMagloClient
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class LeadConnectionReportService:
+class TalkoLeadConnectionReportService:
     def __init__(
         self,
-        maglo_client: MagloClient,
-        db_manager: DocDatabaseSessionManager,
-        logger: HollerServiceLogger,
+        maglo_client: TalkoMagloClient,
+        db_manager: TalkoDocDatabaseSessionManager,
+        logger: TalkoServiceLogger,
     ):
         self.maglo_client = maglo_client
         self.db_manager = db_manager
         self.logger = logger
 
-        self.logger.debug("LeadConnectionReportService initialized")
+        self.logger.debug("TalkoLeadConnectionReportService initialized")
 
     async def generate_daily_report(self, api_key: str) -> List[Dict[str, Any]]:
         self.logger.info("Generating daily lead connection report")
@@ -128,7 +128,7 @@ class LeadConnectionReportService:
         return None
 
     async def _get_connected_lead_ids(self, start_ms: int, end_ms: int) -> Set[int]:
-        self.logger.info("Fetching connected lead IDs from CDR")
+        self.logger.info("Fetching connected lead IDs from TalkoCDR")
 
         pipeline = [
             {
@@ -144,7 +144,7 @@ class LeadConnectionReportService:
 
         result: Set[int] = set()
 
-        async with self.db_manager.collection(CDR.CollectionName.CDR) as collection:
+        async with self.db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
             self.logger.debug("Mongo aggregation started")
 
             async for doc in collection.aggregate(pipeline):
@@ -153,7 +153,7 @@ class LeadConnectionReportService:
                     try:
                         result.add(int(lid))
                     except (ValueError, TypeError):
-                        self.logger.warning(f"Invalid lead_id in CDR: {lid}")
+                        self.logger.warning(f"Invalid lead_id in TalkoCDR: {lid}")
 
         self.logger.debug("Mongo aggregation completed")
         self.logger.debug(f"Connected lead IDs: {result}")

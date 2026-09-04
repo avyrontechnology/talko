@@ -7,24 +7,24 @@ import pytz
 from dateutil.relativedelta import relativedelta
 
 from src.components.analytics import constants as analytics_constants
-from src.components.analytics.builder import QueryBuilder
-from src.components.analytics.date_range_helper import DateRangeHelper
-from src.components.analytics.enums import Metric, TimeInterval
-from src.components.cdr.models import CDR
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.analytics.builder import TalkoQueryBuilder
+from src.components.analytics.date_range_helper import TalkoDateRangeHelper
+from src.components.analytics.enums import TalkoMetric, TalkoTimeInterval
+from src.components.cdr.models import TalkoCDR
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.auto_format import safe_to_int
-from src.utils.enums import UserRoleHierarchy
+from src.utils.enums import TalkoUserRoleHierarchy
 
 
-class CallTrendsHelper:
+class TalkoCallTrendsHelper:
     """Helper class to handle logic for dashboard call trends processing and formatting."""
 
     def __init__(
         self,
-        logger: HollerServiceLogger,
-        date_range_helper: DateRangeHelper,
-        query_builder: QueryBuilder,
+        logger: TalkoServiceLogger,
+        date_range_helper: TalkoDateRangeHelper,
+        query_builder: TalkoQueryBuilder,
     ) -> None:
         self.__logger = logger
         self.__date_range_helper = date_range_helper
@@ -143,21 +143,21 @@ class CallTrendsHelper:
 
     def _get_cond_for_metric(self, metric: str) -> Any:
         """Retrieve condition for a given metric."""
-        conditions: Dict[Metric, Union[bool, Dict[str, Any]]] = {
-            Metric.TOTAL_CALLS: True,
-            Metric.TOTAL_CONNECTED_CALLS: {
+        conditions: Dict[TalkoMetric, Union[bool, Dict[str, Any]]] = {
+            TalkoMetric.TOTAL_CALLS: True,
+            TalkoMetric.TOTAL_CONNECTED_CALLS: {
                 analytics_constants.EQ: [
                     analytics_constants.CALL_STATUS,
                     analytics_constants.ANSWERED,
                 ]
             },
-            Metric.TOTAL_MISSED_CALLS: {
+            TalkoMetric.TOTAL_MISSED_CALLS: {
                 analytics_constants.EQ: [
                     analytics_constants.CALL_STATUS,
                     analytics_constants.MISSED,
                 ]
             },
-            Metric.LEAD_CONNECTED_CALLS: {
+            TalkoMetric.LEAD_CONNECTED_CALLS: {
                 analytics_constants.QUERY_AND: [
                     {
                         analytics_constants.EQ: [
@@ -173,7 +173,7 @@ class CallTrendsHelper:
                     },
                 ]
             },
-            Metric.AGENT_CONNECTED_CALLS: {
+            TalkoMetric.AGENT_CONNECTED_CALLS: {
                 analytics_constants.QUERY_AND: [
                     {
                         analytics_constants.EQ: [
@@ -189,7 +189,7 @@ class CallTrendsHelper:
                     },
                 ]
             },
-            Metric.LEAD_MISSED_CALLS: {
+            TalkoMetric.LEAD_MISSED_CALLS: {
                 analytics_constants.QUERY_AND: [
                     {
                         analytics_constants.EQ: [
@@ -205,7 +205,7 @@ class CallTrendsHelper:
                     },
                 ]
             },
-            Metric.AGENT_MISSED_CALLS: {
+            TalkoMetric.AGENT_MISSED_CALLS: {
                 analytics_constants.QUERY_AND: [
                     {
                         analytics_constants.EQ: [
@@ -221,16 +221,16 @@ class CallTrendsHelper:
                     },
                 ]
             },
-            Metric.TOTAL_TALK_TIME: True,
-            Metric.TOTAL_CALL_DURATION: True,
-            Metric.TOTAL_UNIQUE_CALLS: True,
+            TalkoMetric.TOTAL_TALK_TIME: True,
+            TalkoMetric.TOTAL_CALL_DURATION: True,
+            TalkoMetric.TOTAL_UNIQUE_CALLS: True,
         }
 
         try:
-            return conditions[Metric(metric)]
+            return conditions[TalkoMetric(metric)]
         except ValueError:
             raise ValueError(
-                f"Invalid metric_filter: {metric}. Must be one of {[m.value for m in Metric]}"
+                f"Invalid metric_filter: {metric}. Must be one of {[m.value for m in TalkoMetric]}"
             )
 
     def _filter_by_metric(
@@ -243,8 +243,8 @@ class CallTrendsHelper:
         filtered = []
         for doc in documents:
             if metric in [
-                Metric.TOTAL_CONNECTED_CALLS.value,
-                Metric.TOTAL_MISSED_CALLS.value,
+                TalkoMetric.TOTAL_CONNECTED_CALLS.value,
+                TalkoMetric.TOTAL_MISSED_CALLS.value,
             ]:
                 if (
                     doc.get(analytics_constants.STATUS_CALL)
@@ -252,10 +252,10 @@ class CallTrendsHelper:
                 ):
                     filtered.append(doc)
             elif metric in [
-                Metric.LEAD_CONNECTED_CALLS.value,
-                Metric.AGENT_CONNECTED_CALLS.value,
-                Metric.LEAD_MISSED_CALLS.value,
-                Metric.AGENT_MISSED_CALLS.value,
+                TalkoMetric.LEAD_CONNECTED_CALLS.value,
+                TalkoMetric.AGENT_CONNECTED_CALLS.value,
+                TalkoMetric.LEAD_MISSED_CALLS.value,
+                TalkoMetric.AGENT_MISSED_CALLS.value,
             ]:
                 cond1 = (
                     doc.get(analytics_constants.STATUS_CALL)
@@ -277,19 +277,19 @@ class CallTrendsHelper:
         self, filtered_docs: List[Dict[str, Any]], metric: str
     ) -> int:
         """Compute total count or duration based on metric type."""
-        if metric == Metric.TOTAL_UNIQUE_CALLS.value:
+        if metric == TalkoMetric.TOTAL_UNIQUE_CALLS.value:
             unique_entities = {
                 doc.get("entity_id") or doc.get("lead_id")
                 for doc in filtered_docs
                 if doc.get("entity_id") or doc.get("lead_id")
             }
             return len(unique_entities)
-        elif metric == Metric.TOTAL_TALK_TIME.value:
+        elif metric == TalkoMetric.TOTAL_TALK_TIME.value:
             return sum(
                 safe_to_int(doc.get(analytics_constants.DATA_TALK_TIME, 0))
                 for doc in filtered_docs
             )
-        elif metric == Metric.TOTAL_CALL_DURATION.value:
+        elif metric == TalkoMetric.TOTAL_CALL_DURATION.value:
             return sum(
                 safe_to_int(doc.get(analytics_constants.TOTAL_CALL_DURATION, 0))
                 for doc in filtered_docs
@@ -301,18 +301,18 @@ class CallTrendsHelper:
     ) -> List[Union[datetime, Tuple[datetime, datetime]]]:
         """Generate date periods for trend aggregation."""
         periods = []
-        if view_type == TimeInterval.DAYS.value:
+        if view_type == TalkoTimeInterval.DAYS.value:
             current = start_ist.replace(hour=0, minute=0, second=0, microsecond=0)
             while current <= end_ist:
                 periods.append(current)
                 current += timedelta(days=1)
-        elif view_type == TimeInterval.WEEKS.value:
+        elif view_type == TalkoTimeInterval.WEEKS.value:
             current = start_ist
             while current <= end_ist:
                 period_end = min(current + timedelta(days=6), end_ist)
                 periods.append((current, period_end))
                 current = period_end + timedelta(seconds=1)
-        elif view_type == TimeInterval.MONTHS.value:
+        elif view_type == TalkoTimeInterval.MONTHS.value:
             current = start_ist.replace(day=1)
             while current <= end_ist:
                 next_month = (current.replace(day=28) + timedelta(days=4)).replace(
@@ -334,7 +334,7 @@ class CallTrendsHelper:
         offset: Optional[int],
     ) -> Tuple[List[Union[datetime, Tuple[datetime, datetime]]], Optional[str]]:
         """Paginate results by month for daily view."""
-        if view_type != TimeInterval.DAYS.value:
+        if view_type != TalkoTimeInterval.DAYS.value:
             return periods, None
 
         periods_by_month = defaultdict(list)
@@ -384,22 +384,22 @@ class CallTrendsHelper:
             if not period:
                 continue
 
-            if metric == Metric.TOTAL_UNIQUE_CALLS.value:
+            if metric == TalkoMetric.TOTAL_UNIQUE_CALLS.value:
                 unique_key = doc.get("entity_id") or doc.get("lead_id")
                 if unique_key:
                     unique_entities[period].add(unique_key)
-            elif metric == Metric.TOTAL_TALK_TIME.value:
+            elif metric == TalkoMetric.TOTAL_TALK_TIME.value:
                 period_aggregation[period] += safe_to_int(
                     doc.get(analytics_constants.DATA_TALK_TIME, 0)
                 )
-            elif metric == Metric.TOTAL_CALL_DURATION.value:
+            elif metric == TalkoMetric.TOTAL_CALL_DURATION.value:
                 period_aggregation[period] += safe_to_int(
                     doc.get(analytics_constants.TOTAL_CALL_DURATION, 0)
                 )
             else:
                 period_aggregation[period] += 1
 
-        if metric == Metric.TOTAL_UNIQUE_CALLS.value:
+        if metric == TalkoMetric.TOTAL_UNIQUE_CALLS.value:
             for p in unique_entities:
                 period_aggregation[p] = len(unique_entities[p])
 
@@ -407,10 +407,10 @@ class CallTrendsHelper:
 
     def _format_period_label(self, period, view_type: str) -> str:
         """Return a formatted label for the time period."""
-        if view_type == TimeInterval.DAYS.value:
+        if view_type == TalkoTimeInterval.DAYS.value:
             return period.strftime("%d/%m/%Y")
-        elif view_type == TimeInterval.WEEKS.value:
+        elif view_type == TalkoTimeInterval.WEEKS.value:
             return f"{period[0].strftime('%d/%m/%Y')}-{period[1].strftime('%d/%m/%Y')}"
-        elif view_type == TimeInterval.MONTHS.value:
+        elif view_type == TalkoTimeInterval.MONTHS.value:
             return period[0].strftime("%b %Y")
         return ""

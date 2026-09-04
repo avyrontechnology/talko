@@ -5,9 +5,9 @@ import pytest
 from src.components.partner_config.message import (
     PARTNER_CONFIG_WITH_PARTNER_ID_ALREADY_EXIST,
 )
-from src.components.partner_config.repository import PartnerConfigRepository
-from src.components.partner_config.validation import PartnerConfigValidator
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.partner_config.repository import TalkoPartnerConfigRepository
+from src.components.partner_config.validation import TalkoPartnerConfigValidator
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 @pytest.mark.asyncio
@@ -15,15 +15,15 @@ class TestPartnerConfigValidator:
 
     @pytest.fixture
     def mock_logger(self):
-        return MagicMock(spec=HollerServiceLogger)
+        return MagicMock(spec=TalkoServiceLogger)
 
     @pytest.fixture
     def mock_partner_config_repository(self):
-        return MagicMock(spec=PartnerConfigRepository)
+        return MagicMock(spec=TalkoPartnerConfigRepository)
 
     @pytest.fixture
     def validator(self, mock_logger, mock_partner_config_repository):
-        return PartnerConfigValidator(
+        return TalkoPartnerConfigValidator(
             logger=mock_logger,
             partner_config_repository=mock_partner_config_repository,
         )

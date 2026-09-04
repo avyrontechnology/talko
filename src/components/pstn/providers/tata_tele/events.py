@@ -2,7 +2,7 @@ import base64
 import json
 
 
-class TataTeleEvents:
+class TalkoTataTeleEvents:
     """
     Tata Tele SmartFlo WebSocket event builder and parser.
 

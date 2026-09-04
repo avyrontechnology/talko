@@ -2,8 +2,8 @@ import pytest
 from bson import ObjectId
 from pydantic import ValidationError
 
-from src.components.partner_config.models import PartnerConfigModel
-from src.utils.enums import RingType  # Assuming RingType is an enum defined elsewhere
+from src.components.partner_config.models import TalkoPartnerConfigModel
+from src.utils.enums import TalkoRingType  # Assuming TalkoRingType is an enum defined elsewhere
 
 
 class TestPartnerConfigModel:
@@ -11,7 +11,7 @@ class TestPartnerConfigModel:
     def test_mutual_exclusivity_raises_value_error(self):
         """Should raise ValueError if both round_robin and service_board are True"""
         with pytest.raises(ValidationError) as exc_info:
-            PartnerConfigModel(
+            TalkoPartnerConfigModel(
                 partner_id=1,
                 is_active=True,
                 vendor_id=ObjectId(),
@@ -25,7 +25,7 @@ class TestPartnerConfigModel:
 
     def test_mutual_exclusivity_passes_for_round_robin_only(self):
         """Should pass if only round_robin is True"""
-        model = PartnerConfigModel(
+        model = TalkoPartnerConfigModel(
             partner_id=1,
             is_active=True,
             vendor_id=ObjectId(),
@@ -38,7 +38,7 @@ class TestPartnerConfigModel:
 
     def test_mutual_exclusivity_passes_for_service_board_only(self):
         """Should pass if only service_board is True"""
-        model = PartnerConfigModel(
+        model = TalkoPartnerConfigModel(
             partner_id=1,
             is_active=True,
             vendor_id=ObjectId(),
@@ -51,7 +51,7 @@ class TestPartnerConfigModel:
 
     def test_mutual_exclusivity_passes_if_both_false(self):
         """Should pass if both round_robin and service_board are False"""
-        model = PartnerConfigModel(
+        model = TalkoPartnerConfigModel(
             partner_id=1,
             is_active=True,
             vendor_id=ObjectId(),
@@ -64,7 +64,7 @@ class TestPartnerConfigModel:
     def test_service_board_requires_ids(self):
         """Should raise ValueError if service_board is enabled without service_board_ids"""
         with pytest.raises(ValidationError) as exc_info:
-            PartnerConfigModel(
+            TalkoPartnerConfigModel(
                 partner_id=1,
                 is_active=True,
                 vendor_id=ObjectId(),
@@ -79,7 +79,7 @@ class TestPartnerConfigModel:
     def test_round_robin_requires_did_count(self):
         """Should raise ValueError if round_robin is enabled without round_robin_did_count"""
         with pytest.raises(ValidationError) as exc_info:
-            PartnerConfigModel(
+            TalkoPartnerConfigModel(
                 partner_id=1,
                 is_active=True,
                 vendor_id=ObjectId(),
@@ -94,7 +94,7 @@ class TestPartnerConfigModel:
 
     def test_round_robin_initializes_did_indices(self):
         """Should initialize did_indices['round_robin'] if missing when round_robin is enabled"""
-        model = PartnerConfigModel(
+        model = TalkoPartnerConfigModel(
             partner_id=1,
             is_active=True,
             vendor_id=ObjectId(),
@@ -109,7 +109,7 @@ class TestPartnerConfigModel:
     def test_ring_type_required_for_multiple_attendance(self):
         """Should raise ValueError if ring_type is None with multiple default attendance numbers"""
         with pytest.raises(ValidationError) as exc_info:
-            PartnerConfigModel(
+            TalkoPartnerConfigModel(
                 partner_id=1,
                 is_active=True,
                 vendor_id=ObjectId(),

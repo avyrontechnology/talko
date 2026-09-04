@@ -1,21 +1,21 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Depends, Request
 from dependency_injector.wiring import Provide, inject
-from src.core.container import Container
+from src.core.container import TalkoContainer
 from src.components.common.responses import (
-    ForbiddenResponse,
-    InternalServerErrorResponse,
+    TalkoForbiddenResponse,
+    TalkoInternalServerErrorResponse,
 )
 
 # from src.loggers.maglo_logger import MagloServiceLogger
 
 
-class AllowedHostsMiddleware(BaseHTTPMiddleware):
+class TalkoAllowedHostsMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, allowed_hosts: list[str]):
         super().__init__(app)
         self.allowed_hosts = allowed_hosts
         self.excluded_paths = {
-            "/holler-service/v1/health",
+            "/talko-service/v1/health",
         }
 
     @inject
@@ -24,7 +24,7 @@ class AllowedHostsMiddleware(BaseHTTPMiddleware):
         request,
         call_next,
         # logger: BabblerServiceLogger = Depends(
-        #     Provide[Container.logger]
+        #     Provide[TalkoContainer.logger]
         # ),
     ):
 
@@ -35,8 +35,8 @@ class AllowedHostsMiddleware(BaseHTTPMiddleware):
             host = request.headers.get("host")
             if host not in self.allowed_hosts:
                 # maglo_service_logger.error(f"Host not Allowed Host: {host}")
-                return ForbiddenResponse(detail="Host Not Allowed")
+                return TalkoForbiddenResponse(detail="Host Not Allowed")
             return await call_next(request)
         except Exception as exc:
             # maglo_service_logger.error(f"Got an unexpected Error: {exc}")
-            return InternalServerErrorResponse()
+            return TalkoInternalServerErrorResponse()

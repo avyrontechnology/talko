@@ -8,25 +8,25 @@ from fastapi import UploadFile
 
 from src.components.call_assets.messages import MISSING_FILE_PATH, SOMETHING_WENT_WRONG
 from src.components.common.responses import (
-    BadRequestResponse,
-    InternalServerErrorResponse,
+    TalkoBadRequestResponse,
+    TalkoInternalServerErrorResponse,
 )
-from src.components.digital_assets.storage.helper import StorageHelper
-from src.core.environment import ENV
-from src.exceptions import BadRequestError
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.digital_assets.storage.helper import TalkoStorageHelper
+from src.core.environment import TalkoENV
+from src.exceptions import TalkoBadRequestError
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class AssetsHelper:
+class TalkoAssetsHelper:
     """
     Helper functions for assets management
     """
 
-    def __init__(self, logger: HollerServiceLogger) -> None:
+    def __init__(self, logger: TalkoServiceLogger) -> None:
         try:
-            self.__logger: HollerServiceLogger = logger
+            self.__logger: TalkoServiceLogger = logger
         except Exception as e:
-            self.__logger.error("Failed to initialize AssetsHelper: {}".format(str(e)))
+            self.__logger.error("Failed to initialize TalkoAssetsHelper: {}".format(str(e)))
             raise
 
     async def url_to_upload_file(self, file_url: str) -> UploadFile:
@@ -89,16 +89,16 @@ class AssetsHelper:
             file_name = f"{uuid.uuid4().hex}.{ext}"
 
             # Build safe file path
-            file_path = f"{ENV.ENVIRONMENT}/{partner_id}/{ENV.SERVICE_NAME}/{asset_type}/{file_name}"
+            file_path = f"{TalkoENV.ENVIRONMENT}/{partner_id}/{TalkoENV.SERVICE_NAME}/{asset_type}/{file_name}"
 
             self.__logger.info(
                 "Uploading file: {} to path: {}".format(file_name, file_path)
             )
 
             # Perform the upload
-            await StorageHelper.upload_file(file_obj, file_path)
+            await TalkoStorageHelper.upload_file(file_obj, file_path)
 
-            uploaded_url = StorageHelper.get_presigned_url(file_path)
+            uploaded_url = TalkoStorageHelper.get_presigned_url(file_path)
             self.__logger.info(
                 "Uploaded {} to DigitalOcean at {}".format(file_name, file_path)
             )
@@ -121,15 +121,15 @@ class AssetsHelper:
         """
         if not file_path:
             self.__logger.warning("FilePath not found for recording URL generation")
-            raise BadRequestError(MISSING_FILE_PATH)
+            raise TalkoBadRequestError(MISSING_FILE_PATH)
 
         self.__logger.info(
             "Received file_path for URL generation: {}".format(file_path)
         )
         try:
             self.__logger.debug("Starting presigned URL generation")
-            # If StorageHelper.get_presigned_url is blocking, consider running in a threadpool
-            do_recording_url: str = StorageHelper.get_presigned_url(file_path)
+            # If TalkoStorageHelper.get_presigned_url is blocking, consider running in a threadpool
+            do_recording_url: str = TalkoStorageHelper.get_presigned_url(file_path)
             self.__logger.info("Finished URL generation")
             self.__logger.debug("Generated recording URL: {}".format(do_recording_url))
             return do_recording_url

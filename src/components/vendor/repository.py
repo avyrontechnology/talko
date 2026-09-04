@@ -2,26 +2,26 @@ from typing import Any, Dict, Union
 
 from bson import ObjectId
 
-from src.components.vendor.models import VendorModel
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.vendor.models import TalkoVendorModel
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class VendorRepository:
+class TalkoVendorRepository:
     """
     Repository class for handling database operations related to vendors.
-    Uses asynchronous MongoDB sessions via the DocDatabaseSessionManager.
+    Uses asynchronous MongoDB sessions via the TalkoDocDatabaseSessionManager.
     """
 
     def __init__(
-        self, session_factory: DocDatabaseSessionManager, logger: HollerServiceLogger
+        self, session_factory: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
     ):
         """
-        Initialize the VendorRepository.
+        Initialize the TalkoVendorRepository.
 
         Args:
-            session_factory (DocDatabaseSessionManager): MongoDB session manager.
-            logger (HollerServiceLogger): Logger instance for logging operations.
+            session_factory (TalkoDocDatabaseSessionManager): MongoDB session manager.
+            logger (TalkoServiceLogger): Logger instance for logging operations.
         """
         self.db_manager = session_factory
         self.logger = logger
@@ -38,7 +38,7 @@ class VendorRepository:
         """
         try:
             async with self.db_manager.collection(
-                VendorModel.CollectionName.VENDOR
+                TalkoVendorModel.CollectionName.VENDOR
             ) as collection:
                 result = await collection.insert_one(vendor_dict)
                 self.logger.info(f"Inserted vendor with ID: {result.inserted_id}")
@@ -59,7 +59,7 @@ class VendorRepository:
         """
         try:
             async with self.db_manager.collection(
-                VendorModel.CollectionName.VENDOR
+                TalkoVendorModel.CollectionName.VENDOR
             ) as collection:
                 return await collection.find_one({"slug": slug})
         except Exception as e:
@@ -81,7 +81,7 @@ class VendorRepository:
         """
         try:
             async with self.db_manager.collection(
-                VendorModel.CollectionName.VENDOR
+                TalkoVendorModel.CollectionName.VENDOR
             ) as collection:
                 return await collection.find_one(
                     {"vendor_type": vendor_type, "name": vendor_name}
@@ -102,7 +102,7 @@ class VendorRepository:
         """
         try:
             async with self.db_manager.collection(
-                VendorModel.CollectionName.VENDOR
+                TalkoVendorModel.CollectionName.VENDOR
             ) as collection:
                 query = {} if include_inactive else {"is_active": True}
                 return await collection.find(query).to_list(length=None)
@@ -122,7 +122,7 @@ class VendorRepository:
         """
         try:
             async with self.db_manager.collection(
-                VendorModel.CollectionName.VENDOR
+                TalkoVendorModel.CollectionName.VENDOR
             ) as collection:
                 return await collection.find_one({"_id": vendor_id, "is_active": True})
         except Exception as e:
@@ -141,7 +141,7 @@ class VendorRepository:
         """
         try:
             async with self.db_manager.collection(
-                VendorModel.CollectionName.VENDOR
+                TalkoVendorModel.CollectionName.VENDOR
             ) as collection:
                 return await collection.find_one({"_id": vendor_id})
         except Exception as e:
@@ -167,7 +167,7 @@ class VendorRepository:
         """
         try:
             async with self.db_manager.collection(
-                VendorModel.CollectionName.VENDOR
+                TalkoVendorModel.CollectionName.VENDOR
             ) as collection:
                 result = await collection.find_one_and_update(
                     {"_id": vendor_id},

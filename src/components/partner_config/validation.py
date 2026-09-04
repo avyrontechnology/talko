@@ -3,11 +3,11 @@ from bson import ObjectId
 from src.components.partner_config.message import (
     PARTNER_CONFIG_WITH_PARTNER_ID_ALREADY_EXIST,
 )
-from src.components.partner_config.repository import PartnerConfigRepository
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.partner_config.repository import TalkoPartnerConfigRepository
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class PartnerConfigValidator:
+class TalkoPartnerConfigValidator:
     """
     Validator class for partner configuration operations.
 
@@ -17,8 +17,8 @@ class PartnerConfigValidator:
 
     def __init__(
         self,
-        logger: HollerServiceLogger,
-        partner_config_repository: PartnerConfigRepository,
+        logger: TalkoServiceLogger,
+        partner_config_repository: TalkoPartnerConfigRepository,
     ):
         """
         Initialize the validator with repositories and logger.

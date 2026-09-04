@@ -2,15 +2,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.components.partner_config.repository import PartnerConfigRepository
-from src.components.vendor_config.services import VendorConfigService
+from src.components.partner_config.repository import TalkoPartnerConfigRepository
+from src.components.vendor_config.services import TalkoVendorConfigService
 
 
 @pytest.fixture
 def repo():
     db_manager = MagicMock()
     logger = MagicMock()
-    repo = PartnerConfigRepository(db_manager, logger)
+    repo = TalkoPartnerConfigRepository(db_manager, logger)
 
     # Shared mock collection
     collection = MagicMock()
@@ -144,7 +144,7 @@ class TestPartnerConfigRepository:
         # Arrange
         db_manager = MagicMock()
         logger = MagicMock()
-        repo = PartnerConfigRepository(db_manager=db_manager, logger=logger)
+        repo = TalkoPartnerConfigRepository(db_manager=db_manager, logger=logger)
 
         # Mock the collection context manager
         collection = AsyncMock()

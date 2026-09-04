@@ -2,45 +2,45 @@ import re
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from src.components.call_management.constant import DIALER_FIELD_MAPPING
-from src.components.call_management.handlers.webhook_base_handler import WebhookHandler
-from src.components.call_management.repository import CallRepository
-from src.components.cdr.constants import EntityType
+from src.components.call_management.handlers.webhook_base_handler import TalkoWebhookHandler
+from src.components.call_management.repository import TalkoCallRepository
+from src.components.cdr.constants import TalkoEntityType
 from src.components.cdr.entity_fields import derive_entity_fields
-from src.components.cdr.models import CDR
-from src.components.did_management.services import DidManagementService
-from src.components.integrations.console.console_constants import ConsoleApiConstants
-from src.components.integrations.console.maglo_client import MagloClient
-from src.components.integrations.console.maglo_constants import MagloApiConstants
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.datetime_util import DateTimeUtil
+from src.components.cdr.models import TalkoCDR
+from src.components.did_management.services import TalkoDidManagementService
+from src.components.integrations.console.console_constants import TalkoConsoleApiConstants
+from src.components.integrations.console.maglo_client import TalkoMagloClient
+from src.components.integrations.console.maglo_constants import TalkoMagloApiConstants
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.datetime_util import TalkoDateTimeUtil
 from src.utils.phone_number_utils import normalize_phone_number
 
 # Matches Tata Tele unresolved template placeholders like "$hangupcause_key" or "_number"
 _UNRESOLVED_PLACEHOLDER = re.compile(r"^\$[a-zA-Z_]+$|^_[a-zA-Z_]+$")
 
 
-class DialerWebhookHandler(WebhookHandler):
+class TalkoDialerWebhookHandler(TalkoWebhookHandler):
     """
     Handler for outbound DIALER campaign webhooks.
-    Creates CDR if missing, updates otherwise.
+    Creates TalkoCDR if missing, updates otherwise.
     """
 
     def __init__(
         self,
-        logger: HollerServiceLogger,
-        call_repository: CallRepository,
-        did_management_service: DidManagementService,
+        logger: TalkoServiceLogger,
+        call_repository: TalkoCallRepository,
+        did_management_service: TalkoDidManagementService,
         vendor_type: str = "tata_tele",
     ):
         super().__init__(logger, call_repository, vendor_type)
-        self.maglo_client: MagloClient = MagloClient(logger)
-        self.datetime_util: DateTimeUtil = DateTimeUtil()
-        self.did_management_service: DidManagementService = did_management_service
-        self.logger: HollerServiceLogger = logger
+        self.maglo_client: TalkoMagloClient = TalkoMagloClient(logger)
+        self.datetime_util: TalkoDateTimeUtil = TalkoDateTimeUtil()
+        self.did_management_service: TalkoDidManagementService = did_management_service
+        self.logger: TalkoServiceLogger = logger
 
     async def process_webhook(self, payload: Dict[str, Any]) -> Dict[str, str]:
         """
-        Main webhook processing: lookup, lead upsert, field mapping, CDR create/update.
+        Main webhook processing: lookup, lead upsert, field mapping, TalkoCDR create/update.
         """
         self.logger.info("Received dialer webhook, payload: {}".format(payload))
 
@@ -106,13 +106,13 @@ class DialerWebhookHandler(WebhookHandler):
             )
         )
 
-        # 4. Check for existing CDR
+        # 4. Check for existing TalkoCDR
         existing_cdr: Optional[Dict[str, Any]] = (
             await self.call_repository.get_cdr_by_call_id_or_uuid(call_id, uuid_val)
         )
 
         self.logger.debug(
-            "Existing CDR lookup: found={}".format(existing_cdr is not None)
+            "Existing TalkoCDR lookup: found={}".format(existing_cdr is not None)
         )
 
         entity_fields = self._derive_entity_fields(
@@ -160,12 +160,12 @@ class DialerWebhookHandler(WebhookHandler):
         action: str = await self._persist_cdr(existing_cdr, final_data, payload)
 
         self.logger.info(
-            "CDR persistence action: {}, final data: {}".format(action, final_data)
+            "TalkoCDR persistence action: {}, final data: {}".format(action, final_data)
         )
 
         # 9. Relay to makun-ai (Section 16.4 live path) — best-effort, never
         # lets a relay failure surface as a failure of this webhook, since
-        # our own CDR write above already succeeded.
+        # our own TalkoCDR write above already succeeded.
         await self._relay_to_makunai(partner_id, payload)
 
         return {
@@ -293,7 +293,7 @@ class DialerWebhookHandler(WebhookHandler):
             self.logger.debug("Maglo upsert response: {}".format(response))
 
             lead_id: Optional[int] = (
-                response.get(MagloApiConstants.FIELD_LEAD_ID) or None
+                response.get(TalkoMagloApiConstants.FIELD_LEAD_ID) or None
             )
             if lead_id:
                 self.logger.info(
@@ -302,12 +302,12 @@ class DialerWebhookHandler(WebhookHandler):
             else:
                 self.logger.warning("No lead_id returned from Maglo upsert")
 
-            lead_name: str = response.get(MagloApiConstants.FIELD_AGENT_NAME) or ""
+            lead_name: str = response.get(TalkoMagloApiConstants.FIELD_AGENT_NAME) or ""
             lead_request_id: Optional[int] = (
-                response.get(MagloApiConstants.FIELD_LEAD_REQUEST_ID) or None
+                response.get(TalkoMagloApiConstants.FIELD_LEAD_REQUEST_ID) or None
             )
             assigned_agent_id: Optional[int] = response.get(
-                MagloApiConstants.LEAD_RESPONSE_ASSIGNED_TO
+                TalkoMagloApiConstants.LEAD_RESPONSE_ASSIGNED_TO
             )
 
             id_data: Any = lead_request_id if lead_request_id is not None else lead_id
@@ -333,7 +333,7 @@ class DialerWebhookHandler(WebhookHandler):
         lead_name: Optional[str],
         payload: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Optional[Any]]:
-        entity_type: Optional[Union[str, EntityType]] = None
+        entity_type: Optional[Union[str, TalkoEntityType]] = None
         entity_id: Optional[Any] = None
         entity_name: Optional[str] = None
 
@@ -374,13 +374,13 @@ class DialerWebhookHandler(WebhookHandler):
         entity_id: Optional[Any],
         entity_name: Optional[str],
     ) -> Dict[str, Any]:
-        self.logger.debug("Building base CDR fields for dialer webhook")
+        self.logger.debug("Building base TalkoCDR fields for dialer webhook")
 
         timestamp: int = self.datetime_util.get_current_time()
         call_uuid: Optional[str] = payload.get("uuid")
         call_id: Optional[str] = payload.get("call_id")
 
-        base_cdr = CDR(
+        base_cdr = TalkoCDR(
             action="outbound",
             calling_mode="dialer",
             call_status=payload.get("call_status", "initiated"),
@@ -643,7 +643,7 @@ class DialerWebhookHandler(WebhookHandler):
         payload: Dict[str, Any],
     ) -> str:
         self.logger.debug(
-            "Persisting CDR, existing record: {}, final data: {}".format(
+            "Persisting TalkoCDR, existing record: {}, final data: {}".format(
                 existing, final_data
             )
         )
@@ -654,7 +654,7 @@ class DialerWebhookHandler(WebhookHandler):
 
         if existing:
             self.logger.debug(
-                "Existing CDR found, updating record with ID: {}".format(
+                "Existing TalkoCDR found, updating record with ID: {}".format(
                     existing["_id"]
                 )
             )
@@ -662,24 +662,24 @@ class DialerWebhookHandler(WebhookHandler):
                 existing["_id"], final_data
             )
             self.logger.debug(
-                "CDR update result for ID {}: {}".format(existing["_id"], success)
+                "TalkoCDR update result for ID {}: {}".format(existing["_id"], success)
             )
             return "updated" if success else "update_failed"
 
-        self.logger.debug("No existing CDR found, creating new record")
+        self.logger.debug("No existing TalkoCDR found, creating new record")
         final_data["created_at"] = self.datetime_util.get_current_time()
         self.logger.debug(
-            "Final data with timestamps for new CDR: {}".format(final_data)
+            "Final data with timestamps for new TalkoCDR: {}".format(final_data)
         )
         final_data["action"] = (
             f"dialer_{event_type}" if event_type != "unknown" else "dialer_event"
         )
         self.logger.debug(
-            "Final data with action field for new CDR: {}".format(final_data)
+            "Final data with action field for new TalkoCDR: {}".format(final_data)
         )
         await self.call_repository.insert_cdr(final_data)
         self.logger.info(
-            "New CDR created for call_id: {}, event_type: {}".format(
+            "New TalkoCDR created for call_id: {}, event_type: {}".format(
                 final_data.get("call_id"), event_type
             )
         )
@@ -742,7 +742,7 @@ class DialerWebhookHandler(WebhookHandler):
                 ivr_phone=normalized,
             )
 
-            agent_id: Optional[Any] = agent_data.get(ConsoleApiConstants.FIELD_AGENT_ID)
+            agent_id: Optional[Any] = agent_data.get(TalkoConsoleApiConstants.FIELD_AGENT_ID)
             if agent_id is not None:
                 self.logger.info(
                     "Resolved agent id={} from normalized phone ending {}".format(
@@ -772,5 +772,5 @@ class DialerWebhookHandler(WebhookHandler):
         call_id: Optional[str] = None,
         uuid: Optional[str] = None,
     ) -> Dict[str, str]:
-        self.logger.warning("CDR API payload not supported for dialer")
+        self.logger.warning("TalkoCDR API payload not supported for dialer")
         return {"status": "not_supported"}

@@ -3,33 +3,33 @@ from fastapi import UploadFile
 from typing import Any, Dict, List
 
 
-from src.components.call_assets.helper import AssetsHelper
-from src.components.call_assets.repository import AssetRepository
+from src.components.call_assets.helper import TalkoAssetsHelper
+from src.components.call_assets.repository import TalkoAssetRepository
 from src.components.call_assets.messages import FAILED_TO_UPDATE_RECORDING_STATUS
-from src.components.call_management.repository import CallRepository
-from src.components.cdr.repository import CDRRepository
-from src.components.digital_assets.constants import DigitalAssetEnum
-from src.exceptions import BadRequestError
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.call_management.repository import TalkoCallRepository
+from src.components.cdr.repository import TalkoCDRRepository
+from src.components.digital_assets.constants import TalkoDigitalAssetEnum
+from src.exceptions import TalkoBadRequestError
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class RecordingsUpdateTask:
+class TalkoRecordingsUpdateTask:
     """
     Encapsulates logic for checking and saving unsaved call recordings
     """
-    def __init__(self, logger: HollerServiceLogger, cdr_repository: CDRRepository,call_repository:CallRepository,  assets_repository: AssetRepository, assets_helper: AssetsHelper) -> None:
+    def __init__(self, logger: TalkoServiceLogger, cdr_repository: TalkoCDRRepository,call_repository:TalkoCallRepository,  assets_repository: TalkoAssetRepository, assets_helper: TalkoAssetsHelper) -> None:
         """
-        Initialize the RecordingsUpdateTask.
+        Initialize the TalkoRecordingsUpdateTask.
         Args:
             logger: Logger instance for logging task details.
-            cdr_repository: Repository for accessing CDR records.
+            cdr_repository: Repository for accessing TalkoCDR records.
             assets_repository: Repository for accessing call_assets functions.
         """
-        self.__logger: HollerServiceLogger = logger
-        self.__cdr_repository: CDRRepository = cdr_repository
-        self.__call_repository: CallRepository = call_repository
-        self.__assets_repository: AssetRepository = assets_repository
-        self.__helper: AssetsHelper = assets_helper
+        self.__logger: TalkoServiceLogger = logger
+        self.__cdr_repository: TalkoCDRRepository = cdr_repository
+        self.__call_repository: TalkoCallRepository = call_repository
+        self.__assets_repository: TalkoAssetRepository = assets_repository
+        self.__helper: TalkoAssetsHelper = assets_helper
 
     async def get_cdrs_with_unsaved_recordings(self, limit: int = 15, skip: int = 0) -> List[Dict[str, Any]]:
         """
@@ -55,7 +55,7 @@ class RecordingsUpdateTask:
         # 1. fetch cdrs with whose recordings is not saved yet
         pending_cdrs: List[Dict[str, Any]] = await self.get_cdrs_with_unsaved_recordings()
 
-        self.__logger.info("Fetched {} incomplete CDR(s) with unsaved recordings".format(len(pending_cdrs)))
+        self.__logger.info("Fetched {} incomplete TalkoCDR(s) with unsaved recordings".format(len(pending_cdrs)))
 
         if not pending_cdrs:
             self.__logger.info("No records found with unsaved recordings")
@@ -78,14 +78,14 @@ class RecordingsUpdateTask:
                         file_path: str = await self.__helper.store_media_to_digital_ocean(
                             file_obj,
                             cdr["partner_id"],
-                            DigitalAssetEnum.GLOBAL_MEDIA_CONSTANT.name
+                            TalkoDigitalAssetEnum.GLOBAL_MEDIA_CONSTANT.name
                         )
                         self.__logger.info("Call recording uploaded successfully at {}".format(file_path))
 
                         # creating record for the recordings in db
                         await self.__assets_repository.create_digital_asset(
                             cdr["partner_id"], 
-                            DigitalAssetEnum.GLOBAL_MEDIA_CONSTANT.name, 
+                            TalkoDigitalAssetEnum.GLOBAL_MEDIA_CONSTANT.name, 
                             file_path, 
                             cdr["agent"],
                             cdr["caller_id_number"],
@@ -110,5 +110,5 @@ class RecordingsUpdateTask:
                     self.__logger.info("Recording is already saved for {}".format(identifier))
             except Exception as e:
                 temp_call_id: str = cdr.get("call_id", str(cdr.get("_id", "unknown")))
-                self.__logger.error("Error processing CDR {}: {}".format(temp_call_id, str(e)))
+                self.__logger.error("Error processing TalkoCDR {}: {}".format(temp_call_id, str(e)))
         return "Recordings saved"

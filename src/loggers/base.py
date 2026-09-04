@@ -6,12 +6,12 @@ from starlette_context import context
 from starlette_context.plugins.request_id import RequestIdPlugin
 
 from src.config.log import LOGGING_CONFIG
-from src.loggers import LogLevel
+from src.loggers import TalkoLogLevel
 
-from ..exceptions import LoggerException
+from ..exceptions import TalkoLoggerException
 
 
-class RequestIdFilter(logging.Filter):
+class TalkoRequestIdFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool | logging.LogRecord:
         try:
             record.request_id = context[RequestIdPlugin.key]
@@ -21,7 +21,7 @@ class RequestIdFilter(logging.Filter):
         return True
 
 
-class BaseLogger:
+class TalkoBaseLogger:
     __logger = None
     LOG_LEVEL = "DEBUG"
 
@@ -45,14 +45,14 @@ class BaseLogger:
     @classmethod
     def _set_file_handler(cls):
         fh = logging.FileHandler("console_service.log")
-        fh.addFilter(RequestIdFilter())
+        fh.addFilter(TalkoRequestIdFilter())
         fh.setFormatter(cls._get_log_format())
         cls.__logger.addHandler(fh)
 
     @classmethod
     def _set_stream_handler(cls):
         sh = logging.StreamHandler()
-        sh.addFilter(RequestIdFilter())
+        sh.addFilter(TalkoRequestIdFilter())
         sh.setFormatter(cls._get_log_format())
         cls.__logger.addHandler(sh)
 
@@ -64,7 +64,7 @@ class BaseLogger:
 
     @classmethod
     def _add_filter(cls):
-        cls.__logger.addFilter(RequestIdFilter())
+        cls.__logger.addFilter(TalkoRequestIdFilter())
 
     @classmethod
     def _type(cls):
@@ -76,7 +76,7 @@ class BaseLogger:
 
     @classmethod
     def _set_log_level(cls):
-        cls.__logger.setLevel(cls.__get_log_level(LogLevel.Level.DEBUG))
+        cls.__logger.setLevel(cls.__get_log_level(TalkoLogLevel.Level.DEBUG))
 
     def _log_with_context(self, level, message: str):
         # Get the previous frame in the stack, skipping the logger's internal calls
@@ -104,17 +104,17 @@ class BaseLogger:
         self._log_with_context(logging.ERROR, message)
 
     @classmethod
-    def __get_log_level(cls, level: LogLevel.Level) -> int:
+    def __get_log_level(cls, level: TalkoLogLevel.Level) -> int:
         match level:
-            case LogLevel.Level.DEBUG:
+            case TalkoLogLevel.Level.DEBUG:
                 return logging.DEBUG
-            case LogLevel.Level.INFO:
+            case TalkoLogLevel.Level.INFO:
                 return logging.INFO
-            case LogLevel.Level.WARNING:
+            case TalkoLogLevel.Level.WARNING:
                 return logging.WARNING
-            case LogLevel.Level.CRITICAL:
+            case TalkoLogLevel.Level.CRITICAL:
                 return logging.CRITICAL
-            case LogLevel.Level.ERROR:
+            case TalkoLogLevel.Level.ERROR:
                 return logging.ERROR
             case _:
                 raise Exception(f"log level not found - {level.name}")

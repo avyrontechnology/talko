@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 
-class Contract:
+class TalkoContract:
     class VendorConfigCreate(BaseModel):
         name: Optional[str] = None
         vendor_id: str

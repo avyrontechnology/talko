@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 
-from src.components.pstn.dto import CallContext
+from src.components.pstn.dto import TalkoCallContext
 
 
-class AbstractPSTNProvider(ABC):
+class TalkoAbstractPSTNProvider(ABC):
     """
     Abstract base class for all PSTN provider implementations.
 
     Each provider (Tata Tele, Twilio, Exotel, etc.) implements this interface
-    to adapt its WebSocket protocol to the provider-agnostic PSTNBridgeService.
+    to adapt its WebSocket protocol to the provider-agnostic TalkoPSTNBridgeService.
 
     Audio contract:
         - All inbound audio (provider → us) is μ-law 8kHz mono, base64-encoded.
@@ -21,9 +21,9 @@ class AbstractPSTNProvider(ABC):
     """
 
     @abstractmethod
-    async def parse_start_event(self, raw_event: dict) -> CallContext:
+    async def parse_start_event(self, raw_event: dict) -> TalkoCallContext:
         """
-        Parse a provider-specific 'start' WebSocket event into a CallContext.
+        Parse a provider-specific 'start' WebSocket event into a TalkoCallContext.
 
         Must populate at minimum:
             call_sid, stream_sid, did_number, caller_number, direction.
@@ -32,7 +32,7 @@ class AbstractPSTNProvider(ABC):
             raw_event: Raw parsed JSON dict of the start event from the provider.
 
         Returns:
-            Fully populated CallContext for this call.
+            Fully populated TalkoCallContext for this call.
         """
         ...
 

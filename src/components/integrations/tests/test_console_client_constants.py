@@ -3,13 +3,13 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 import pytest
 from aiohttp import ClientResponseError
 
-from src.components.integrations.console.console_client import ConsoleClient
+from src.components.integrations.console.console_client import TalkoConsoleClient
 
 
 def make_client(api_key="test-key"):
     logger = MagicMock()
     with patch(
-        "src.components.integrations.console.console_client.ConsoleApiConstants"
+        "src.components.integrations.console.console_client.TalkoConsoleApiConstants"
     ) as mock_constants, patch(
         "src.components.integrations.console.console_client.aiohttp.ClientSession"
     ) as mock_session_cls:
@@ -17,7 +17,7 @@ def make_client(api_key="test-key"):
         mock_constants.API_KEY_HEADER = "x-api-key"
         mock_constants.get_agent_by_ivr_phone_url.return_value = "https://console.example.com/console-service/v1/1/user/+911234567890/get_user_details_by_ivr"
         mock_session_cls.return_value = MagicMock()
-        client = ConsoleClient(logger=logger)
+        client = TalkoConsoleClient(logger=logger)
         client._mock_constants = mock_constants
     return client, logger
 
@@ -27,24 +27,24 @@ class TestConsoleClientInit:
     def test_warns_when_api_key_missing(self):
         logger = MagicMock()
         with patch(
-            "src.components.integrations.console.console_client.ConsoleApiConstants"
+            "src.components.integrations.console.console_client.TalkoConsoleApiConstants"
         ) as mock_constants, patch(
             "src.components.integrations.console.console_client.aiohttp.ClientSession"
         ):
             mock_constants.CONSOLE_API_KEY = ""
-            ConsoleClient(logger=logger)
+            TalkoConsoleClient(logger=logger)
         logger.warning.assert_called_once()
         assert "missing" in logger.warning.call_args[0][0].lower()
 
     def test_no_warning_when_api_key_present(self):
         logger = MagicMock()
         with patch(
-            "src.components.integrations.console.console_client.ConsoleApiConstants"
+            "src.components.integrations.console.console_client.TalkoConsoleApiConstants"
         ) as mock_constants, patch(
             "src.components.integrations.console.console_client.aiohttp.ClientSession"
         ):
             mock_constants.CONSOLE_API_KEY = "valid-key"
-            ConsoleClient(logger=logger)
+            TalkoConsoleClient(logger=logger)
         logger.warning.assert_not_called()
 
 
@@ -61,13 +61,13 @@ class TestGetAgentByIvrPhoneGuards:
     async def test_returns_empty_when_api_key_missing(self):
         logger = MagicMock()
         with patch(
-            "src.components.integrations.console.console_client.ConsoleApiConstants"
+            "src.components.integrations.console.console_client.TalkoConsoleApiConstants"
         ) as mock_constants, patch(
             "src.components.integrations.console.console_client.aiohttp.ClientSession"
         ):
             mock_constants.CONSOLE_API_KEY = ""
             mock_constants.API_KEY_HEADER = "x-api-key"
-            client = ConsoleClient(logger=logger)
+            client = TalkoConsoleClient(logger=logger)
 
         result = await client.get_agent_by_ivr_phone(
             partner_id=1, ivr_phone="+911234567890"

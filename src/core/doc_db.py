@@ -2,37 +2,37 @@ import contextlib
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo.client_session import ClientSession
 from typing import Any, AsyncIterator
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.core.environment import ENV
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.core.environment import TalkoENV
 
 
-class DocDatabaseSessionManager:
+class TalkoDocDatabaseSessionManager:
     def __init__(
-        self, logger: HollerServiceLogger, engine_kwargs: dict[str, Any] = None
+        self, logger: TalkoServiceLogger, engine_kwargs: dict[str, Any] = None
     ):
         if engine_kwargs is None:
             engine_kwargs = {}
-        self.__logger: HollerServiceLogger = logger
+        self.__logger: TalkoServiceLogger = logger
         self._engine_kwargs = engine_kwargs
-        self._db_name = ENV.MONGO_DB
+        self._db_name = TalkoENV.MONGO_DB
         self._client: AsyncIOMotorClient | None = None
         self._db: AsyncIOMotorDatabase | None = None
 
     def _get_connection_string(self):
-        if ENV.ENVIRONMENT != "LOCAL":
+        if TalkoENV.ENVIRONMENT != "LOCAL":
             self._host = "mongodb+srv://{user}:{password}@{db_host}/admin{tls}&{auth_source}".format(
-                user=ENV.MONGO_USER,
-                password=ENV.MONGO_PASSWORD,
-                db_host=ENV.MONGO_HOST,
+                user=TalkoENV.MONGO_USER,
+                password=TalkoENV.MONGO_PASSWORD,
+                db_host=TalkoENV.MONGO_HOST,
                 tls="?tls=true",
                 auth_source="authSource=admin",
             )
         else:
             self._host = "mongodb://{user}:{password}@{db_host}:{port}".format(
-                user=ENV.MONGO_USER,
-                password=ENV.MONGO_PASSWORD,
-                db_host=ENV.MONGO_HOST,
-                port=ENV.MONGO_PORT,
+                user=TalkoENV.MONGO_USER,
+                password=TalkoENV.MONGO_PASSWORD,
+                db_host=TalkoENV.MONGO_HOST,
+                port=TalkoENV.MONGO_PORT,
             )
 
     def _initialize_client(self):
@@ -74,7 +74,7 @@ class DocDatabaseSessionManager:
         snapshot-isolation risk: a document committed moments earlier by a
         different session isn't guaranteed visible inside a fresh
         transaction's snapshot. That caused real read-your-recent-write
-        failures (e.g. a Celery task reading a CDR a webhook had just
+        failures (e.g. a Celery task reading a TalkoCDR a webhook had just
         written). Call sites that genuinely need multi-operation atomicity
         (a read-check followed by a conditional write) should use connect()
         directly instead, not this.

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 
-class Contract:
+class TalkoContract:
 
     class CreateCallRecordReq(BaseModel):
         caller: str

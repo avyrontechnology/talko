@@ -2,9 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.components.cdr.dto import Contract
-from src.components.cdr.services import CDRService
-from src.exceptions import ResourceNotFound
+from src.components.cdr.dto import TalkoContract
+from src.components.cdr.services import TalkoCDRService
+from src.exceptions import TalkoResourceNotFound
 
 
 @pytest.mark.asyncio
@@ -17,7 +17,7 @@ class TestCDRServiceSetCustomFieldValues:
         datetime_util.get_current_time.return_value = 1735689600000
         custom_field_validator = AsyncMock()
 
-        service = CDRService(
+        service = TalkoCDRService(
             repository=repository,
             logger=logger,
             datetime_util=datetime_util,
@@ -52,12 +52,12 @@ class TestCDRServiceSetCustomFieldValues:
             values={"lead_source": "Web"},
         )
 
-        assert isinstance(result, Contract.SetCDRCustomFieldsResponse)
+        assert isinstance(result, TalkoContract.SetCDRCustomFieldsResponse)
         assert result.call_id == "call-1"
         assert result.custom_fields == {"lead_source": "Web"}
 
         custom_field_validator.validate_and_normalize_values.assert_awaited_once_with(
-            1, "CDR", {"lead_source": "Web"}
+            1, "TalkoCDR", {"lead_source": "Web"}
         )
         repository.set_custom_field_values.assert_awaited_once_with(
             "call-1", {"lead_source": "Web"}, 1735689600000
@@ -67,7 +67,7 @@ class TestCDRServiceSetCustomFieldValues:
         service, repository, _ = setup
         repository.find_cdr_by_call_id.return_value = None
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await service.set_custom_field_values(
                 user_id=1, partner_id=1, call_id="missing", values={"x": 1}
             )
@@ -80,7 +80,7 @@ class TestCDRServiceSetCustomFieldValues:
             "partner_id": 999,
         }
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await service.set_custom_field_values(
                 user_id=1, partner_id=1, call_id="call-1", values={"x": 1}
             )

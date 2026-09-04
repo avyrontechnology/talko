@@ -1,27 +1,27 @@
-from src.components.vendor.dto import Contract
-from src.components.vendor.repository import VendorRepository
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.vendor.dto import TalkoContract
+from src.components.vendor.repository import TalkoVendorRepository
+from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.common_validation import validate_required_fields
 
 
-class VendorValidator:
+class TalkoVendorValidator:
     """
     Validator class for validating vendor-related input data.
     Ensures that required fields are present and business rules are enforced.
     """
 
-    def __init__(self, repository: VendorRepository, logger: HollerServiceLogger):
+    def __init__(self, repository: TalkoVendorRepository, logger: TalkoServiceLogger):
         """
-        Initialize the VendorValidator.
+        Initialize the TalkoVendorValidator.
 
         Args:
-            repository (VendorRepository): Repository for checking existing vendor records.
-            logger (HollerServiceLogger): Logger instance for logging validation activities.
+            repository (TalkoVendorRepository): Repository for checking existing vendor records.
+            logger (TalkoServiceLogger): Logger instance for logging validation activities.
         """
         self.repository = repository
         self.logger = logger
 
-    async def validate_vendor_create(self, vendor: Contract.VendorCreate):
+    async def validate_vendor_create(self, vendor: TalkoContract.VendorCreate):
         """Validate VendorCreate data."""
         # Check required fields
         required_fields = ["name", "vendor_type"]

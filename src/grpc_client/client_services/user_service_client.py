@@ -2,20 +2,20 @@ from typing import Dict, List, Union
 
 from grpc.aio import AioRpcError
 
-from src.grpc_client.grpc_client import GRPCClient
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.grpc_client.grpc_client import TalkoGRPCClient
+from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.pub import user_pb2, user_pb2_grpc
 
-logger = HollerServiceLogger.get_logger()
+logger = TalkoServiceLogger.get_logger()
 
 
-class UserServiceClient(GRPCClient):
+class TalkoUserServiceClient(TalkoGRPCClient):
 
     def __init__(self):
         super().__init__()
         self.stub = user_pb2_grpc.UserServiceStub(self.channel)
 
-    @GRPCClient.call_with_retry
+    @TalkoGRPCClient.call_with_retry
     async def get_users_availability_status(
         self, user_ids: Union[int, List[int]]
     ) -> Dict[int, str]:

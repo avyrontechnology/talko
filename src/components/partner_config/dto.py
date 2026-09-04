@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 
-class Contract:
+class TalkoContract:
     class PartnerConfigCreate(BaseModel):
         partner_id: int
         vendor_id: str

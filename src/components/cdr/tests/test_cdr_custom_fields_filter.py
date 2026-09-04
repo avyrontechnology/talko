@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from src.components.cdr.helper import GetCallRecordHistoryHelper
+from src.components.cdr.helper import TalkoGetCallRecordHistoryHelper
 
 
 class TestAddCustomFieldsFilter:
@@ -8,7 +8,7 @@ class TestAddCustomFieldsFilter:
         logger = MagicMock()
         query = {"partner_id": 132}
 
-        GetCallRecordHistoryHelper.add_custom_fields_filter(
+        TalkoGetCallRecordHistoryHelper.add_custom_fields_filter(
             query, {"lead_source": "Referral", "lead_score": 87}, logger
         )
 
@@ -22,7 +22,7 @@ class TestAddCustomFieldsFilter:
         logger = MagicMock()
         query = {"partner_id": 132}
 
-        GetCallRecordHistoryHelper.add_custom_fields_filter(query, None, logger)
+        TalkoGetCallRecordHistoryHelper.add_custom_fields_filter(query, None, logger)
 
         assert query == {"partner_id": 132}
 
@@ -30,7 +30,7 @@ class TestAddCustomFieldsFilter:
         logger = MagicMock()
         query = {"partner_id": 132}
 
-        GetCallRecordHistoryHelper.add_custom_fields_filter(query, {}, logger)
+        TalkoGetCallRecordHistoryHelper.add_custom_fields_filter(query, {}, logger)
 
         assert query == {"partner_id": 132}
 
@@ -39,7 +39,7 @@ class TestBuildCallRecordHistoryQueryCustomFields:
     def test_custom_fields_param_flows_into_query(self):
         logger = MagicMock()
 
-        query = GetCallRecordHistoryHelper.build_call_record_history_query(
+        query = TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
             lead_id=None,
             service_board_id=323,
             partner_id=132,
@@ -54,7 +54,7 @@ class TestBuildCallRecordHistoryQueryCustomFields:
     def test_omitting_custom_fields_adds_no_dotted_keys(self):
         logger = MagicMock()
 
-        query = GetCallRecordHistoryHelper.build_call_record_history_query(
+        query = TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
             lead_id=None,
             service_board_id=323,
             partner_id=132,

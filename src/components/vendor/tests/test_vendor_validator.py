@@ -2,27 +2,27 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.components.vendor.dto import Contract
-from src.components.vendor.validation import VendorValidator
-from src.utils.enums import VendorType
+from src.components.vendor.dto import TalkoContract
+from src.components.vendor.validation import TalkoVendorValidator
+from src.utils.enums import TalkoVendorType
 
 
 @pytest.mark.asyncio
 class TestVendorValidator:
-    """Unit tests for VendorValidator class."""
+    """Unit tests for TalkoVendorValidator class."""
 
     @classmethod
     def setup_class(cls):
         cls.mock_repository = AsyncMock()
         cls.mock_logger = MagicMock()
-        cls.validator = VendorValidator(
+        cls.validator = TalkoVendorValidator(
             repository=cls.mock_repository, logger=cls.mock_logger
         )
 
     async def test_validate_vendor_create_success(self):
         """Should pass validation if required fields exist and vendor type doesn't exist already."""
-        vendor_data = Contract.VendorCreate(
-            name="airtel", vendor_type=VendorType.AIRTEL
+        vendor_data = TalkoContract.VendorCreate(
+            name="airtel", vendor_type=TalkoVendorType.AIRTEL
         )
 
         self.mock_repository.find_vendor_by_type.return_value = None
@@ -36,8 +36,8 @@ class TestVendorValidator:
 
     async def test_validate_vendor_create_duplicate_vendor_type(self):
         """Should raise ValueError if vendor with same type already exists."""
-        vendor_data = Contract.VendorCreate(
-            name="airtel", vendor_type=VendorType.AIRTEL
+        vendor_data = TalkoContract.VendorCreate(
+            name="airtel", vendor_type=TalkoVendorType.AIRTEL
         )
 
         self.mock_repository.find_vendor_by_type.return_value = {
@@ -61,7 +61,7 @@ class TestVendorValidator:
             lambda *_: (_ for _ in ()).throw(ValueError("Missing fields")),
         )
 
-        vendor_data = Contract.VendorCreate(name="", vendor_type=VendorType.AIRTEL)
+        vendor_data = TalkoContract.VendorCreate(name="", vendor_type=TalkoVendorType.AIRTEL)
 
         with pytest.raises(ValueError, match="Missing fields"):
             await self.validator.validate_vendor_create(vendor_data)

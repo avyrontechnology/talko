@@ -2,31 +2,31 @@ import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.components.call_agent_map.repository import AgentMappingRepository
+from src.components.call_agent_map.repository import TalkoAgentMappingRepository
 from src.components.call_management.constant import ORDERBY, SIMULTANEOUS
-from src.components.call_management.enums import InboundType
+from src.components.call_management.enums import TalkoInboundType
 from src.components.cdr.entity_fields import derive_entity_fields
-from src.components.integrations.console.maglo_constants import MagloApiConstants
+from src.components.integrations.console.maglo_constants import TalkoMagloApiConstants
 
 
 @dataclass
-class TransferTarget:
+class TalkoTransferTarget:
     type: str  # "number" | "agent"
     data: List[str]
     ring_type: str = SIMULTANEOUS
     skip_active: bool = False
     # Set only when reassign_inactive_agent kicked in and swapped the caller's
-    # agent_id for a different, active one — lets callers update CDR/event
+    # agent_id for a different, active one — lets callers update TalkoCDR/event
     # metadata to the agent actually being dialed.
     resolved_agent_id: Optional[int] = None
     # Set only when a reassignment happened AND Maglo confirmed the lead
     # tied to that phone number (its lead_request_id) — priority-2 override
-    # for the CDR's lead_id/entity_id, on top of whatever the caller already
+    # for the TalkoCDR's lead_id/entity_id, on top of whatever the caller already
     # had on record (priority 1).
     reassigned_lead_id: Optional[int] = None
 
 
-class AgentDialPlanResolver:
+class TalkoAgentDialPlanResolver:
     """
     Decides whether to transfer to normal phone numbers or to cloud phonic / agent extensions.
     Fetches configuration directly from Maglo (Tata Smartflo) at runtime — no caching.
@@ -37,7 +37,7 @@ class AgentDialPlanResolver:
     def __init__(
         self,
         maglo_client,
-        agent_mapping_repo: AgentMappingRepository,
+        agent_mapping_repo: TalkoAgentMappingRepository,
         logger,
         user_service_client=None,
     ):
@@ -54,8 +54,8 @@ class AgentDialPlanResolver:
         fallback_agent_number: Optional[str] = None,
         reassign_inactive_agent: bool = False,
         customer_number: Optional[str] = None,
-    ) -> TransferTarget:
-        """Resolve transfer target for one known agent (usually from existing CDR)"""
+    ) -> TalkoTransferTarget:
+        """Resolve transfer target for one known agent (usually from existing TalkoCDR)"""
         self.__logger.debug(
             "Resolving dialplan for single agent {} (partner {})".format(
                 agent_id, partner_id
@@ -88,7 +88,7 @@ class AgentDialPlanResolver:
                     extension, agent_id, partner_id
                 )
             )
-            return TransferTarget(
+            return TalkoTransferTarget(
                 type="agent",
                 data=[extension],
                 ring_type=SIMULTANEOUS,
@@ -99,7 +99,7 @@ class AgentDialPlanResolver:
 
         # Fallback to normal phone number. Prefer the freshly-looked-up
         # number for the (possibly reassigned) agent over the caller-supplied
-        # fallback — the fallback comes from a CDR field that only gets set
+        # fallback — the fallback comes from a TalkoCDR field that only gets set
         # once and then copied forward on every later call, so it goes stale
         # whenever the agent's number changes or the assigned agent changes.
         # Only fall back to it when Maglo has no number on record at all.
@@ -111,7 +111,7 @@ class AgentDialPlanResolver:
                     number_to_use, agent_id, partner_id
                 )
             )
-            return TransferTarget(
+            return TalkoTransferTarget(
                 type="number",
                 data=[number_to_use],
                 ring_type=SIMULTANEOUS,
@@ -123,7 +123,7 @@ class AgentDialPlanResolver:
         self.__logger.warning(
             "No valid target for agent {} (partner {})".format(agent_id, partner_id)
         )
-        return TransferTarget(
+        return TalkoTransferTarget(
             type="number",
             data=[],
             resolved_agent_id=resolved_agent_id,
@@ -144,11 +144,11 @@ class AgentDialPlanResolver:
         inbound_round_robin_index: int = 0,
     ) -> Dict[str, Any]:
         """
-        Main entry point for no-CDR inbound logic.
-        Returns dict ready for CDR creation and dialplan response.
+        Main entry point for no-TalkoCDR inbound logic.
+        Returns dict ready for TalkoCDR creation and dialplan response.
         """
         self.__logger.info(
-            "Resolving inbound no-CDR call from {} to DID {} ".format(
+            "Resolving inbound no-TalkoCDR call from {} to DID {} ".format(
                 customer_number, call_to_number
             )
             + "(partner {}, board {})".format(partner_id, service_board_id)
@@ -179,7 +179,7 @@ class AgentDialPlanResolver:
                 reassign_inactive_agent=reassign_inactive_agent,
                 customer_number=customer_number,
             )
-            # Reflect a possible reassignment so the CDR and event metadata
+            # Reflect a possible reassignment so the TalkoCDR and event metadata
             # record the agent actually being dialed, not the stale owner.
             if agent_ids_list:
                 assigned_agent_id = agent_ids_list[0]["agent_id"]
@@ -227,7 +227,7 @@ class AgentDialPlanResolver:
                 )
                 + "Falling back to empty transfer."
             )
-            target = TransferTarget(type="number", data=[])
+            target = TalkoTransferTarget(type="number", data=[])
             agent_ids_list = []
 
         # Priority 1: the lead_id already resolved via _get_or_create_lead.
@@ -265,7 +265,7 @@ class AgentDialPlanResolver:
         agent_id: int,
         reassign_inactive_agent: bool = False,
         customer_number: Optional[str] = None,
-    ) -> Tuple[TransferTarget, List[Dict[str, Optional[Any]]]]:
+    ) -> Tuple[TalkoTransferTarget, List[Dict[str, Optional[Any]]]]:
         """Handle case when lead has one assigned agent."""
         self.__logger.debug(
             "Resolving single assigned agent {} (partner {})".format(
@@ -292,7 +292,7 @@ class AgentDialPlanResolver:
         )
 
         if is_cloud and extension:
-            target = TransferTarget(
+            target = TalkoTransferTarget(
                 type="agent",
                 data=[extension],
                 ring_type=SIMULTANEOUS,
@@ -301,7 +301,7 @@ class AgentDialPlanResolver:
             )
             cloud_num = extension
         else:
-            target = TransferTarget(
+            target = TalkoTransferTarget(
                 type="number",
                 data=[agent_number] if agent_number else [],
                 ring_type=SIMULTANEOUS,
@@ -333,7 +333,7 @@ class AgentDialPlanResolver:
         service_board_id: int,
         enable_inbound_round_robin: bool = False,
         inbound_round_robin_index: int = 0,
-    ) -> Tuple[TransferTarget, List[Dict[str, Optional[Any]]], Optional[int]]:
+    ) -> Tuple[TalkoTransferTarget, List[Dict[str, Optional[Any]]], Optional[int]]:
         """Handle case when no assigned agent → ring board agents.
 
         Rings everyone at once by default. When inbound round robin is
@@ -357,7 +357,7 @@ class AgentDialPlanResolver:
                     service_board_id, partner_id
                 )
             )
-            return TransferTarget(type="number", data=[]), [], None
+            return TalkoTransferTarget(type="number", data=[]), [], None
 
         self.__logger.debug(
             "Found {} agents in board {} (partner {})".format(
@@ -376,7 +376,7 @@ class AgentDialPlanResolver:
             # keeps covering every agent — compute before slicing below.
             next_index = (inbound_round_robin_index + 1) % len(agents_to_ring)
             # Round robin rings only the cursor agent (not the whole board
-            # in order), so the event/CDR carry a single agent_id +
+            # in order), so the event/TalkoCDR carry a single agent_id +
             # agent_number.
             agents_to_ring = agents_to_ring[:1]
             ring_type = ORDERBY
@@ -424,7 +424,7 @@ class AgentDialPlanResolver:
 
         target_type = "agent" if any_cloud else "number"
 
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type=target_type,
             data=transfer_data,
             ring_type=ring_type,
@@ -560,7 +560,7 @@ class AgentDialPlanResolver:
         """
         Picks a replacement from the board's other active agents and notifies
         Maglo of the reassignment, awaiting its response so the confirmed
-        lead_request_id can flow back onto this call's CDR. Returns
+        lead_request_id can flow back onto this call's TalkoCDR. Returns
         (new_agent_id, reassigned_lead_id) — both None if no other active
         agent is available; reassigned_lead_id is None if the Maglo call
         fails (the agent swap still stands, just without a confirmed lead id).
@@ -625,33 +625,33 @@ class AgentDialPlanResolver:
             )
 
     def map_transfer_to_inbound_fields(
-        self, target: Optional[TransferTarget]
+        self, target: Optional[TalkoTransferTarget]
     ) -> Tuple[str, Optional[str]]:
         """
-        Maps TransferTarget to inbound_type string and cloud_agent_number.
+        Maps TalkoTransferTarget to inbound_type string and cloud_agent_number.
 
         Args:
-            target: TransferTarget object (or None)
+            target: TalkoTransferTarget object (or None)
 
         Returns:
             Tuple[str, Optional[str]]: (inbound_type_str, cloud_agent_number)
         """
         if not target:
-            return InboundType.PHONE_NUMBER.value, None
+            return TalkoInboundType.PHONE_NUMBER.value, None
 
         if target.type == "number":
-            return InboundType.PHONE_NUMBER.value, None
+            return TalkoInboundType.PHONE_NUMBER.value, None
 
         if target.type == "agent":
             cloud_number = target.data[0] if target.data else None
-            return InboundType.SOFT_PHONE.value, cloud_number
+            return TalkoInboundType.SOFT_PHONE.value, cloud_number
 
         self.__logger.warning(
             "Unknown transfer type '{}' - defaulting to phone_number".format(
                 target.type
             )
         )
-        return InboundType.PHONE_NUMBER.value, None
+        return TalkoInboundType.PHONE_NUMBER.value, None
 
     async def _get_or_create_lead(
         self,
@@ -672,14 +672,14 @@ class AgentDialPlanResolver:
                 )
             )
 
-            lead_id = response_data.get(MagloApiConstants.FIELD_AGENT_ID) or None
-            lead_name = response_data.get(MagloApiConstants.FIELD_AGENT_NAME) or ""
+            lead_id = response_data.get(TalkoMagloApiConstants.FIELD_AGENT_ID) or None
+            lead_name = response_data.get(TalkoMagloApiConstants.FIELD_AGENT_NAME) or ""
             lead_request_id = (
-                response_data.get(MagloApiConstants.FIELD_LEAD_REQUEST_ID) or None
+                response_data.get(TalkoMagloApiConstants.FIELD_LEAD_REQUEST_ID) or None
             )
 
             assigned_agent_id = response_data.get(
-                MagloApiConstants.LEAD_RESPONSE_ASSIGNED_TO
+                TalkoMagloApiConstants.LEAD_RESPONSE_ASSIGNED_TO
             )
 
             self.__logger.info(
@@ -745,7 +745,7 @@ class AgentDialPlanResolver:
             return is_cloud_enabled, extension, agent_id_val, agent_name, agent_number
 
         except ValueError as ve:
-            # MagloClient raises ValueError on non-200 status (including 404)
+            # TalkoMagloClient raises ValueError on non-200 status (including 404)
             error_str = str(ve)
             if "404" in error_str and "Service board with id" in error_str:
                 self.__logger.warning(
@@ -770,20 +770,20 @@ class AgentDialPlanResolver:
             return False, None, None, None, None
 
 
-class DialplanResponseBuilder:
+class TalkoDialplanResponseBuilder:
     """
     Helper class that formats the final dialplan response payload.
     Centralizes all response structure logic for consistency and testability.
     """
 
     @staticmethod
-    def build_transfer_response(target: Optional[TransferTarget]) -> List[dict]:
+    def build_transfer_response(target: Optional[TalkoTransferTarget]) -> List[dict]:
         """
-        Builds the standard transfer block based on a TransferTarget.
+        Builds the standard transfer block based on a TalkoTransferTarget.
         Returns a list with one transfer object (as expected by the API).
         """
         if not target:
-            return DialplanResponseBuilder.build_empty_response()
+            return TalkoDialplanResponseBuilder.build_empty_response()
 
         return [
             {

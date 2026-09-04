@@ -2,27 +2,27 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 
 from src.components.digital_assets import schema
-from src.components.digital_assets.logger_adapter import LoggerAdapter
-from src.components.digital_assets.services import DigitalAssetService
-from src.core.container import Container
+from src.components.digital_assets.logger_adapter import TalkoLoggerAdapter
+from src.components.digital_assets.services import TalkoDigitalAssetService
+from src.core.container import TalkoContainer
 
-logger = LoggerAdapter().get_logger()
+logger = TalkoLoggerAdapter().get_logger()
 
 
-class DigitalAssetController:
+class TalkoDigitalAssetController:
     digital_asset_router = APIRouter()
 
     @digital_asset_router.get(
         "/digital_assets",
-        response_model=schema.DigitalAssetResponse,
+        response_model=schema.TalkoDigitalAssetResponse,
         description="Fetch a digital asset by its ID and type",
     )
     @inject
     async def get_digital_assets(
         partner_id: int,
         asset_type: str,
-        digital_asset_service: DigitalAssetService = Depends(
-            Provide[Container.digital_asset_service]
+        digital_asset_service: TalkoDigitalAssetService = Depends(
+            Provide[TalkoContainer.digital_asset_service]
         ),
     ):
         """
@@ -42,7 +42,7 @@ class DigitalAssetController:
             asset_type (str): The type of the digital asset (e.g., image, video).
 
         Returns:
-            DigitalAssetResponse: A response model containing the details of the digital asset.
+            TalkoDigitalAssetResponse: A response model containing the details of the digital asset.
 
         Raises:
             HTTPException: If an error occurs during the retrieval of asset details, a 500
@@ -82,7 +82,7 @@ class DigitalAssetController:
 
     @digital_asset_router.post(
         "/upload_digital_asset",
-        response_model=schema.UploadDigitalAssetResponse,
+        response_model=schema.TalkoUploadDigitalAssetResponse,
     )
     @inject
     async def upload_digital_asset(
@@ -90,8 +90,8 @@ class DigitalAssetController:
         partner_id: int,
         asset_type: str,
         input_file: UploadFile,
-        digital_asset_service: DigitalAssetService = Depends(
-            Provide[Container.digital_asset_service]
+        digital_asset_service: TalkoDigitalAssetService = Depends(
+            Provide[TalkoContainer.digital_asset_service]
         ),
     ):
         """
@@ -104,7 +104,7 @@ class DigitalAssetController:
             input_file (UploadFile): The file to be uploaded.
 
         Returns:
-            DigitalAssetResponse: Contains the file name and URL of the uploaded asset.
+            TalkoDigitalAssetResponse: Contains the file name and URL of the uploaded asset.
 
         Raises:
             HTTPException: Raised for client-side or server-side errors with appropriate messages.
@@ -149,8 +149,8 @@ class DigitalAssetController:
     async def delete_digital_asset(
         request: Request,
         asset_id: int,
-        digital_asset_service: DigitalAssetService = Depends(
-            Provide[Container.digital_asset_service],
+        digital_asset_service: TalkoDigitalAssetService = Depends(
+            Provide[TalkoContainer.digital_asset_service],
         ),
     ):
         """

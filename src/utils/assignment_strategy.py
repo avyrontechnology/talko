@@ -4,7 +4,7 @@ from typing import Dict, Generic, List, TypeVar
 T = TypeVar("T")  # Generic type variable
 
 
-class BaseAssignmentStrategy(Generic[T]):
+class TalkoBaseAssignmentStrategy(Generic[T]):
     """Base class for generic assignment strategies."""
 
     def assign(self, items: List[T], groups: List[T]) -> Dict[T, T]:
@@ -12,7 +12,7 @@ class BaseAssignmentStrategy(Generic[T]):
         pass
 
 
-class RoundRobinAssignment(BaseAssignmentStrategy[T]):
+class TalkoRoundRobinAssignment(TalkoBaseAssignmentStrategy[T]):
     """Assigns items in a round-robin fashion with a specified starting index."""
 
     def assign(
@@ -26,7 +26,7 @@ class RoundRobinAssignment(BaseAssignmentStrategy[T]):
         return {item: next(assigned_to_cycle) for item in items}
 
 
-class EvenDistributionAssignment(BaseAssignmentStrategy[T]):
+class TalkoEvenDistributionAssignment(TalkoBaseAssignmentStrategy[T]):
     """Ensures an even distribution of items across groups."""
 
     def assign(self, items: List[T], groups: List[T]) -> Dict[T, T]:

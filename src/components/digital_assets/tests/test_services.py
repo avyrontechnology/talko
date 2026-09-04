@@ -3,21 +3,21 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import HTTPException
 
-from src.components.digital_assets.constants import DigitalAssetEnum
-from src.components.digital_assets.repositories import DigitalAssetRepository
-from src.components.digital_assets.schema import UploadDigitalAssetResponse
-from src.components.digital_assets.services import DigitalAssetService
-from src.components.digital_assets.storage.helper import StorageHelper
+from src.components.digital_assets.constants import TalkoDigitalAssetEnum
+from src.components.digital_assets.repositories import TalkoDigitalAssetRepository
+from src.components.digital_assets.schema import TalkoUploadDigitalAssetResponse
+from src.components.digital_assets.services import TalkoDigitalAssetService
+from src.components.digital_assets.storage.helper import TalkoStorageHelper
 
 
 @pytest.fixture
 def mock_digital_asset_repository():
-    return MagicMock(spec=DigitalAssetRepository)
+    return MagicMock(spec=TalkoDigitalAssetRepository)
 
 
 @pytest.fixture
 def digital_asset_service(mock_digital_asset_repository):
-    return DigitalAssetService(mock_digital_asset_repository)
+    return TalkoDigitalAssetService(mock_digital_asset_repository)
 
 
 @pytest.mark.asyncio
@@ -40,7 +40,7 @@ async def test_get_digital_asset_details_not_found(
 ):
     # Arrange
     partner_id = 1
-    asset_type = DigitalAssetEnum.CONSOLE_PARTNER_GST.name
+    asset_type = TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST.name
     mock_digital_asset_repository.get_digital_asset_by_partner_id = AsyncMock(
         return_value=None
     )
@@ -56,7 +56,7 @@ async def test_create_digital_asset_success(
 ):
     # Arrange
     partner_id = 1
-    asset_type = DigitalAssetEnum.CONSOLE_PARTNER_GST.name
+    asset_type = TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST.name
     user_id = 1
     file = MagicMock()
     file.filename = "image.jpg"
@@ -71,8 +71,8 @@ async def test_create_digital_asset_success(
     )
 
     # Mock upload and presigned URL generation
-    StorageHelper.upload_file = AsyncMock()
-    StorageHelper.get_presigned_url = MagicMock(return_value=uploaded_url)
+    TalkoStorageHelper.upload_file = AsyncMock()
+    TalkoStorageHelper.get_presigned_url = MagicMock(return_value=uploaded_url)
 
     # Act
     result = await digital_asset_service.create_digital_asset(
@@ -80,7 +80,7 @@ async def test_create_digital_asset_success(
     )
 
     # Assert
-    assert isinstance(result, UploadDigitalAssetResponse)
+    assert isinstance(result, TalkoUploadDigitalAssetResponse)
     assert result.url == uploaded_url
     assert result.file_name == "image.jpg"
 
@@ -109,7 +109,7 @@ async def test_create_digital_asset_error(
 ):
     # Arrange
     partner_id = 1
-    asset_type = DigitalAssetEnum.CONSOLE_PARTNER_GST.name
+    asset_type = TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST.name
     user_id = 1
     file = MagicMock()
     mock_digital_asset_repository.create_digital_asset = AsyncMock(
@@ -128,22 +128,22 @@ async def test_create_digital_asset_not_created():
     """Test raising ValueError when the digital asset is not created."""
     # Arrange
     partner_id = 1
-    asset_type = DigitalAssetEnum.CONSOLE_PARTNER_GST.name
+    asset_type = TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST.name
     user_id = 1
     file = MagicMock()
     file.filename = "test_image.jpg"
 
     # Mock repository and helper behavior
-    mock_repository = MagicMock(spec=DigitalAssetRepository)
+    mock_repository = MagicMock(spec=TalkoDigitalAssetRepository)
     mock_repository.create_digital_asset = AsyncMock(
         return_value=None
     )  # Simulate failure
-    StorageHelper.upload_file = AsyncMock()
-    StorageHelper.get_presigned_url = MagicMock(
+    TalkoStorageHelper.upload_file = AsyncMock()
+    TalkoStorageHelper.get_presigned_url = MagicMock(
         return_value="http://example.com/test_image.jpg"
     )
 
-    service = DigitalAssetService(mock_repository)
+    service = TalkoDigitalAssetService(mock_repository)
 
     with pytest.raises(HTTPException) as exc_info:
         await service.create_digital_asset(partner_id, asset_type, file, user_id)
@@ -158,7 +158,7 @@ async def test_get_digital_assets_by_digital_asset_ids_success(digital_asset_ser
     mock_asset1.name = "file1.jpg"
     mock_asset1.partner_id = 1
     mock_asset1.version = 1
-    mock_asset1.asset_type = DigitalAssetEnum.CONSOLE_PARTNER_GST.value  # Use a valid enum value
+    mock_asset1.asset_type = TalkoDigitalAssetEnum.CONSOLE_PARTNER_GST.value  # Use a valid enum value
     mock_asset1.additional_info = {}
     mock_asset1.created_by = 1
     mock_asset1.updated_by = 1
@@ -176,7 +176,7 @@ async def test_get_digital_assets_by_digital_asset_ids_success(digital_asset_ser
     mock_digital_asset_repository.get_digital_assets_by_digital_asset_ids = AsyncMock(
         return_value=[mock_asset1, mock_asset2]
     )
-    StorageHelper.get_presigned_url = MagicMock(side_effect=[
+    TalkoStorageHelper.get_presigned_url = MagicMock(side_effect=[
         "http://example.com/file1.jpg", "http://example.com/file2.jpg"
     ])
 

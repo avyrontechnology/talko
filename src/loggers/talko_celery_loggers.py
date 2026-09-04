@@ -1,7 +1,7 @@
 import logging
 
 
-class CeleryLogger:
+class TalkoCeleryLogger:
     @staticmethod
     def get_logger() -> logging.Logger:
         """

@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from src.components.call_agent_map.validation import AgentMapperValidator
+from src.components.call_agent_map.validation import TalkoAgentMapperValidator
 
 
 @pytest.mark.asyncio
@@ -20,7 +20,7 @@ class TestAgentMapperValidator:
 
     @pytest.fixture
     def validator(self, mock_repository, mock_logger):
-        return AgentMapperValidator(repository=mock_repository, logger=mock_logger)
+        return TalkoAgentMapperValidator(repository=mock_repository, logger=mock_logger)
 
     async def test_validate_agent_not_already_mapped_success(
         self, validator, mock_repository, mock_logger

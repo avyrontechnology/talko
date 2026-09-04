@@ -1,27 +1,27 @@
 import os
 
-from src.grpc_client.client_services.api_key_service_client import ApiKeyServiceClient
-from src.grpc_client.client_services.auth_service_client import AuthServiceClient
-from src.grpc_client.client_services.user_service_client import UserServiceClient
-from src.grpc_client.constants import GrpcServices
-from src.grpc_client.grpc_client import GRPCClient
-from src.loggers.holler_rpc_logger import HollerRPCLogger
+from src.grpc_client.client_services.api_key_service_client import TalkoApiKeyServiceClient
+from src.grpc_client.client_services.auth_service_client import TalkoAuthServiceClient
+from src.grpc_client.client_services.user_service_client import TalkoUserServiceClient
+from src.grpc_client.constants import TalkoGrpcServices
+from src.grpc_client.grpc_client import TalkoGRPCClient
+from src.loggers.talko_rpc_logger import TalkoRPCLogger
 
-logger = HollerRPCLogger.get_logger()
+logger = TalkoRPCLogger.get_logger()
 
 
-class RPCServiceFactory:
+class TalkoRPCServiceFactory:
     """Factory to centralize the creation of service clients."""
 
     @staticmethod
-    def get_service(service_name: str) -> GRPCClient:
+    def get_service(service_name: str) -> TalkoGRPCClient:
 
-        if service_name == GrpcServices.AUTH:
-            return AuthServiceClient()
-        if service_name == GrpcServices.API_KEY:
-            return ApiKeyServiceClient()
-        if service_name == GrpcServices.USER:
-            return UserServiceClient()
+        if service_name == TalkoGrpcServices.AUTH:
+            return TalkoAuthServiceClient()
+        if service_name == TalkoGrpcServices.API_KEY:
+            return TalkoApiKeyServiceClient()
+        if service_name == TalkoGrpcServices.USER:
+            return TalkoUserServiceClient()
 
         # Future services can be added here.
         else:

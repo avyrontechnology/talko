@@ -3,16 +3,16 @@ from typing import Any, Dict, Optional
 from bson import ObjectId
 from pydantic import ConfigDict, Field
 
-from src.utils.timestamped_model import TimestampedModel
+from src.utils.timestamped_model import TalkoTimestampedModel
 
 
-class VendorConfigModel(TimestampedModel):
+class TalkoVendorConfigModel(TalkoTimestampedModel):
     name: str  # Name of the vendor configuration
     vendor_id: ObjectId  # Vendor identifier
     generic_url_handler: Dict[str, Any]  # Config for generic URL handling
     cdr_url_handler: Optional[Dict[str, Any]] = Field(
-        None, description="Config for CDR API endpoint"
-    )  # CDR URL handler config
+        None, description="Config for TalkoCDR API endpoint"
+    )  # TalkoCDR URL handler config
     dialer_url_handler: Optional[Dict[str, Any]] = Field(
         None, description="Config for dialer APIs"
     )

@@ -1,28 +1,28 @@
 import json
 import time
-from src.components.common.responses import InternalServerErrorResponse
-from src.core.container import Container
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.common.responses import TalkoInternalServerErrorResponse
+from src.core.container import TalkoContainer
+from src.loggers.talko_service_logger import TalkoServiceLogger
 from dependency_injector.wiring import Provide, inject
 from fastapi import Depends, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import StreamingResponse
 
 
-class RequestResponseLoggingMiddleware(BaseHTTPMiddleware):
+class TalkoRequestResponseLoggingMiddleware(BaseHTTPMiddleware):
     @inject
     async def dispatch(
         self,
         request: Request,
         call_next,
-        logger: HollerServiceLogger = Provide[Container.logger],
+        logger: TalkoServiceLogger = Provide[TalkoContainer.logger],
     ):
         excluded_paths = ("/docs", "/openapi.json", "/robots.txt")
 
         temp_excluded_paths = (
-            "/holler-service/v1/upload_digital_asset",
-            "/holler-service/v1/update_constant",
-            "/holler-service/v1/reports/daily-lead-connection-csv",
+            "/talko-service/v1/upload_digital_asset",
+            "/talko-service/v1/update_constant",
+            "/talko-service/v1/reports/daily-lead-connection-csv",
             "/reports/daily-lead-connection-csv",
         )
 
@@ -96,4 +96,4 @@ class RequestResponseLoggingMiddleware(BaseHTTPMiddleware):
                     exec
                 )
             )
-            return InternalServerErrorResponse()
+            return TalkoInternalServerErrorResponse()

@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, field_validator
 
 
-class Contract:
+class TalkoContract:
     class CDRCreate(BaseModel):
         action: str
         calling_mode: str
@@ -141,7 +141,7 @@ class Contract:
         created_at: Optional[int] = None
         updated_at: Optional[int] = None
 
-        # Additional fields from CDR
+        # Additional fields from TalkoCDR
         call_id: Optional[str] = None
         call_recording: Optional[str] = None
         disposition: Optional[str] = None
@@ -285,7 +285,7 @@ class Contract:
                 return 0
 
     class AgentCallRecordHistoryResponse(BaseModel):
-        call_record: List["Contract.CallRecordHistoryResponse"] = []
+        call_record: List["TalkoContract.CallRecordHistoryResponse"] = []
         total_count: int
 
         @field_validator("call_record", mode="before")
@@ -296,7 +296,7 @@ class Contract:
             return v
 
     class AgentCallLogResponse(BaseModel):
-        call_histories: List["Contract.CallLogResponse"] = []
+        call_histories: List["TalkoContract.CallLogResponse"] = []
         total_count: int
 
         @field_validator("call_histories", mode="before")

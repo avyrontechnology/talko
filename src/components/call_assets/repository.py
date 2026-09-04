@@ -5,24 +5,24 @@ from pymongo.errors import DuplicateKeyError
 from pymongo.results import InsertOneResult
 
 from src.components.call_assets.messages import DUPLICATE_ASSET_INSERTION
-from src.components.call_assets.models import AssetsModel
-from src.core.doc_db import DocDatabaseSessionManager
-from src.exceptions import DuplicateResourceError
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.call_assets.models import TalkoAssetsModel
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.exceptions import TalkoDuplicateResourceError
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
-class AssetRepository:
+class TalkoAssetRepository:
     def __init__(
-        self, db_manager: DocDatabaseSessionManager, logger: HollerServiceLogger
+        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
     ):
         """
-        Initialize the AssetRepository.
+        Initialize the TalkoAssetRepository.
 
         Args:
             db_manager: MongoDB session manager.
             logger: Logger for capturing logs.
         """
-        self.__db_manager: DocDatabaseSessionManager = db_manager
-        self.__logger: HollerServiceLogger = logger
+        self.__db_manager: TalkoDocDatabaseSessionManager = db_manager
+        self.__logger: TalkoServiceLogger = logger
 
     async def get_digital_asset_by_partner_id(
         self, partner_id: int, asset_type: str
@@ -38,7 +38,7 @@ class AssetRepository:
             asset_type (str): The type of the digital asset (e.g., image, video).
 
         Returns:
-            DigitalAssets: The digital asset object, or None if not found.
+            TalkoDigitalAssets: The digital asset object, or None if not found.
 
         Raises:
             Exception: If an unexpected error occurs during the database operation.
@@ -46,7 +46,7 @@ class AssetRepository:
         try:
             self.__logger.info("Fetching latest digital asset for partner_id={}, asset_type={}".format(partner_id, asset_type))
             async with self.__db_manager.collection(
-                AssetsModel.CollectionName.ASSETS
+                TalkoAssetsModel.CollectionName.ASSETS
             ) as collection:
                 doc = await collection.find_one(
                 {"partner_id": partner_id, "asset_type": asset_type},
@@ -54,7 +54,7 @@ class AssetRepository:
             )
             if doc:
                 self.__logger.info("Found digital asset: {}".format(doc))
-                asset: AssetsModel = AssetsModel(**doc)
+                asset: TalkoAssetsModel = TalkoAssetsModel(**doc)
                 asset_dict: dict = asset.model_dump()
                 asset_dict["id"] = str(doc["_id"])
                 self.__logger.info("Digital Assets Dictionary: {}".format(asset_dict))
@@ -66,19 +66,19 @@ class AssetRepository:
             self.__logger.error("Error fetching digital asset: {}".format(str(e)))
             raise e
 
-    async def get_digital_asset_by_id(self, asset_id: str) -> Optional[AssetsModel]:
+    async def get_digital_asset_by_id(self, asset_id: str) -> Optional[TalkoAssetsModel]:
         """
         Fetch a digital asset by its MongoDB _id.
         """
         try:
             self.__logger.info("Fetching digital asset with _id={}".format(asset_id))
             async with self.__db_manager.collection(
-                AssetsModel.CollectionName.ASSETS
+                TalkoAssetsModel.CollectionName.ASSETS
             ) as collection:
                 doc: Optional[Dict[str, Any]] = await collection.find_one({"_id": asset_id})
             if doc:
                 self.__logger.info("Found digital asset: {}".format(doc))
-                return AssetsModel(**doc)
+                return TalkoAssetsModel(**doc)
             else:
                 self.__logger.info("No digital asset found")
                 return None
@@ -88,7 +88,7 @@ class AssetRepository:
 
     async def create_digital_asset(
         self, partner_id: int, asset_type: str, file_name: str, user_id: int,lead_number: int, call_time:Optional[int] = 0, agent_id: Optional[int] = None, call_id: Optional[str] = None
-    ) -> AssetsModel:
+    ) -> TalkoAssetsModel:
         """
         Create a new digital asset in MongoDB with versioning logic (1→2→3→1).
         """
@@ -96,7 +96,7 @@ class AssetRepository:
             # Fetch latest version
             self.__logger.info("Received request for creating asset for partner_id {}, asset_type {}, filename {}, user_id {}, lead_number {}, call_time {} and agent_id {}".format(partner_id, asset_type, file_name, user_id, lead_number, call_time, agent_id))
             async with self.__db_manager.collection(
-                AssetsModel.CollectionName.ASSETS
+                TalkoAssetsModel.CollectionName.ASSETS
             ) as collection:
                 latest_doc: Optional[Dict[str, Any]] = await collection.find_one(
                 {"partner_id": partner_id, "asset_type": asset_type},
@@ -108,7 +108,7 @@ class AssetRepository:
 
             self.__logger.info("Creating new digital asset with version={}".format(new_version))
 
-            new_asset: AssetsModel = AssetsModel(
+            new_asset: TalkoAssetsModel = TalkoAssetsModel(
                 name=file_name,
                 partner_id=partner_id,
                 asset_type=asset_type,
@@ -123,16 +123,16 @@ class AssetRepository:
                     }
             )
             try:
-                async with self.__db_manager.collection(AssetsModel.CollectionName.ASSETS) as collection:
+                async with self.__db_manager.collection(TalkoAssetsModel.CollectionName.ASSETS) as collection:
                     result: InsertOneResult = await collection.insert_one(new_asset.model_dump())
                     self.__logger.info("Digital asset record created successfully: {} with id {}".format(new_asset, str(result.inserted_id)))
                     return new_asset
             except Exception as e:
-                self.__logger.error("Failed to insert CDR: {}".format(str(e)))
+                self.__logger.error("Failed to insert TalkoCDR: {}".format(str(e)))
                 raise
         except DuplicateKeyError as e:
             self.__logger.error("Duplicate key error: {}".format(str(e)))
-            raise DuplicateResourceError(DUPLICATE_ASSET_INSERTION)
+            raise TalkoDuplicateResourceError(DUPLICATE_ASSET_INSERTION)
         except Exception as e:
             self.__logger.error("Error creating digital asset: {}".format(str(e)))
             raise e

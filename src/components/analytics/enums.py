@@ -2,7 +2,7 @@ from enum import Enum
 
 
 # Enums for analytics types
-class AnalyticsType(str, Enum):
+class TalkoAnalyticsType(str, Enum):
     AGENT_CALL_ANALYTICS = "agent_call_analytics"
     TOTAL_AGENT_TALK_TIME = "total_agent_talk_time"
     AGENT_TALK_TIME_DISTRIBUTION = "agent_talk_time_distribution"
@@ -10,21 +10,21 @@ class AnalyticsType(str, Enum):
     DASHBOARD_CALL_TRENDS = "dashboard_call_trends"
 
 
-class DateRangePeriod(str, Enum):
+class TalkoDateRangePeriod(str, Enum):
     TODAY = "today"
     LAST_WEEK = "last_week"
     THREE_MONTHS = "three_months"
     CUSTOM = "custom"
 
 
-class RoleType(str, Enum):
+class TalkoRoleType(str, Enum):
     ADMIN = "admin"
     MANAGER = "manager"
     TEAM_LEAD = "team_lead"
     AGENT = "agent"
 
 
-class Metric(str, Enum):
+class TalkoMetric(str, Enum):
     """Enum for valid metric names."""
 
     TOTAL_CALLS = "total_calls"
@@ -39,7 +39,7 @@ class Metric(str, Enum):
     TOTAL_UNIQUE_CALLS = "total_unique_calls"
 
 
-class TimeInterval(str, Enum):
+class TalkoTimeInterval(str, Enum):
     DAYS = "DAYS"
     WEEKS = "WEEKS"
     MONTHS = "MONTHS"

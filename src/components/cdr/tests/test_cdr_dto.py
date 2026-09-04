@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from src.components.cdr.dto import Contract
+from src.components.cdr.dto import TalkoContract
 
 
 def test_cdr_create_valid():
@@ -34,7 +34,7 @@ def test_cdr_create_valid():
         "queue": "support_queue",
         "partner_id": 10,
     }
-    cdr = Contract.CDRCreate(**data)
+    cdr = TalkoContract.CDRCreate(**data)
     assert cdr.action == "call"
     assert cdr.calling_mode == "inbound"
     assert cdr.date_time == 1727181060000
@@ -78,7 +78,7 @@ def test_cdr_create_missing_optional_fields():
         "call_uuid": "uuid-123",
         "hangup_by": "agent",
     }
-    cdr = Contract.CDRCreate(**data)
+    cdr = TalkoContract.CDRCreate(**data)
     assert cdr.agent is None
     assert cdr.call_recording is None
     assert cdr.disposition is None
@@ -110,7 +110,7 @@ def test_cdr_create_invalid_types():
         "hangup_by": "agent",
     }
     with pytest.raises(ValidationError) as exc_info:
-        Contract.CDRCreate(**invalid_data)
+        TalkoContract.CDRCreate(**invalid_data)
     exc_info.value.errors()
 
 
@@ -193,7 +193,7 @@ def test_cdr_response_valid():
         "customer_ring_time": "5",
         "reason_key": "BUSY",
     }
-    cdr = Contract.CDRResponse(**data)
+    cdr = TalkoContract.CDRResponse(**data)
     assert cdr.id == "12345"
     assert cdr.customer == 9999999999
     assert cdr.total_call_duration == 120
@@ -219,7 +219,7 @@ def test_cdr_response_handle_int_fields():
         "call_uuid": "uuid-123",
         "hangup_by": "agent",
     }
-    Contract.CDRResponse(**data)
+    TalkoContract.CDRResponse(**data)
 
 
 def test_call_log_response_handle_int_fields():
@@ -242,7 +242,7 @@ def test_call_log_response_handle_int_fields():
         "end_stamp": "null",  # Should be None
         "answer_stamp": "invalid",  # Should be None
     }
-    call_log = Contract.CallLogResponse(**data)
+    call_log = TalkoContract.CallLogResponse(**data)
     assert call_log.total_call_duration == 0
     assert call_log.talk_time == 0
     assert call_log.start_stamp is None
@@ -268,7 +268,7 @@ def test_call_log_response_customer_int():
         "call_uuid": "uuid-123",
         "hangup_by": "agent",
     }
-    call_log = Contract.CallLogResponse(**data)
+    call_log = TalkoContract.CallLogResponse(**data)
     assert call_log.customer == 9999999999
 
 
@@ -299,7 +299,7 @@ def test_call_record_history_response_valid():
         "lead_name": "John Doe",
         "call_type": "incoming",
     }
-    call_record = Contract.CallRecordHistoryResponse(**data)
+    call_record = TalkoContract.CallRecordHistoryResponse(**data)
     assert call_record.partner_id == 10
     assert call_record.lead_number == "9999999999"
     assert call_record.total_call_duration == 120
@@ -317,7 +317,7 @@ def test_call_record_history_response_handle_int_fields():
         "total_call_duration": "invalid",  # Should be converted to 0
         "talk_time": None,  # Should be converted to 0
     }
-    call_record = Contract.CallRecordHistoryResponse(**data)
+    call_record = TalkoContract.CallRecordHistoryResponse(**data)
     assert call_record.total_call_duration == 0
     assert call_record.talk_time == 0
 
@@ -331,13 +331,13 @@ def test_call_record_history_response_lead_number_int():
         "hangup_by": "agent",
         "lead_number": 9999999999,  # Integer
     }
-    call_record = Contract.CallRecordHistoryResponse(**data)
+    call_record = TalkoContract.CallRecordHistoryResponse(**data)
     assert call_record.lead_number == 9999999999
 
 
 def test_agent_call_record_history_response_valid():
     """Test AgentCallRecordHistoryResponse with valid data."""
-    call_record = Contract.CallRecordHistoryResponse(
+    call_record = TalkoContract.CallRecordHistoryResponse(
         partner_id=10,
         calling_mode="inbound",
         call_status="answered",
@@ -347,7 +347,7 @@ def test_agent_call_record_history_response_valid():
         "call_record": [call_record],
         "total_count": 1,
     }
-    response = Contract.AgentCallRecordHistoryResponse(**data)
+    response = TalkoContract.AgentCallRecordHistoryResponse(**data)
     assert response.call_record == [call_record]
     assert response.total_count == 1
 
@@ -358,14 +358,14 @@ def test_agent_call_record_history_response_empty_call_record():
         "call_record": None,  # Should be converted to []
         "total_count": 0,
     }
-    response = Contract.AgentCallRecordHistoryResponse(**data)
+    response = TalkoContract.AgentCallRecordHistoryResponse(**data)
     assert response.call_record == []
     assert response.total_count == 0
 
 
 def test_agent_call_log_response_valid():
     """Test AgentCallLogResponse with valid data."""
-    call_log = Contract.CallLogResponse(
+    call_log = TalkoContract.CallLogResponse(
         id="12345",
         action="call",
         calling_mode="inbound",
@@ -382,7 +382,7 @@ def test_agent_call_log_response_valid():
         "call_histories": [call_log],
         "total_count": 1,
     }
-    response = Contract.AgentCallLogResponse(**data)
+    response = TalkoContract.AgentCallLogResponse(**data)
     assert response.call_histories == [call_log]
     assert response.total_count == 1
 
@@ -393,7 +393,7 @@ def test_agent_call_log_response_empty_call_histories():
         "call_histories": None,  # Should be converted to []
         "total_count": 0,
     }
-    response = Contract.AgentCallLogResponse(**data)
+    response = TalkoContract.AgentCallLogResponse(**data)
     assert response.call_histories == []
     assert response.total_count == 0
 
@@ -411,7 +411,7 @@ def test_call_record_history_payload_valid():
         "call_type": "incoming",
         "did_number": "8888888888",
     }
-    payload = Contract.CallRecordHistoryPayload(**data)
+    payload = TalkoContract.CallRecordHistoryPayload(**data)
     assert payload.lead_id == 123
     assert payload.time_range == "1727181060-1727184660"
     assert payload.call_status == ["answered", "missed"]
@@ -421,7 +421,7 @@ def test_call_record_history_payload_valid():
 def test_call_record_history_payload_missing_optional_fields():
     """Test CallRecordHistoryPayload with missing optional fields."""
     data = {}
-    payload = Contract.CallRecordHistoryPayload(**data)
+    payload = TalkoContract.CallRecordHistoryPayload(**data)
     assert payload.lead_id is None
     assert payload.service_board_id is None
     assert payload.time_range is None
@@ -441,7 +441,7 @@ def test_call_record_history_payload_invalid_call_status():
     with pytest.raises(
         ValidationError, match=r"Invalid call_status values: \['invalid'\]"
     ):
-        Contract.CallRecordHistoryPayload(**data)
+        TalkoContract.CallRecordHistoryPayload(**data)
 
 
 def test_call_record_history_payload_invalid_call_type():
@@ -450,7 +450,7 @@ def test_call_record_history_payload_invalid_call_type():
         "call_type": "invalid",
     }
     with pytest.raises(ValidationError, match=r"Invalid call_type: invalid"):
-        Contract.CallRecordHistoryPayload(**data)
+        TalkoContract.CallRecordHistoryPayload(**data)
 
 
 def test_call_record_history_payload_invalid_time_range_format():
@@ -462,7 +462,7 @@ def test_call_record_history_payload_invalid_time_range_format():
         ValidationError,
         match=r"time_range must be in format 'start_time-end_time' with valid integers",
     ):
-        Contract.CallRecordHistoryPayload(**data)
+        TalkoContract.CallRecordHistoryPayload(**data)
 
 
 def test_call_record_history_payload_invalid_time_range_values():
@@ -474,7 +474,7 @@ def test_call_record_history_payload_invalid_time_range_values():
         ValidationError,
         match=r"time_range must be in format 'start_time-end_time' with valid integers",
     ):
-        Contract.CallRecordHistoryPayload(**data)
+        TalkoContract.CallRecordHistoryPayload(**data)
 
 
 def test_call_record_history_payload_time_range_start_greater_than_end():
@@ -486,4 +486,4 @@ def test_call_record_history_payload_time_range_start_greater_than_end():
         ValidationError,
         match=r"time_range must be in format 'start_time-end_time' with valid integers",
     ):
-        Contract.CallRecordHistoryPayload(**data)
+        TalkoContract.CallRecordHistoryPayload(**data)

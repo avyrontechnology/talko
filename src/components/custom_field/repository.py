@@ -3,19 +3,19 @@ from typing import Any, Dict, List, Optional
 from bson import ObjectId
 
 from src.components.custom_field.constants import SET
-from src.components.custom_field.models import CustomFieldDefinition
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.custom_field.models import TalkoCustomFieldDefinition
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class CustomFieldRepository:
+class TalkoCustomFieldRepository:
     """
     Repository class for handling all database operations related to
     custom field definitions.
     """
 
     def __init__(
-        self, db_manager: DocDatabaseSessionManager, logger: HollerServiceLogger
+        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
     ):
         self.__db_manager = db_manager
         self.__logger = logger
@@ -23,7 +23,7 @@ class CustomFieldRepository:
     async def insert_custom_field(self, field_dict: dict) -> str:
         try:
             async with self.__db_manager.collection(
-                CustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
+                TalkoCustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
             ) as collection:
                 result: Any = await collection.insert_one(field_dict)
                 self.__logger.info(
@@ -43,7 +43,7 @@ class CustomFieldRepository:
     ) -> Optional[Dict[str, Any]]:
         try:
             async with self.__db_manager.collection(
-                CustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
+                TalkoCustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
             ) as collection:
                 return await collection.find_one(
                     {
@@ -61,7 +61,7 @@ class CustomFieldRepository:
     async def find_by_id(self, field_id: ObjectId) -> Optional[Dict[str, Any]]:
         try:
             async with self.__db_manager.collection(
-                CustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
+                TalkoCustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
             ) as collection:
                 return await collection.find_one({"_id": field_id})
         except Exception as e:
@@ -85,7 +85,7 @@ class CustomFieldRepository:
                 query["is_active"] = True
 
             async with self.__db_manager.collection(
-                CustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
+                TalkoCustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
             ) as collection:
                 cursor = collection.find(query).sort("sequence", 1)
                 return await cursor.to_list(None)
@@ -102,7 +102,7 @@ class CustomFieldRepository:
     ) -> Optional[Dict[str, Any]]:
         try:
             async with self.__db_manager.collection(
-                CustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
+                TalkoCustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
             ) as collection:
                 return await collection.find_one_and_update(
                     {"_id": field_id}, {SET: update_dict}, return_document=True

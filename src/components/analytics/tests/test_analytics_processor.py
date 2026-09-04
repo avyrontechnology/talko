@@ -2,16 +2,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.components.analytics.base import AnalyticsBase
+from src.components.analytics.base import TalkoAnalyticsBase
 from src.components.analytics.dto import (
-    AgentCallAnalyticsRequest,
-    AgentTalkTimeDistributionRequest,
-    DashboardFollowupTrendsRequest,
-    PartnerServiceBoardRequest,
-    TotalAgentTalkTimeRequest,
+    TalkoAgentCallAnalyticsRequest,
+    TalkoAgentTalkTimeDistributionRequest,
+    TalkoDashboardFollowupTrendsRequest,
+    TalkoPartnerServiceBoardRequest,
+    TalkoTotalAgentTalkTimeRequest,
 )
-from src.components.analytics.processor import AnalyticsProcessor
-from src.exceptions import PayloadValidationError
+from src.components.analytics.processor import TalkoAnalyticsProcessor
+from src.exceptions import TalkoPayloadValidationError
 
 
 @pytest.mark.asyncio
@@ -22,7 +22,7 @@ class TestAnalyticsProcessor:
         mock_logger = MagicMock()
         mock_grpc_client = AsyncMock()
         mock_user_hierarchy = AsyncMock()
-        processor = AnalyticsProcessor(
+        processor = TalkoAnalyticsProcessor(
             analytics_repository=mock_repo,
             logger=mock_logger,
             grpc_client=mock_grpc_client,
@@ -36,7 +36,7 @@ class TestAnalyticsProcessor:
     async def test_get_agent_call_analytics_success(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = AgentCallAnalyticsRequest(
+        request = TalkoAgentCallAnalyticsRequest(
             time_range="1735689600000-1738272000000",  # 2025-01-01 to 2025-01-31
             agents=[1, 2],
             service_board_id=[1, 3],
@@ -71,7 +71,7 @@ class TestAnalyticsProcessor:
     async def test_get_agent_call_analytics_failure(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = AgentCallAnalyticsRequest(
+        request = TalkoAgentCallAnalyticsRequest(
             time_range="1735689600000-1738272000000",
             agents=[3],
         )
@@ -95,7 +95,7 @@ class TestAnalyticsProcessor:
     async def test_get_total_agent_talk_time_success(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = TotalAgentTalkTimeRequest(
+        request = TalkoTotalAgentTalkTimeRequest(
             time_range="1738368000000-1740787200000",  # 2025-02-01 to 2025-02-28
             agents=[5, 6],
         )
@@ -126,7 +126,7 @@ class TestAnalyticsProcessor:
     async def test_get_agent_talk_time_distribution_success(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = AgentTalkTimeDistributionRequest(
+        request = TalkoAgentTalkTimeDistributionRequest(
             time_range="1740787200000-1743379200000",  # 2025-03-01 to 2025-03-31
             agents=[7],
         )
@@ -157,7 +157,7 @@ class TestAnalyticsProcessor:
     async def test_get_partner_service_board_success(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = PartnerServiceBoardRequest(
+        request = TalkoPartnerServiceBoardRequest(
             time_range="1743465600000-1746057600000",  # 2025-04-01 to 2025-04-30
         )
 
@@ -185,7 +185,7 @@ class TestAnalyticsProcessor:
     async def test_get_total_agent_talk_time_failure(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = TotalAgentTalkTimeRequest(
+        request = TalkoTotalAgentTalkTimeRequest(
             time_range="1738368000000-1740787200000",
             agents=[9],
         )
@@ -211,7 +211,7 @@ class TestAnalyticsProcessor:
     async def test_get_agent_talk_time_distribution_failure(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = AgentTalkTimeDistributionRequest(
+        request = TalkoAgentTalkTimeDistributionRequest(
             time_range="1740787200000-1743379200000",
             agents=[10],
         )
@@ -237,7 +237,7 @@ class TestAnalyticsProcessor:
     async def test_get_partner_service_board_failure(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = PartnerServiceBoardRequest(
+        request = TalkoPartnerServiceBoardRequest(
             time_range="1743465600000-1746057600000",
         )
 
@@ -262,7 +262,7 @@ class TestAnalyticsProcessor:
     async def test_get_dashboard_call_trends_success(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = DashboardFollowupTrendsRequest(
+        request = TalkoDashboardFollowupTrendsRequest(
             time_range="1722470400000-1726444800000",  # 2025-08-01 to 2025-09-15
             service_board_id=[40, 41],
             metric_filter="agent_missed_calls",
@@ -308,7 +308,7 @@ class TestAnalyticsProcessor:
     async def test_get_dashboard_call_trends_failure(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = DashboardFollowupTrendsRequest(
+        request = TalkoDashboardFollowupTrendsRequest(
             time_range="1722470400000-1726444800000",
             service_board_id=[40],
             metric_filter="agent_missed_calls",
@@ -347,7 +347,7 @@ class TestAnalyticsProcessor:
     async def test_parse_time_range_invalid_format(self, setup_processor):
         processor, _, mock_logger, _, _ = setup_processor
 
-        request = AgentCallAnalyticsRequest(
+        request = TalkoAgentCallAnalyticsRequest(
             time_range="invalid_time_range",  # Malformed time_range
             agents=[1, 2],
             service_board_id=[1, 3],

@@ -4,15 +4,15 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from src.components.vendor.models import VendorModel
-from src.components.vendor_config.models import VendorConfigModel
-from src.components.vendor_config.repository import VendorConfigRepository
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.vendor.models import TalkoVendorModel
+from src.components.vendor_config.models import TalkoVendorConfigModel
+from src.components.vendor_config.repository import TalkoVendorConfigRepository
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 # Helper class to simulate an async iterator for MongoDB cursor
-class AsyncIterator:
+class TalkoAsyncIterator:
     def __init__(self, items):
         self.items = items
         self.index = 0
@@ -32,15 +32,15 @@ class AsyncIterator:
 class TestVendorConfigRepository:
     @pytest.fixture
     def mock_db_manager(self):
-        return MagicMock(spec=DocDatabaseSessionManager)
+        return MagicMock(spec=TalkoDocDatabaseSessionManager)
 
     @pytest.fixture
     def mock_logger(self):
-        return MagicMock(spec=HollerServiceLogger)
+        return MagicMock(spec=TalkoServiceLogger)
 
     @pytest.fixture
     def repository(self, mock_db_manager, mock_logger):
-        return VendorConfigRepository(mock_db_manager, mock_logger)
+        return TalkoVendorConfigRepository(mock_db_manager, mock_logger)
 
     async def test_insert_vendor_config_success(
         self, repository, mock_db_manager, mock_logger
@@ -153,7 +153,7 @@ class TestVendorConfigRepository:
             },
         ]
         mock_collection.aggregate = MagicMock(
-            return_value=AsyncIterator(mock_configs)
+            return_value=TalkoAsyncIterator(mock_configs)
         )  # Use MagicMock instead of AsyncMock
         mock_db_manager.collection.return_value.__aenter__.return_value = (
             mock_collection
@@ -180,7 +180,7 @@ class TestVendorConfigRepository:
             }
         ]
         mock_collection.aggregate = MagicMock(
-            return_value=AsyncIterator(mock_configs)
+            return_value=TalkoAsyncIterator(mock_configs)
         )  # Use MagicMock instead of AsyncMock
         mock_db_manager.collection.return_value.__aenter__.return_value = (
             mock_collection
@@ -210,7 +210,7 @@ class TestVendorConfigRepository:
             "created_at": "2023-01-01",
             "updated_at": "2023-01-02",
         }
-        mock_collection.aggregate = MagicMock(return_value=AsyncIterator([mock_config]))
+        mock_collection.aggregate = MagicMock(return_value=TalkoAsyncIterator([mock_config]))
         mock_db_manager.collection.return_value.__aenter__.return_value = (
             mock_collection
         )
@@ -230,7 +230,7 @@ class TestVendorConfigRepository:
         config_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.aggregate = MagicMock(
-            return_value=AsyncIterator([])
+            return_value=TalkoAsyncIterator([])
         )  # Use MagicMock instead of AsyncMock
         mock_db_manager.collection.return_value.__aenter__.return_value = (
             mock_collection
@@ -515,7 +515,7 @@ class TestVendorConfigRepository:
                 "assigned_did": ["did2"],
             }
         ]
-        mock_collection.aggregate = MagicMock(return_value=AsyncIterator(mock_configs))
+        mock_collection.aggregate = MagicMock(return_value=TalkoAsyncIterator(mock_configs))
         mock_db_manager.collection.return_value.__aenter__.return_value = (
             mock_collection
         )
@@ -724,7 +724,7 @@ class TestVendorConfigRepository:
                 "vendor_type": vendor_type,
             },
         ]
-        mock_collection.aggregate = MagicMock(return_value=AsyncIterator(mock_configs))
+        mock_collection.aggregate = MagicMock(return_value=TalkoAsyncIterator(mock_configs))
         mock_db_manager.collection.return_value.__aenter__.return_value = (
             mock_collection
         )

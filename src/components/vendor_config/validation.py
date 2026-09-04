@@ -1,13 +1,13 @@
 from bson import ObjectId
 
-from src.components.vendor.repository import VendorRepository
-from src.components.vendor_config.dto import Contract
-from src.components.vendor_config.repository import VendorConfigRepository
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.vendor.repository import TalkoVendorRepository
+from src.components.vendor_config.dto import TalkoContract
+from src.components.vendor_config.repository import TalkoVendorConfigRepository
+from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.common_validation import validate_required_fields
 
 
-class VendorConfigValidator:
+class TalkoVendorConfigValidator:
     """
     Validator class for vendor configuration operations.
 
@@ -17,9 +17,9 @@ class VendorConfigValidator:
 
     def __init__(
         self,
-        repository: VendorRepository,
-        logger: HollerServiceLogger,
-        vendor_config_repository: VendorConfigRepository,
+        repository: TalkoVendorRepository,
+        logger: TalkoServiceLogger,
+        vendor_config_repository: TalkoVendorConfigRepository,
     ):
         """
         Initialize the validator with repositories and logger.
@@ -32,7 +32,7 @@ class VendorConfigValidator:
         self.__logger = logger
         self.__vendor_config_repository = vendor_config_repository
 
-    def validate_vendor_config_create(self, config: Contract.VendorConfigCreate):
+    def validate_vendor_config_create(self, config: TalkoContract.VendorConfigCreate):
         """
         Validate required fields for creating a vendor config.
 

@@ -10,27 +10,27 @@ context_request_id_var = ContextVar("request_id", default=str(uuid.uuid4().hex).
 
 
 @dataclass
-class RequestAuthContext:
+class TalkoRequestAuthContext:
     header_name: str
     header_value: str
 
 
-_request_auth: ContextVar[RequestAuthContext | None] = ContextVar(
+_request_auth: ContextVar[TalkoRequestAuthContext | None] = ContextVar(
     "request_auth", default=None
 )
 
 
 def set_request_auth(header_name: str, header_value: str) -> None:
     _request_auth.set(
-        RequestAuthContext(header_name=header_name, header_value=header_value)
+        TalkoRequestAuthContext(header_name=header_name, header_value=header_value)
     )
 
 
-def get_request_auth() -> RequestAuthContext | None:
+def get_request_auth() -> TalkoRequestAuthContext | None:
     return _request_auth.get()
 
 
-class ContextMiddleware(BaseContextMiddleware):
+class TalkoContextMiddleware(BaseContextMiddleware):
     def __init__(self, app, propagate_request_id=True) -> None:
         super().__init__(app, plugins=(plugins.request_id.RequestIdPlugin(),))
         self.propagate_request_id = propagate_request_id

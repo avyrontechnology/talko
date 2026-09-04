@@ -1,4 +1,4 @@
-class ENV:
+class TalkoENV:
     PROD: str = "prod"
     STAGING: str = "staging"
     DEV: str = "dev"
@@ -7,7 +7,7 @@ class ENV:
     INT: str = "int"
 
 
-class GrpcServices:
+class TalkoGrpcServices:
     AUTH: str = "auth"
     PARTNER: str = "partner"
     USER: str = "user"

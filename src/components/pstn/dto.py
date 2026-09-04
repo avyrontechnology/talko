@@ -3,18 +3,18 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
-from src.components.pstn.constants import CallDirection, PSTNProvider
+from src.components.pstn.constants import TalkoCallDirection, TalkoPSTNProvider
 
 
 @dataclass
-class CallContext:
+class TalkoCallContext:
     """Normalized call metadata passed between service layers during a live call."""
 
-    provider: PSTNProvider
+    provider: TalkoPSTNProvider
     call_sid: str
     did_number: str
     caller_number: str
-    direction: CallDirection
+    direction: TalkoCallDirection
     stream_sid: str = ""
     context_data: Optional[Dict[str, Any]] = None
     pending_context_found: bool = False
@@ -34,7 +34,7 @@ class CallContext:
 # API Request / Response Schemas
 
 
-class CreatePSTNAgentConfigRequest(BaseModel):
+class TalkoCreatePSTNAgentConfigRequest(BaseModel):
     did_number: str
     makunai_agent_id: int
     partner_id: int
@@ -45,7 +45,7 @@ class CreatePSTNAgentConfigRequest(BaseModel):
     welcome_message: Optional[str] = None
 
 
-class PSTNAgentConfigResponse(BaseModel):
+class TalkoPSTNAgentConfigResponse(BaseModel):
     id: str
     did_number: str
     makunai_agent_id: int
@@ -56,7 +56,7 @@ class PSTNAgentConfigResponse(BaseModel):
     welcome_message: Optional[str] = None
 
 
-class CallContextResponse(BaseModel):
+class TalkoCallContextResponse(BaseModel):
     """For logging/debugging active calls via admin API."""
 
     call_sid: str

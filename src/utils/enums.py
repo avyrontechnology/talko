@@ -4,26 +4,26 @@ from typing import Optional
 from src.utils.auto_format import normalize_auto_format
 
 
-class VendorType(str, Enum):
+class TalkoVendorType(str, Enum):
     AIRTEL = "airtel"
     TATA_TELE = "tata_tele"
     KNOWLARITY = "knowlarity"
     ACEFHONE = "acefhone"
 
 
-class NumberType(str, Enum):
+class TalkoNumberType(str, Enum):
     PRIMARY_NUMBER = "primary"
     WHATSAPP_NUMBER = "whatsapp"
     ADDITIONAL_NUMBER = "alternate"
 
 
-class TimeFilter(str, Enum):
+class TalkoTimeFilter(str, Enum):
     TODAY = "Today"
     LAST_WEEK = "Last week"
     LAST_MONTH = "Last month"
 
 
-class CallStatus(str, Enum):
+class TalkoCallStatus(str, Enum):
     UNKNOWN = "Unknown Status"
     CANCELED = "Cancelled"
     NOANSWER = "No Answer"
@@ -32,21 +32,21 @@ class CallStatus(str, Enum):
     BUSY = "Busy"
 
 
-class HangupCause(str, Enum):
+class TalkoHangupCause(str, Enum):
     UNKNOWN = "Unknown Status"
-    CANCELED = CallStatus.CANCELED.value
+    CANCELED = TalkoCallStatus.CANCELED.value
     CHANUNAVAIL = "Channel Unavailable"
-    DISCONNECTED_BY_CALLEE = CallStatus.DISCONNECTED_BY_CALLEE.value
-    DISCONNECTED_BY_CALLER = CallStatus.DISCONNECTED_BY_CALLER.value
-    NOANSWER = CallStatus.NOANSWER.value
-    BUSY = CallStatus.BUSY.value
+    DISCONNECTED_BY_CALLEE = TalkoCallStatus.DISCONNECTED_BY_CALLEE.value
+    DISCONNECTED_BY_CALLER = TalkoCallStatus.DISCONNECTED_BY_CALLER.value
+    NOANSWER = TalkoCallStatus.NOANSWER.value
+    BUSY = TalkoCallStatus.BUSY.value
     CONGESTION = "Congestion"
     FAILED = "Failed"
     FACILITY_REJECTED = "Facility rejected"
     NORMAL_CLEARING = "Normal clearing"
 
     @classmethod
-    def from_raw(cls, value: Optional[str]) -> "HangupCause":
+    def from_raw(cls, value: Optional[str]) -> "TalkoHangupCause":
         mapping = {
             None: cls.UNKNOWN,
             "cancel": cls.CANCELED,
@@ -75,20 +75,20 @@ class HangupCause(str, Enum):
         return cls.UNKNOWN  # Fallback to UNKNOWN if no match
 
 
-class ReasonKey(str, Enum):
-    UNKNOWN = CallStatus.UNKNOWN.value
+class TalkoReasonKey(str, Enum):
+    UNKNOWN = TalkoCallStatus.UNKNOWN.value
     DISCONNECTED_BY_CALLEE = "Call Disconnected By Callee"
     DISCONNECTED_BY_CALLER = "Call Disconnected By Caller"
     DROPPED = "Calls Dropped"
-    CANCELED = CallStatus.CANCELED.value
+    CANCELED = TalkoCallStatus.CANCELED.value
     INITIATED = "Initiated"
-    NOANSWER = CallStatus.NOANSWER.value
+    NOANSWER = TalkoCallStatus.NOANSWER.value
     CONGESTION_IN_NETWORK = "Congestion in network"
-    BUSY = CallStatus.BUSY.value
+    BUSY = TalkoCallStatus.BUSY.value
     HANDLE_NONE = ""
 
     @classmethod
-    def from_raw(cls, value: Optional[str]) -> "ReasonKey":
+    def from_raw(cls, value: Optional[str]) -> "TalkoReasonKey":
         mapping = {
             None: cls.HANDLE_NONE,
             "": cls.HANDLE_NONE,  # Handle empty string
@@ -114,12 +114,12 @@ class ReasonKey(str, Enum):
         return cls.UNKNOWN  # Fallback to UNKNOWN if no match
 
 
-class RingType(str, Enum):
+class TalkoRingType(str, Enum):
     ORDER_BY = "order_by"
     SIMULTANEOUS = "simultaneous"
 
 
-class UserRoleHierarchy(int, Enum):
+class TalkoUserRoleHierarchy(int, Enum):
     ADMIN = 1
     MAINTAINER = 3
     MANAGER = 4
@@ -127,6 +127,6 @@ class UserRoleHierarchy(int, Enum):
     AGENT = 8
 
 
-class ConnectionStatus(Enum):
+class TalkoConnectionStatus(Enum):
     NOT_CONNECTED = "not connected"
     CONNECTED = "connected"

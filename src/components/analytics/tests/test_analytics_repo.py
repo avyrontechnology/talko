@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.components.analytics import constants as analytics_constants
-from src.components.analytics.builder import QueryBuilder
-from src.components.analytics.enums import DateRangePeriod, TimeInterval
-from src.components.analytics.repositories import AnalyticsRepository
+from src.components.analytics.builder import TalkoQueryBuilder
+from src.components.analytics.enums import TalkoDateRangePeriod, TalkoTimeInterval
+from src.components.analytics.repositories import TalkoAnalyticsRepository
 
 
 class TestAnalyticsRepository:
@@ -19,14 +19,14 @@ class TestAnalyticsRepository:
             self.mock_collection
         )
 
-        self.repo = AnalyticsRepository(
+        self.repo = TalkoAnalyticsRepository(
             db_manager=self.mock_db_manager,
             logger=self.mock_logger,
             analytics_query_builder=self.mock_query_builder,
         )
 
     @pytest.mark.asyncio
-    @patch("src.components.analytics.repositories.DateRangeHelper.adjust_date_range")
+    @patch("src.components.analytics.repositories.TalkoDateRangeHelper.adjust_date_range")
     async def test_get_agent_call_analytics_success(self, mock_adjust):
         """Test successful retrieval of agent call analytics."""
         fake_result = [
@@ -47,7 +47,7 @@ class TestAnalyticsRepository:
         self.mock_collection.aggregate.return_value.to_list = AsyncMock(
             side_effect=[fake_count_result, fake_result]
         )
-        mock_adjust.return_value = (1000, 2000, DateRangePeriod.CUSTOM.value)
+        mock_adjust.return_value = (1000, 2000, TalkoDateRangePeriod.CUSTOM.value)
         self.mock_query_builder.build_query.return_value = {
             analytics_constants.PARTNER_ID: 42,
             "date_time": {
@@ -77,12 +77,12 @@ class TestAnalyticsRepository:
         self.mock_collection.aggregate.assert_called()
         self.mock_logger.debug.assert_any_call(
             f"Retrieving agent call analytics for partner_id: 42, "
-            f"start_date: 1000, end_date: 2000, period: {DateRangePeriod.CUSTOM.value}, "
+            f"start_date: 1000, end_date: 2000, period: {TalkoDateRangePeriod.CUSTOM.value}, "
             f"limit: 10, offset: 1"
         )
 
     @pytest.mark.asyncio
-    @patch("src.components.analytics.repositories.DateRangeHelper.adjust_date_range")
+    @patch("src.components.analytics.repositories.TalkoDateRangeHelper.adjust_date_range")
     async def test_get_total_agent_talk_time_success(self, mock_adjust):
         """Test successful retrieval of total agent talk time."""
         fake_result = [
@@ -97,7 +97,7 @@ class TestAnalyticsRepository:
         self.mock_collection.aggregate.return_value.to_list = AsyncMock(
             side_effect=[fake_count_result, fake_result]
         )
-        mock_adjust.return_value = (1000, 2000, DateRangePeriod.CUSTOM.value)
+        mock_adjust.return_value = (1000, 2000, TalkoDateRangePeriod.CUSTOM.value)
         self.mock_query_builder.build_query.return_value = {
             analytics_constants.PARTNER_ID: 42,
             "date_time": {
@@ -127,12 +127,12 @@ class TestAnalyticsRepository:
         self.mock_collection.aggregate.assert_called()
         self.mock_logger.debug.assert_any_call(
             f"Retrieving total agent talk time for partner_id: 42, "
-            f"start_date: 1000, end_date: 2000, period: {DateRangePeriod.CUSTOM.value}, "
+            f"start_date: 1000, end_date: 2000, period: {TalkoDateRangePeriod.CUSTOM.value}, "
             f"limit: 10, offset: 1"
         )
 
     @pytest.mark.asyncio
-    @patch("src.components.analytics.repositories.DateRangeHelper.adjust_date_range")
+    @patch("src.components.analytics.repositories.TalkoDateRangeHelper.adjust_date_range")
     async def test_get_agent_talk_time_distribution_success(self, mock_adjust):
         """Test successful retrieval of agent talk time distribution."""
         fake_result = [
@@ -146,7 +146,7 @@ class TestAnalyticsRepository:
         self.mock_collection.aggregate.return_value.to_list = AsyncMock(
             side_effect=[fake_count_result, fake_result]
         )
-        mock_adjust.return_value = (1000, 2000, DateRangePeriod.CUSTOM.value)
+        mock_adjust.return_value = (1000, 2000, TalkoDateRangePeriod.CUSTOM.value)
         self.mock_query_builder.build_query.return_value = {
             analytics_constants.PARTNER_ID: 42,
             "date_time": {
@@ -176,12 +176,12 @@ class TestAnalyticsRepository:
         self.mock_collection.aggregate.assert_called()
         self.mock_logger.debug.assert_any_call(
             f"Retrieving agent talk time distribution for partner_id: 42, "
-            f"start_date: 1000, end_date: 2000, period: {DateRangePeriod.CUSTOM.value}, "
+            f"start_date: 1000, end_date: 2000, period: {TalkoDateRangePeriod.CUSTOM.value}, "
             f"limit: 10, offset: 1"
         )
 
     @pytest.mark.asyncio
-    @patch("src.components.analytics.repositories.DateRangeHelper.adjust_date_range")
+    @patch("src.components.analytics.repositories.TalkoDateRangeHelper.adjust_date_range")
     async def test_get_partner_service_board_success(self, mock_adjust):
         """Test successful retrieval of partner service board analytics."""
         fake_result = [
@@ -197,7 +197,7 @@ class TestAnalyticsRepository:
         self.mock_collection.aggregate.return_value.to_list = AsyncMock(
             return_value=fake_result
         )
-        mock_adjust.return_value = (1000, 2000, DateRangePeriod.CUSTOM.value)
+        mock_adjust.return_value = (1000, 2000, TalkoDateRangePeriod.CUSTOM.value)
         self.mock_query_builder.build_query.return_value = {
             analytics_constants.PARTNER_ID: 42,
             "date_time": {
@@ -221,7 +221,7 @@ class TestAnalyticsRepository:
         self.mock_collection.aggregate.assert_called()
         self.mock_logger.debug.assert_any_call(
             f"Retrieving partner service board analytics for partner_id: 42, "
-            f"start_date: 1000, end_date: 2000, period: {DateRangePeriod.CUSTOM.value}, "
+            f"start_date: 1000, end_date: 2000, period: {TalkoDateRangePeriod.CUSTOM.value}, "
             f"service_board_id: [99]"
         )
 
@@ -262,7 +262,7 @@ class TestAnalyticsRepository:
         mock_helper._calculate_total_count = MagicMock(return_value=fake_total_count)
 
         # Inject mock helper into repo
-        self.repo._AnalyticsRepository__call_trends_helper = mock_helper
+        self.repo._TalkoAnalyticsRepository__call_trends_helper = mock_helper
 
         # Mock DB collection
         self.mock_collection.find.return_value.to_list = AsyncMock(

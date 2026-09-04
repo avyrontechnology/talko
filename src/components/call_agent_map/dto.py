@@ -3,7 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
-class Contract:
+class TalkoContract:
     class AgentDidMappingCreate(BaseModel):
         agent_id: int
         partner_id: int

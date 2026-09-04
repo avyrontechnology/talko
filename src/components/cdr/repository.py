@@ -2,14 +2,14 @@ import re
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from src.components.cdr.constants import AGENT_STATUS_EXPR, LEAD_STATUS_EXPR
-from src.components.cdr.models import CDR
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.cdr.models import TalkoCDR
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class CDRRepository:
+class TalkoCDRRepository:
     def __init__(
-        self, db_manager: DocDatabaseSessionManager, logger: HollerServiceLogger
+        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
     ):
         self.__db_manager = db_manager
         self.__logger = logger
@@ -17,15 +17,15 @@ class CDRRepository:
     async def insert_cdr(self, cdr_dict: dict) -> str:
         try:
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 result: Any = await collection.insert_one(cdr_dict)
                 self.__logger.info(
-                    "Inserted CDR with ID: {}".format(result.inserted_id)
+                    "Inserted TalkoCDR with ID: {}".format(result.inserted_id)
                 )
                 return str(result.inserted_id)
         except Exception as e:
-            self.__logger.error("Failed to insert CDR: {}".format(str(e)))
+            self.__logger.error("Failed to insert TalkoCDR: {}".format(str(e)))
             raise
 
     async def get_cdrs_by_criteria(
@@ -38,11 +38,11 @@ class CDRRepository:
             query: MongoDB query dictionary.
 
         Returns:
-            List[Dict]: List of CDR documents.
+            List[Dict]: List of TalkoCDR documents.
         """
         try:
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 cursor = collection.find(query)
 
@@ -69,7 +69,7 @@ class CDRRepository:
     ) -> list[dict]:
         try:
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 skip_count: int = (offset - 1) * limit
 
@@ -105,7 +105,7 @@ class CDRRepository:
     ):
         try:
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 self.__logger.debug(
                     "Retrieving call logs for user_id: {}, query: {}, status_match: {}, limit: {}, offset: {}".format(
@@ -130,7 +130,7 @@ class CDRRepository:
                 # --- page + total in a single pass over the matched documents ---
                 # Previously this ran two separate aggregate calls (count, then
                 # data), each redoing the $match (and any status_match
-                # $addFields) from scratch. At CDR's scale (tens of millions of
+                # $addFields) from scratch. At TalkoCDR's scale (tens of millions of
                 # rows) that's a full extra index/collection pass for every
                 # request. $facet shares the upstream matched-document stream
                 # between both branches in one round trip instead.
@@ -190,7 +190,7 @@ class CDRRepository:
         vendor_config_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        Fetch a single CDR using call_id or call_uuid and return only
+        Fetch a single TalkoCDR using call_id or call_uuid and return only
         fields required for CallRecordHistoryResponse.
         """
         try:
@@ -262,7 +262,7 @@ class CDRRepository:
             }
 
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 cdr: Optional[Dict[str, Any]] = await collection.find_one(
                     query, projection
@@ -281,21 +281,21 @@ class CDRRepository:
 
     async def update_one(self, filter_query: Dict, update_data: Dict) -> bool:
         try:
-            async with self.__db_manager.collection(CDR.CollectionName.CDR) as collection:
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
                 result = await collection.update_one(filter_query, update_data)
                 self.__logger.info(
-                    "Updated CDR — matched: {}, modified: {}".format(
+                    "Updated TalkoCDR — matched: {}, modified: {}".format(
                         result.matched_count, result.modified_count
                     )
                 )
                 return result.modified_count > 0
         except Exception as e:
-            self.__logger.error("Failed to update CDR: {}".format(str(e)))
+            self.__logger.error("Failed to update TalkoCDR: {}".format(str(e)))
             raise
 
     async def find_cdr_by_call_id(self, call_id: str) -> Optional[Dict[str, Any]]:
         """
-        Fetch a single CDR by call_id for the purpose of setting custom
+        Fetch a single TalkoCDR by call_id for the purpose of setting custom
         field values (needs partner_id for tenant checks and the existing
         custom_fields map to merge into).
         """
@@ -308,16 +308,16 @@ class CDRRepository:
                 "custom_fields": 1,
             }
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 cdr: Optional[Dict[str, Any]] = await collection.find_one(
                     {"call_id": call_id}, projection
                 )
-            self.__logger.info("Fetched CDR by call_id: {}".format(call_id))
+            self.__logger.info("Fetched TalkoCDR by call_id: {}".format(call_id))
             return cdr
         except Exception as e:
             self.__logger.error(
-                "Failed to fetch CDR by call_id {}: {}".format(call_id, str(e))
+                "Failed to fetch TalkoCDR by call_id {}: {}".format(call_id, str(e))
             )
             raise
 
@@ -325,7 +325,7 @@ class CDRRepository:
         self, call_id: str, values: Dict[str, Any], updated_at: int
     ) -> Optional[Dict[str, Any]]:
         """
-        Merge the given slug -> value pairs into the CDR's custom_fields map
+        Merge the given slug -> value pairs into the TalkoCDR's custom_fields map
         using dot-notation $set, and return the updated document.
         """
         try:
@@ -335,7 +335,7 @@ class CDRRepository:
             update_ops["updated_at"] = updated_at
 
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 result: Optional[Dict[str, Any]] = await collection.find_one_and_update(
                     {"call_id": call_id},

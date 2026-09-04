@@ -1,18 +1,18 @@
 import os
 
-from src.core.environment import ENV
+from src.core.environment import TalkoENV
 
 
-class ConsoleApiConstants:
+class TalkoConsoleApiConstants:
     """
     Constants for Console Service API (agent lookup by IVR phone)
     """
 
     CONSOLE_BASE_URL: str = (
-        ENV.CONSOLE_SERVICE_BASE_URL or "http://localhost:8001"
+        TalkoENV.CONSOLE_SERVICE_BASE_URL or "http://localhost:8001"
     ).rstrip("/")
 
-    CONSOLE_API_KEY: str = ENV.CONSOLE_API_KEY or os.getenv("CONSOLE_API_KEY", "")
+    CONSOLE_API_KEY: str = TalkoENV.CONSOLE_API_KEY or os.getenv("CONSOLE_API_KEY", "")
 
     REQUEST_TIMEOUT_SECONDS: int = 10
 

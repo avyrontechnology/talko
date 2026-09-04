@@ -2,17 +2,17 @@ from typing import Optional
 
 from pydantic import BaseModel, model_validator
 
-from src.utils.datetime_util import DateTimeUtil
+from src.utils.datetime_util import TalkoDateTimeUtil
 
 
-class TimestampedModel(BaseModel):
+class TalkoTimestampedModel(BaseModel):
     created_at: Optional[int] = None  # Created timestamp
     updated_at: Optional[int] = None  # Updated timestamp
 
     @model_validator(mode="before")
     @classmethod
     def set_timestamps(cls, data: dict) -> dict:
-        datetime_util = DateTimeUtil()
+        datetime_util = TalkoDateTimeUtil()
         current_timestamp = datetime_util.get_current_time()
 
         # Set created_at only if it's not provided (for new instances)

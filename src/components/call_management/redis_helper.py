@@ -7,15 +7,15 @@ from typing import Any, Dict, Optional
 from redis import asyncio as aioredis
 
 from src.components.cache.redis_client import get_redis_client
-from src.core.redis import RedisCache
+from src.core.redis import TalkoRedisCache
 from src.core.redis_constants import (
     PENDING_CALL_CONTEXT_KEY,
     PENDING_CALL_CONTEXT_TTL_SECONDS,
 )
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 PENDING_CTX_TTL = PENDING_CALL_CONTEXT_TTL_SECONDS
-PREFIX = RedisCache.KeysPrefix.HOLLER.value
+PREFIX = TalkoRedisCache.KeysPrefix.TALKO.value
 
 # Guards to_num_idx / outbound_room writes against out-of-order background
 # tasks: a call's context is only written by whichever caller passes the
@@ -47,8 +47,8 @@ return 1
 OUTBOUND_ROOM_TTL = 300
 
 
-class CallRedisHelper:
-    def __init__(self, logger: HollerServiceLogger) -> None:
+class TalkoCallRedisHelper:
+    def __init__(self, logger: TalkoServiceLogger) -> None:
         self.__logger = logger
         self.__redis: Optional[aioredis.Redis] = None
 
@@ -56,7 +56,7 @@ class CallRedisHelper:
         # Now returns the singleton pool — no new connection per call
         if self.__redis is None:
             self.__redis = await get_redis_client()
-            self.__logger.info("[CallRedisHelper] Redis pool acquired")
+            self.__logger.info("[TalkoCallRedisHelper] Redis pool acquired")
         return self.__redis
 
     def _ctx_key(self, call_id: str) -> str:
@@ -90,7 +90,7 @@ class CallRedisHelper:
             return bool(acquired)
         except Exception as e:
             self.__logger.error(
-                "[CallRedisHelper][MISSED_CALLBACK_LOCK] ❌ call_uuid={} error={}".format(
+                "[TalkoCallRedisHelper][MISSED_CALLBACK_LOCK] ❌ call_uuid={} error={}".format(
                     call_uuid, e
                 )
             )
@@ -108,9 +108,9 @@ class CallRedisHelper:
         The ETA task, the beat sweeper, and manual re-dispatches can all
         reach execution for the same call_uuid. Whichever execution acquires
         this lock first places the call; losers return "duplicate_suppressed".
-        Paired with the callback-CDR existence check (which covers the case
+        Paired with the callback-TalkoCDR existence check (which covers the case
         where the winner already finished and released nothing — locks
-        expire, CDR rows don't).
+        expire, TalkoCDR rows don't).
         """
         try:
             redis = await self._get_redis()
@@ -119,7 +119,7 @@ class CallRedisHelper:
             return bool(acquired)
         except Exception as e:
             self.__logger.error(
-                "[CallRedisHelper][MISSED_CALLBACK_EXEC] ❌ call_uuid={} error={}".format(
+                "[TalkoCallRedisHelper][MISSED_CALLBACK_EXEC] ❌ call_uuid={} error={}".format(
                     call_uuid, e
                 )
             )
@@ -135,7 +135,7 @@ class CallRedisHelper:
             )
         except Exception as e:
             self.__logger.error(
-                "[CallRedisHelper][MISSED_CALLBACK_EXEC] ❌ check call_uuid={} "
+                "[TalkoCallRedisHelper][MISSED_CALLBACK_EXEC] ❌ check call_uuid={} "
                 "error={}".format(call_uuid, e)
             )
             # Fail closed here (treat as locked): the sweeper skips and
@@ -147,7 +147,7 @@ class CallRedisHelper:
     def _outbound_room_key(self, to_number: str) -> str:
         """
         Redis key for a pre-created makun-ai room for an outbound call.
-        Keyed by to_number (digits only, no leading +) so holler-service
+        Keyed by to_number (digits only, no leading +) so talko-service
         can find it when the Tata WebSocket start event arrives.
         """
         return "{}outbound_room:{}".format(PREFIX, to_number)
@@ -161,10 +161,10 @@ class CallRedisHelper:
             redis = await self._get_redis()
             key = self._ctx_key(call_id)
             await redis.set(key, json.dumps(payload, default=str), ex=PENDING_CTX_TTL)
-            self.__logger.info("[CallRedisHelper][STORE] ✅ key={}".format(key))
+            self.__logger.info("[TalkoCallRedisHelper][STORE] ✅ key={}".format(key))
         except Exception as e:
             self.__logger.error(
-                "[CallRedisHelper][STORE] ❌ error={} traceback={}".format(
+                "[TalkoCallRedisHelper][STORE] ❌ error={} traceback={}".format(
                     e, traceback.format_exc()
                 )
             )
@@ -175,12 +175,12 @@ class CallRedisHelper:
             key = self._ctx_key(call_id)
             raw = await redis.get(key)
             if raw is None:
-                self.__logger.warning("[CallRedisHelper][GET] MISS key={}".format(key))
+                self.__logger.warning("[TalkoCallRedisHelper][GET] MISS key={}".format(key))
                 return None
-            self.__logger.info("[CallRedisHelper][GET] ✅ HIT key={}".format(key))
+            self.__logger.info("[TalkoCallRedisHelper][GET] ✅ HIT key={}".format(key))
             return json.loads(raw.decode("utf-8") if isinstance(raw, bytes) else raw)
         except Exception as e:
-            self.__logger.error("[CallRedisHelper][GET] ❌ error={}".format(e))
+            self.__logger.error("[TalkoCallRedisHelper][GET] ❌ error={}".format(e))
             return None
 
     async def delete_pending_call_context(self, call_id: str) -> None:
@@ -188,9 +188,9 @@ class CallRedisHelper:
             redis = await self._get_redis()
             key = self._ctx_key(call_id)
             await redis.delete(key)
-            self.__logger.info("[CallRedisHelper][DELETE] key={}".format(key))
+            self.__logger.info("[TalkoCallRedisHelper][DELETE] key={}".format(key))
         except Exception as e:
-            self.__logger.error("[CallRedisHelper][DELETE] ❌ error={}".format(e))
+            self.__logger.error("[TalkoCallRedisHelper][DELETE] ❌ error={}".format(e))
 
     async def _set_if_newer(
         self, key: str, value: Dict[str, Any], created_at: float, ttl: int
@@ -237,19 +237,19 @@ class CallRedisHelper:
             )
             if applied:
                 self.__logger.info(
-                    "[CallRedisHelper][IDX][STORE] to_number={} store_key={}".format(
+                    "[TalkoCallRedisHelper][IDX][STORE] to_number={} store_key={}".format(
                         to_number, store_key
                     )
                 )
             else:
                 self.__logger.warning(
-                    "[CallRedisHelper][IDX][STORE] ⏭️ skipped stale write "
+                    "[TalkoCallRedisHelper][IDX][STORE] ⏭️ skipped stale write "
                     "to_number={} store_key={} — newer context already stored".format(
                         to_number, store_key
                     )
                 )
         except Exception as e:
-            self.__logger.error("[CallRedisHelper][IDX][STORE] ❌ error={}".format(e))
+            self.__logger.error("[TalkoCallRedisHelper][IDX][STORE] ❌ error={}".format(e))
 
     async def get_store_key_by_to_number(self, to_number: str) -> Optional[str]:
         try:
@@ -258,18 +258,18 @@ class CallRedisHelper:
             raw = await redis.get(key)
             if raw is None:
                 self.__logger.warning(
-                    "[CallRedisHelper][IDX][GET] MISS to_number={}".format(to_number)
+                    "[TalkoCallRedisHelper][IDX][GET] MISS to_number={}".format(to_number)
                 )
                 return None
             result = self._decode_idx_value(raw)
             self.__logger.info(
-                "[CallRedisHelper][IDX][GET] HIT to_number={} store_key={}".format(
+                "[TalkoCallRedisHelper][IDX][GET] HIT to_number={} store_key={}".format(
                     to_number, result
                 )
             )
             return result
         except Exception as e:
-            self.__logger.error("[CallRedisHelper][IDX][GET] ❌ error={}".format(e))
+            self.__logger.error("[TalkoCallRedisHelper][IDX][GET] ❌ error={}".format(e))
             return None
 
     async def delete_to_number_index(self, to_number: str) -> None:
@@ -278,10 +278,10 @@ class CallRedisHelper:
             key = self._idx_key(to_number)
             await redis.delete(key)
             self.__logger.info(
-                "[CallRedisHelper][IDX][DELETE] to_number={}".format(to_number)
+                "[TalkoCallRedisHelper][IDX][DELETE] to_number={}".format(to_number)
             )
         except Exception as e:
-            self.__logger.error("[CallRedisHelper][IDX][DELETE] ❌ error={}".format(e))
+            self.__logger.error("[TalkoCallRedisHelper][IDX][DELETE] ❌ error={}".format(e))
 
     async def fetch_and_delete_context(
         self, to_number: str
@@ -294,7 +294,7 @@ class CallRedisHelper:
         Uses a Redis pipeline to collapse GET context + DELETE both keys
         into one round trip after the initial index GET.
 
-        Called by PSTNBridgeService._attach_pending_context().
+        Called by TalkoPSTNBridgeService._attach_pending_context().
         """
         try:
             redis = await self._get_redis()
@@ -305,7 +305,7 @@ class CallRedisHelper:
 
             if store_key_raw is None:
                 self.__logger.warning(
-                    "[CallRedisHelper][FETCH_DEL] MISS idx to_number={}".format(
+                    "[TalkoCallRedisHelper][FETCH_DEL] MISS idx to_number={}".format(
                         to_number
                     )
                 )
@@ -314,7 +314,7 @@ class CallRedisHelper:
             store_key = self._decode_idx_value(store_key_raw)
             if not store_key:
                 self.__logger.warning(
-                    "[CallRedisHelper][FETCH_DEL] ❌ malformed idx value "
+                    "[TalkoCallRedisHelper][FETCH_DEL] ❌ malformed idx value "
                     "to_number={}".format(to_number)
                 )
                 return None
@@ -330,14 +330,14 @@ class CallRedisHelper:
             raw_context = results[0]
             if raw_context is None:
                 self.__logger.warning(
-                    "[CallRedisHelper][FETCH_DEL] MISS ctx store_key={}".format(
+                    "[TalkoCallRedisHelper][FETCH_DEL] MISS ctx store_key={}".format(
                         store_key
                     )
                 )
                 return None
 
             self.__logger.info(
-                "[CallRedisHelper][FETCH_DEL] ✅ HIT store_key={}".format(store_key)
+                "[TalkoCallRedisHelper][FETCH_DEL] ✅ HIT store_key={}".format(store_key)
             )
             return json.loads(
                 raw_context.decode("utf-8")
@@ -347,7 +347,7 @@ class CallRedisHelper:
 
         except Exception as e:
             self.__logger.error(
-                "[CallRedisHelper][FETCH_DEL] ❌ error={} traceback={}".format(
+                "[TalkoCallRedisHelper][FETCH_DEL] ❌ error={} traceback={}".format(
                     e, traceback.format_exc()
                 )
             )
@@ -364,7 +364,7 @@ class CallRedisHelper:
 
         payload must contain:
             room_name    str   LiveKit room name
-            caller_token str   LiveKit token for holler-service to join
+            caller_token str   LiveKit token for talko-service to join
             livekit_url  str   LiveKit server URL
             agent_id     int   makun-ai agent id (for logging)
             created_at   float time.time() when stored
@@ -384,21 +384,21 @@ class CallRedisHelper:
             )
             if applied:
                 self.__logger.info(
-                    "[CallRedisHelper][OUTBOUND_ROOM][STORE] ✅ to_number={} "
+                    "[TalkoCallRedisHelper][OUTBOUND_ROOM][STORE] ✅ to_number={} "
                     "room={} ex={}s".format(
                         to_number, payload.get("room_name"), OUTBOUND_ROOM_TTL
                     )
                 )
             else:
                 self.__logger.warning(
-                    "[CallRedisHelper][OUTBOUND_ROOM][STORE] ⏭️ skipped stale "
+                    "[TalkoCallRedisHelper][OUTBOUND_ROOM][STORE] ⏭️ skipped stale "
                     "write to_number={} room={} — newer room already stored".format(
                         to_number, payload.get("room_name")
                     )
                 )
         except Exception as e:
             self.__logger.error(
-                "[CallRedisHelper][OUTBOUND_ROOM][STORE] ❌ to_number={} "
+                "[TalkoCallRedisHelper][OUTBOUND_ROOM][STORE] ❌ to_number={} "
                 "error={} traceback={}".format(to_number, e, traceback.format_exc())
             )
             raise  # caller (_pre_create_session) must know it failed
@@ -449,7 +449,7 @@ class CallRedisHelper:
 
             if raw is None:
                 self.__logger.info(
-                    "[CallRedisHelper][OUTBOUND_ROOM][FETCH] MISS to_number={}".format(
+                    "[TalkoCallRedisHelper][OUTBOUND_ROOM][FETCH] MISS to_number={}".format(
                         to_number
                     )
                 )
@@ -458,20 +458,20 @@ class CallRedisHelper:
             payload = json.loads(raw.decode("utf-8") if isinstance(raw, bytes) else raw)
             age = time.time() - payload.get("created_at", time.time())
             self.__logger.info(
-                "[CallRedisHelper][OUTBOUND_ROOM][FETCH] ✅ HIT to_number={} "
+                "[TalkoCallRedisHelper][OUTBOUND_ROOM][FETCH] ✅ HIT to_number={} "
                 "room={} age={:.1f}s".format(to_number, payload.get("room_name"), age)
             )
             return payload
 
         except json.JSONDecodeError as e:
             self.__logger.error(
-                "[CallRedisHelper][OUTBOUND_ROOM][FETCH] ❌ JSON decode error "
+                "[TalkoCallRedisHelper][OUTBOUND_ROOM][FETCH] ❌ JSON decode error "
                 "to_number={} error={}".format(to_number, e)
             )
             return None
         except Exception as e:
             self.__logger.error(
-                "[CallRedisHelper][OUTBOUND_ROOM][FETCH] ❌ to_number={} "
+                "[TalkoCallRedisHelper][OUTBOUND_ROOM][FETCH] ❌ to_number={} "
                 "error={} traceback={}".format(to_number, e, traceback.format_exc())
             )
             return None

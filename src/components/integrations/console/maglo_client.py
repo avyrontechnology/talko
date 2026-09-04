@@ -2,27 +2,27 @@ from typing import Any, Dict, Optional
 
 import aiohttp
 
-from src.components.integrations.console.maglo_constants import MagloApiConstants
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.integrations.console.maglo_constants import TalkoMagloApiConstants
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class MagloClient:
+class TalkoMagloClient:
     """
     Simple client for Maglo APIs.
     """
 
     def __init__(
         self,
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ):
-        self.logger: HollerServiceLogger = logger
+        self.logger: TalkoServiceLogger = logger
         self.session: aiohttp.ClientSession = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(
-                total=MagloApiConstants.REQUEST_TIMEOUT_SECONDS
+                total=TalkoMagloApiConstants.REQUEST_TIMEOUT_SECONDS
             )
         )
-        self.base_url: str = MagloApiConstants.MAGLO_BASE_URL.rstrip("/")
-        self.headers: Dict[str, str] = MagloApiConstants.DEFAULT_HEADERS.copy()
+        self.base_url: str = TalkoMagloApiConstants.MAGLO_BASE_URL.rstrip("/")
+        self.headers: Dict[str, str] = TalkoMagloApiConstants.DEFAULT_HEADERS.copy()
 
     async def get_agent_details(
         self,
@@ -39,7 +39,7 @@ class MagloClient:
                 agent_id, service_board_id
             )
         )
-        url: str = MagloApiConstants.get_agent_details_url()
+        url: str = TalkoMagloApiConstants.get_agent_details_url()
         params: Dict[str, str] = {
             "agent_id": str(agent_id),
             "service_board_id": str(service_board_id),
@@ -87,11 +87,11 @@ class MagloClient:
         """
         Calls Maglo IVR Leads upsert API (PATCH /v1/ivr-leads).
         """
-        url: str = MagloApiConstants.upsert_ivr_leads_url()
+        url: str = TalkoMagloApiConstants.upsert_ivr_leads_url()
         payload: Dict[str, Any] = {
-            MagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: partner_id,
-            MagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: service_board_id,
-            MagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: phone_number,
+            TalkoMagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: partner_id,
+            TalkoMagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: service_board_id,
+            TalkoMagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: phone_number,
         }
 
         self.logger.info("Upserting IVR lead: {}".format(payload))
@@ -130,16 +130,16 @@ class MagloClient:
         Calls Maglo lead reassignment API (PATCH /v1/leads/reassign-by-phone)
         to hand ownership of a lead to a new agent.
         """
-        url: str = MagloApiConstants.reassign_lead_by_phone_url()
+        url: str = TalkoMagloApiConstants.reassign_lead_by_phone_url()
         payload: Dict[str, Any] = {
-            MagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: phone_number,
-            MagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: partner_id,
-            MagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: service_board_id,
-            MagloApiConstants.DEFAULT_AGENT_ID_PARAM: agent_id,
+            TalkoMagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: phone_number,
+            TalkoMagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: partner_id,
+            TalkoMagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: service_board_id,
+            TalkoMagloApiConstants.DEFAULT_AGENT_ID_PARAM: agent_id,
             # performed_by is the new owner itself — the reassignment is
             # system-driven (no human/admin actor), so the new agent is
             # recorded as having performed it.
-            MagloApiConstants.LEAD_PAYLOAD_PERFORMED_BY: agent_id,
+            TalkoMagloApiConstants.LEAD_PAYLOAD_PERFORMED_BY: agent_id,
         }
 
         self.logger.info("Reassigning lead via Maglo: {}".format(payload))
@@ -176,9 +176,9 @@ class MagloClient:
         Expects body: {"api_key": "..."}
         Returns the 'data' part of the response (current_date + service_boards)
         """
-        url: str = MagloApiConstants.leads_created_today_url()
+        url: str = TalkoMagloApiConstants.leads_created_today_url()
         payload: Dict[str, str] = {
-            MagloApiConstants.API_KEY_FIELD: api_key,
+            TalkoMagloApiConstants.API_KEY_FIELD: api_key,
         }
 
         self.logger.info("Fetching leads created today")
@@ -223,4 +223,4 @@ class MagloClient:
         """Close session when app shuts down (optional)."""
         if not self.session.closed:
             await self.session.close()
-            self.logger.debug("MagloClient session closed")
+            self.logger.debug("TalkoMagloClient session closed")

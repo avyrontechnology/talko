@@ -3,24 +3,24 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from src.components.call_management.repository import CallRepository
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.call_management.repository import TalkoCallRepository
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 @pytest.mark.asyncio
 class TestCallRepository:
     @pytest.fixture
     def mock_db_manager(self):
-        return MagicMock(spec=DocDatabaseSessionManager)
+        return MagicMock(spec=TalkoDocDatabaseSessionManager)
 
     @pytest.fixture
     def mock_logger(self):
-        return MagicMock(spec=HollerServiceLogger)
+        return MagicMock(spec=TalkoServiceLogger)
 
     @pytest.fixture
     def repository(self, mock_db_manager, mock_logger):
-        return CallRepository(mock_db_manager, mock_logger)
+        return TalkoCallRepository(mock_db_manager, mock_logger)
 
     async def test_get_vendor_config_success(
         self, repository, mock_db_manager, mock_logger
@@ -380,7 +380,7 @@ class TestCallRepository:
             await repository.find_cdr_by_numbers("123", "456")
 
         mock_logger.error.assert_called_with(
-            "Error finding CDR by numbers: Query failed"
+            "Error finding TalkoCDR by numbers: Query failed"
         )
 
     async def test_find_cdr_by_numbers_not_found(
@@ -400,4 +400,4 @@ class TestCallRepository:
         result = await repository.find_cdr_by_numbers("123", "456")
 
         assert result is None
-        mock_logger.debug.assert_any_call("No CDR found for given numbers")
+        mock_logger.debug.assert_any_call("No TalkoCDR found for given numbers")

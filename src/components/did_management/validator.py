@@ -2,21 +2,21 @@ from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
 
-from src.components.partner_config.repository import PartnerConfigRepository
-from src.components.vendor_config.repository import VendorConfigRepository
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.partner_config.repository import TalkoPartnerConfigRepository
+from src.components.vendor_config.repository import TalkoVendorConfigRepository
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class DidValidator:
+class TalkoDidValidator:
     """
     Validator class for DID-related operations.
     """
 
     def __init__(
         self,
-        vendor_config_repository: VendorConfigRepository,
-        partner_config_repository: PartnerConfigRepository,
-        logger: HollerServiceLogger,
+        vendor_config_repository: TalkoVendorConfigRepository,
+        partner_config_repository: TalkoPartnerConfigRepository,
+        logger: TalkoServiceLogger,
     ) -> None:
         """
         Initialize the validator with necessary dependencies.
@@ -25,11 +25,11 @@ class DidValidator:
         :param partner_config_repository: Repository for partner config operations.
         :param logger: Logger instance for logging validation actions.
         """
-        self.vendor_config_repository: VendorConfigRepository = vendor_config_repository
-        self.partner_config_repository: PartnerConfigRepository = (
+        self.vendor_config_repository: TalkoVendorConfigRepository = vendor_config_repository
+        self.partner_config_repository: TalkoPartnerConfigRepository = (
             partner_config_repository
         )
-        self.logger: HollerServiceLogger = logger
+        self.logger: TalkoServiceLogger = logger
 
     async def validate_did_assignment(self, did_data: Dict[str, Any]) -> None:
         """

@@ -3,11 +3,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from src.components.custom_field.repository import CustomFieldRepository
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.custom_field.repository import TalkoCustomFieldRepository
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class FakeCursor:
+class TalkoFakeCursor:
     def __init__(self, data=None):
         self._data = data or []
 
@@ -23,8 +23,8 @@ class TestCustomFieldRepository:
     @pytest.fixture
     def setup(self):
         mock_db_manager = MagicMock()
-        mock_logger = MagicMock(spec=HollerServiceLogger)
-        repo = CustomFieldRepository(mock_db_manager, mock_logger)
+        mock_logger = MagicMock(spec=TalkoServiceLogger)
+        repo = TalkoCustomFieldRepository(mock_db_manager, mock_logger)
         return repo, mock_db_manager, mock_logger
 
     def _mock_collection(self, mock_db_manager, mock_collection):
@@ -59,30 +59,30 @@ class TestCustomFieldRepository:
         mock_collection.find_one = AsyncMock(return_value={"field_slug": "lead_source"})
         self._mock_collection(mock_db_manager, mock_collection)
 
-        result = await repo.find_by_slug(1, "CDR", "lead_source")
+        result = await repo.find_by_slug(1, "TalkoCDR", "lead_source")
         assert result == {"field_slug": "lead_source"}
         mock_collection.find_one.assert_awaited_once_with(
-            {"partner_id": 1, "entity_type": "CDR", "field_slug": "lead_source"}
+            {"partner_id": 1, "entity_type": "TalkoCDR", "field_slug": "lead_source"}
         )
 
     async def test_find_all_filters_inactive_by_default(self, setup):
         repo, mock_db_manager, _ = setup
         mock_collection = MagicMock()
-        mock_collection.find.return_value = FakeCursor([{"field_slug": "a"}])
+        mock_collection.find.return_value = TalkoFakeCursor([{"field_slug": "a"}])
         self._mock_collection(mock_db_manager, mock_collection)
 
-        result = await repo.find_all(1, "CDR")
+        result = await repo.find_all(1, "TalkoCDR")
         assert result == [{"field_slug": "a"}]
         query = mock_collection.find.call_args[0][0]
-        assert query == {"partner_id": 1, "entity_type": "CDR", "is_active": True}
+        assert query == {"partner_id": 1, "entity_type": "TalkoCDR", "is_active": True}
 
     async def test_find_all_include_inactive_skips_active_filter(self, setup):
         repo, mock_db_manager, _ = setup
         mock_collection = MagicMock()
-        mock_collection.find.return_value = FakeCursor([])
+        mock_collection.find.return_value = TalkoFakeCursor([])
         self._mock_collection(mock_db_manager, mock_collection)
 
-        await repo.find_all(1, "CDR", include_inactive=True)
+        await repo.find_all(1, "TalkoCDR", include_inactive=True)
         query = mock_collection.find.call_args[0][0]
         assert "is_active" not in query
 

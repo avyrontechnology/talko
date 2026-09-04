@@ -7,35 +7,35 @@ import pytz
 from dateutil.relativedelta import relativedelta
 
 from src.components.analytics import constants as analytics_constants
-from src.components.analytics.builder import QueryBuilder
-from src.components.analytics.date_range_helper import DateRangeHelper
-from src.components.analytics.enums import Metric, TimeInterval
-from src.components.analytics.helper import CallTrendsHelper
-from src.components.cdr.models import CDR
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.analytics.builder import TalkoQueryBuilder
+from src.components.analytics.date_range_helper import TalkoDateRangeHelper
+from src.components.analytics.enums import TalkoMetric, TalkoTimeInterval
+from src.components.analytics.helper import TalkoCallTrendsHelper
+from src.components.cdr.models import TalkoCDR
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.auto_format import safe_to_int
-from src.utils.enums import UserRoleHierarchy
+from src.utils.enums import TalkoUserRoleHierarchy
 
 
-class AnalyticsRepository:
+class TalkoAnalyticsRepository:
     def __init__(
         self,
-        db_manager: DocDatabaseSessionManager,
-        logger: HollerServiceLogger,
-        analytics_query_builder: QueryBuilder,
+        db_manager: TalkoDocDatabaseSessionManager,
+        logger: TalkoServiceLogger,
+        analytics_query_builder: TalkoQueryBuilder,
     ):
-        self.__db_manager: DocDatabaseSessionManager = db_manager
-        self.__logger: HollerServiceLogger = logger
-        self.__date_range_helper = DateRangeHelper(logger)
-        self.__query_builder: QueryBuilder = analytics_query_builder
+        self.__db_manager: TalkoDocDatabaseSessionManager = db_manager
+        self.__logger: TalkoServiceLogger = logger
+        self.__date_range_helper = TalkoDateRangeHelper(logger)
+        self.__query_builder: TalkoQueryBuilder = analytics_query_builder
         self.__bucket_ranges = [
             {"range": "0-1 minutes", "min": 0, "max": 60},
             {"range": "1-5 minutes", "min": 60, "max": 300},
             {"range": "5-10 minutes", "min": 300, "max": 600},
             {"range": ">=10 minutes", "min": 600, "max": float("inf")},
         ]
-        self.__call_trends_helper = CallTrendsHelper(
+        self.__call_trends_helper = TalkoCallTrendsHelper(
             self.__logger, self.__date_range_helper, self.__query_builder
         )
 
@@ -62,17 +62,17 @@ class AnalyticsRepository:
         entity_type: Optional[str] = None,
         limit: int = 10,
         offset: int = 1,
-        user_role: int = UserRoleHierarchy.MAINTAINER.value,
+        user_role: int = TalkoUserRoleHierarchy.MAINTAINER.value,
     ) -> Dict:
         try:
-            if not agents and user_role != UserRoleHierarchy.MAINTAINER.value:
+            if not agents and user_role != TalkoUserRoleHierarchy.MAINTAINER.value:
                 self.__logger.info(
                     f"No agents provided for partner_id: {partner_id}, returning empty result"
                 )
                 return {analytics_constants.AGENTS: [], "total_count": 0}
             self._validate_pagination(offset, limit)
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 start_date_ms, end_date_ms, period = (
                     self.__date_range_helper.adjust_date_range(start_date, end_date)
@@ -355,17 +355,17 @@ class AnalyticsRepository:
         entity_type: Optional[str] = None,
         limit: int = 10,
         offset: int = 1,
-        user_role: int = UserRoleHierarchy.MAINTAINER.value,
+        user_role: int = TalkoUserRoleHierarchy.MAINTAINER.value,
     ) -> Dict:
         try:
-            if not agents and user_role != UserRoleHierarchy.MAINTAINER.value:
+            if not agents and user_role != TalkoUserRoleHierarchy.MAINTAINER.value:
                 self.__logger.info(
                     f"No agents provided for partner_id: {partner_id}, returning empty result"
                 )
                 return {analytics_constants.AGENTS: [], "total_count": 0}
             self._validate_pagination(offset, limit)
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 start_date_ms, end_date_ms, period = (
                     self.__date_range_helper.adjust_date_range(start_date, end_date)
@@ -476,17 +476,17 @@ class AnalyticsRepository:
         entity_type: Optional[str] = None,
         limit: int = 10,
         offset: int = 1,
-        user_role: int = UserRoleHierarchy.MAINTAINER.value,
+        user_role: int = TalkoUserRoleHierarchy.MAINTAINER.value,
     ) -> Dict:
         try:
-            if not agents and user_role != UserRoleHierarchy.MAINTAINER.value:
+            if not agents and user_role != TalkoUserRoleHierarchy.MAINTAINER.value:
                 self.__logger.info(
                     f"No agents provided for partner_id: {partner_id}, returning empty result"
                 )
                 return {analytics_constants.AGENTS: [], "total_count": 0}
             self._validate_pagination(offset, limit)
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 start_date_ms, end_date_ms, period = (
                     self.__date_range_helper.adjust_date_range(start_date, end_date)
@@ -630,17 +630,17 @@ class AnalyticsRepository:
         limit: int = 10,
         offset: int = 1,
         agents: Optional[List[int]] = None,
-        user_role: int = UserRoleHierarchy.MAINTAINER.value,
+        user_role: int = TalkoUserRoleHierarchy.MAINTAINER.value,
     ) -> Dict:
         try:
-            if not agents and user_role != UserRoleHierarchy.MAINTAINER.value:
+            if not agents and user_role != TalkoUserRoleHierarchy.MAINTAINER.value:
                 self.__logger.info(
                     f"No agents provided for partner_id: {partner_id}, returning empty result"
                 )
                 return {analytics_constants.AGENTS: [], "total_count": 0}
             self._validate_pagination(offset, limit)
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 start_date_ms, end_date_ms, period = (
                     self.__date_range_helper.adjust_date_range(start_date, end_date)
@@ -839,7 +839,7 @@ class AnalyticsRepository:
             )
 
             async with self.__db_manager.collection(
-                CDR.CollectionName.CDR
+                TalkoCDR.CollectionName.TalkoCDR
             ) as collection:
                 cdrs = await collection.find(
                     query, projection=projection, sort=sort_order
@@ -869,7 +869,7 @@ class AnalyticsRepository:
                     "total_count": total_count,
                     "data": formatted_data,
                 }
-                if current_month and trend_basis == TimeInterval.DAYS.value:
+                if current_month and trend_basis == TalkoTimeInterval.DAYS.value:
                     response["current_month"] = current_month
 
                 return response

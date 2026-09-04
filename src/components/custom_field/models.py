@@ -1,18 +1,18 @@
 from typing import List, Optional
 
 from src.components.custom_field.constants import (
-    CustomFieldDataType,
-    CustomFieldEntityType,
+    TalkoCustomFieldDataType,
+    TalkoCustomFieldEntityType,
 )
-from src.utils.timestamped_model import TimestampedModel
+from src.utils.timestamped_model import TalkoTimestampedModel
 
 
-class CustomFieldDefinition(TimestampedModel):
+class TalkoCustomFieldDefinition(TalkoTimestampedModel):
     partner_id: int
-    entity_type: CustomFieldEntityType
+    entity_type: TalkoCustomFieldEntityType
     field_name: str
     field_slug: str
-    data_type: CustomFieldDataType
+    data_type: TalkoCustomFieldDataType
     choice_options: Optional[List[str]] = None
     is_required: bool = False
     sequence: Optional[int] = None

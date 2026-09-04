@@ -7,11 +7,11 @@ import requests
 from bson import ObjectId
 
 from src.components.dialer import messages as dialer_messages
-from src.components.dialer.services import DialerService
-from src.exceptions import BadRequestError, ResourceNotFound
+from src.components.dialer.services import TalkoDialerService
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 
 
-class MockLeadListItem:
+class TalkoMockLeadListItem:
     def __init__(self, **kwargs):
         self.data = kwargs
 
@@ -36,7 +36,7 @@ def mock_logger():
 
 @pytest.fixture
 def dialer_service(mock_partner_config_repo, mock_vendor_config_repo, mock_logger):
-    return DialerService(
+    return TalkoDialerService(
         partner_config_repository=mock_partner_config_repo,
         vendor_config_repository=mock_vendor_config_repo,
         logger=mock_logger,
@@ -56,7 +56,7 @@ class TestDialerService:
         mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(
             return_value={"dialer_enabled": False}
         )
-        with pytest.raises(BadRequestError, match=dialer_messages.DIALER_NOT_ENABLED):
+        with pytest.raises(TalkoBadRequestError, match=dialer_messages.DIALER_NOT_ENABLED):
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
@@ -67,7 +67,7 @@ class TestDialerService:
             return_value={"dialer_enabled": True}
         )
         with pytest.raises(
-            BadRequestError,
+            TalkoBadRequestError,
             match=dialer_messages.NO_VENDOR_CONFIGURATION_LINKED_PARTNER,
         ):
             await dialer_service.fetch_lead_lists(1)
@@ -80,7 +80,7 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": "invalid-id"}
         )
         with pytest.raises(
-            BadRequestError,
+            TalkoBadRequestError,
             match=dialer_messages.INVALID_VENDOR_CONFIGURATION_ID_FORMAT,
         ):
             await dialer_service.fetch_lead_lists(1)
@@ -95,7 +95,7 @@ class TestDialerService:
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(return_value=None)
         with pytest.raises(
-            ResourceNotFound, match=dialer_messages.VENDOR_CONFIGURATION_NOT_FOUND
+            TalkoResourceNotFound, match=dialer_messages.VENDOR_CONFIGURATION_NOT_FOUND
         ):
             await dialer_service.fetch_lead_lists(1)
 
@@ -111,7 +111,7 @@ class TestDialerService:
             return_value={"dialer_url_handler": {}}
         )
         with pytest.raises(
-            BadRequestError,
+            TalkoBadRequestError,
             match=dialer_messages.DIALER_URL_HANDLER_CONFIGURATION_MISSING,
         ):
             await dialer_service.fetch_lead_lists(1)
@@ -170,7 +170,7 @@ class TestDialerService:
             side_effect=httpx.ConnectError("Connection Timeout")
         )
 
-        with pytest.raises(BadRequestError, match="Failed to fetch lead lists"):
+        with pytest.raises(TalkoBadRequestError, match="Failed to fetch lead lists"):
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
@@ -193,7 +193,7 @@ class TestDialerService:
         )
 
         with pytest.raises(
-            BadRequestError,
+            TalkoBadRequestError,
             match=dialer_messages.MISSING_ENDPOINT_IN_LEAD_LISTS_FETCH_CONFIGURATION,
         ):
             await dialer_service.fetch_lead_lists(1)
@@ -214,7 +214,7 @@ class TestDialerService:
         )
         expected_msg = f".*{dialer_messages.NO_DATA_PROVIDED_FOR_BULK_CREATE}"
 
-        with pytest.raises(BadRequestError, match=expected_msg):
+        with pytest.raises(TalkoBadRequestError, match=expected_msg):
             await dialer_service.bulk_create_leads(1, "list_123", {"wrong_key": []})
 
     @pytest.mark.asyncio
@@ -234,7 +234,7 @@ class TestDialerService:
         )
 
         payload = {"data": ["not-a-dict"]}
-        with pytest.raises(BadRequestError, match="must be an object"):
+        with pytest.raises(TalkoBadRequestError, match="must be an object"):
             await dialer_service.bulk_create_leads(1, "list_123", payload)
 
     @pytest.mark.asyncio
@@ -257,7 +257,7 @@ class TestDialerService:
 
         raw_msg = "Internal error while processing in bulk lead upload: Each lead must contain field_0 (phone number)"
 
-        with pytest.raises(BadRequestError, match=re.escape(raw_msg)):
+        with pytest.raises(TalkoBadRequestError, match=re.escape(raw_msg)):
             await dialer_service.bulk_create_leads(1, "list_123", payload)
 
     @pytest.mark.asyncio
@@ -280,7 +280,7 @@ class TestDialerService:
             "data": [{"field_0": "123"}],
             "duplicate_option": "delete_all",
         }  # Invalid option
-        with pytest.raises(BadRequestError, match="Invalid 'duplicate_option'"):
+        with pytest.raises(TalkoBadRequestError, match="Invalid 'duplicate_option'"):
             await dialer_service.bulk_create_leads(1, "list_123", payload)
 
     @pytest.mark.asyncio
@@ -333,7 +333,7 @@ class TestDialerService:
         )
 
         with pytest.raises(
-            BadRequestError,
+            TalkoBadRequestError,
             match=dialer_messages.LEAD_LISTS_FETCH_CONFIGURATION_NOT_FOUND,
         ):
             await dialer_service.fetch_lead_lists(1)
@@ -357,7 +357,7 @@ class TestDialerService:
                 }
             }
         )
-        with pytest.raises(BadRequestError, match="Missing bearer token"):
+        with pytest.raises(TalkoBadRequestError, match="Missing bearer token"):
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
@@ -384,7 +384,7 @@ class TestDialerService:
             side_effect=httpx.ConnectError("Connection Refused")
         )
 
-        with pytest.raises(BadRequestError, match="Failed to fetch lead lists"):
+        with pytest.raises(TalkoBadRequestError, match="Failed to fetch lead lists"):
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
@@ -394,7 +394,7 @@ class TestDialerService:
         mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(
             return_value=None
         )
-        with pytest.raises(BadRequestError, match=dialer_messages.DIALER_NOT_ENABLED):
+        with pytest.raises(TalkoBadRequestError, match=dialer_messages.DIALER_NOT_ENABLED):
             await dialer_service.bulk_create_leads(1, "l", {})
 
     @pytest.mark.asyncio
@@ -410,7 +410,7 @@ class TestDialerService:
         )
 
         with pytest.raises(
-            BadRequestError,
+            TalkoBadRequestError,
             match=dialer_messages.DIALER_URL_HANDLER_CONFIGURATION_MISSING,
         ):
             await dialer_service.bulk_create_leads(1, "l", {})
@@ -440,7 +440,7 @@ class TestDialerService:
         )
 
         payload = {"data": [{"field_0": "1234567890"}]}
-        with pytest.raises(BadRequestError, match="Failed to create bulk leads"):
+        with pytest.raises(TalkoBadRequestError, match="Failed to create bulk leads"):
             await dialer_service.bulk_create_leads(1, "list_123", payload)
 
     @pytest.mark.asyncio
@@ -462,7 +462,7 @@ class TestDialerService:
                 }
             }
         )
-        with pytest.raises(BadRequestError, match="Missing bearer token"):
+        with pytest.raises(TalkoBadRequestError, match="Missing bearer token"):
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
@@ -488,7 +488,7 @@ class TestDialerService:
             side_effect=httpx.ConnectError("Connection failed")
         )
 
-        with pytest.raises(BadRequestError, match="Failed to fetch lead lists"):
+        with pytest.raises(TalkoBadRequestError, match="Failed to fetch lead lists"):
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
@@ -505,7 +505,7 @@ class TestDialerService:
         )
 
         with pytest.raises(
-            BadRequestError,
+            TalkoBadRequestError,
             match=dialer_messages.BULK_LEADS_CREATION_CONFIGURATION_NOT_FOUND,
         ):
             await dialer_service.bulk_create_leads(
@@ -531,7 +531,7 @@ class TestDialerService:
                 }
             }
         )
-        with pytest.raises(BadRequestError, match="Missing bearer token"):
+        with pytest.raises(TalkoBadRequestError, match="Missing bearer token"):
             await dialer_service.bulk_create_leads(
                 1, "list_123", {"data": [{"field_0": "123"}]}
             )
@@ -559,5 +559,5 @@ class TestDialerService:
             side_effect=httpx.ConnectError("Connection error")
         )
 
-        with pytest.raises(BadRequestError, match="Failed to fetch lead lists"):
+        with pytest.raises(TalkoBadRequestError, match="Failed to fetch lead lists"):
             await dialer_service.fetch_lead_lists(1)

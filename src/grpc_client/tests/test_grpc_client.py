@@ -10,11 +10,11 @@ import pytest
 from grpc.aio import UnaryUnaryClientInterceptor
 from starlette_context import context
 
-from src.grpc_client.grpc_client import GRPCClient, logger
-from src.grpc_interceptor.auth_interceptor import ApiKeyClientInterceptor
+from src.grpc_client.grpc_client import TalkoGRPCClient, logger
+from src.grpc_interceptor.auth_interceptor import TalkoApiKeyClientInterceptor
 
 
-class DummyAioRpcError(grpc.aio.AioRpcError):
+class TalkoDummyAioRpcError(grpc.aio.AioRpcError):
     def __init__(self, message="Simulated error"):
         self._message = message
 
@@ -28,7 +28,7 @@ class DummyAioRpcError(grpc.aio.AioRpcError):
         return self._message
 
 
-class MockInterceptor(UnaryUnaryClientInterceptor):
+class TalkoMockInterceptor(UnaryUnaryClientInterceptor):
     """Mock interceptor that inherits from UnaryUnaryClientInterceptor."""
 
     def __init__(self, api_key):
@@ -100,8 +100,8 @@ class TestGRPCClient:
             "src.grpc_client.grpc_client.grpc.aio.insecure_channel"
         ) as mock_insecure_channel:
             with patch(
-                "src.grpc_client.grpc_client.ApiKeyClientInterceptor",
-                return_value=MockInterceptor(api_key="maglo-key"),
+                "src.grpc_client.grpc_client.TalkoApiKeyClientInterceptor",
+                return_value=TalkoMockInterceptor(api_key="maglo-key"),
             ) as mock_interceptor:
                 with patch("os.getenv") as mock_getenv:
                     mock_getenv.side_effect = lambda key, default=None: {
@@ -109,7 +109,7 @@ class TestGRPCClient:
                         "CONSOLE_GRPC_PORT": "50051",
                         "CA": "None",
                     }.get(key, default)
-                    client = GRPCClient()
+                    client = TalkoGRPCClient()
                     channel = client._create_insecure_channel("localhost:50051")
 
                 mock_interceptor.assert_called_with(api_key="maglo-key")
@@ -126,7 +126,7 @@ class TestGRPCClient:
                 "CONSOLE_GRPC_PORT": "50051",
                 "CA": base64.b64encode(b"dummy_ca_cert").decode("utf-8"),
             }.get(key, default)
-            client = GRPCClient()
+            client = TalkoGRPCClient()
             client.channel = AsyncMock()
             await client.close_channel()
 
@@ -139,7 +139,7 @@ class TestGRPCClient:
     @pytest.mark.asyncio
     async def test_call_with_retry_success(self, mock_logger):
         mock_func = AsyncMock(return_value="success")
-        wrapped_func = GRPCClient.call_with_retry(mock_func)
+        wrapped_func = TalkoGRPCClient.call_with_retry(mock_func)
         result = await wrapped_func()
 
         assert result == "success"
@@ -151,25 +151,25 @@ class TestGRPCClient:
     @pytest.mark.asyncio
     async def test_call_with_retry_failure(self, mock_logger):
         with patch("asyncio.sleep", new=AsyncMock()):
-            mock_func = AsyncMock(side_effect=DummyAioRpcError())
-            wrapped_func = GRPCClient.call_with_retry(mock_func)
+            mock_func = AsyncMock(side_effect=TalkoDummyAioRpcError())
+            wrapped_func = TalkoGRPCClient.call_with_retry(mock_func)
             result = await wrapped_func()
 
             assert result is None
-            assert mock_func.call_count == GRPCClient.MAX_RETRIES
+            assert mock_func.call_count == TalkoGRPCClient.MAX_RETRIES
             mock_logger.error.assert_called_with(
-                f"Failed to execute {mock_func.__name__} after {GRPCClient.MAX_RETRIES} attempts"
+                f"Failed to execute {mock_func.__name__} after {TalkoGRPCClient.MAX_RETRIES} attempts"
             )
 
     @pytest.mark.asyncio
     async def test_call_with_retry_partial_success(self, mock_logger):
         with patch("asyncio.sleep", new=AsyncMock()):
-            mock_func = AsyncMock(side_effect=[DummyAioRpcError(), "success"])
-            wrapped_func = GRPCClient.call_with_retry(mock_func)
+            mock_func = AsyncMock(side_effect=[TalkoDummyAioRpcError(), "success"])
+            wrapped_func = TalkoGRPCClient.call_with_retry(mock_func)
             result = await wrapped_func()
 
             assert result == "success"
             assert mock_func.call_count == 2
             mock_logger.info.assert_called_with(
-                f"Retrying {mock_func.__name__} (attempt 2/{GRPCClient.MAX_RETRIES})"
+                f"Retrying {mock_func.__name__} (attempt 2/{TalkoGRPCClient.MAX_RETRIES})"
             )

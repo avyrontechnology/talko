@@ -6,7 +6,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 
-class APIResponse(Response):
+class TalkoAPIResponse(Response):
     """
     Base class for API responses. All custom response types should inherit from this.
     """
@@ -34,7 +34,7 @@ class APIResponse(Response):
         return json.dumps(content)
 
 
-class SuccessResponse(JSONResponse):
+class TalkoSuccessResponse(JSONResponse):
     """
     A standardized success response with a customizable message and data.
     """
@@ -61,7 +61,7 @@ class SuccessResponse(JSONResponse):
         )
 
 
-class ValidationErrorResponse(APIResponse):
+class TalkoValidationErrorResponse(TalkoAPIResponse):
     """
     A response class for handling validation errors.
     """
@@ -85,7 +85,7 @@ class ValidationErrorResponse(APIResponse):
         )
 
 
-class UnauthorizedResponse(APIResponse):
+class TalkoUnauthorizedResponse(TalkoAPIResponse):
     """
     A response class for handling unauthorized access errors.
     """
@@ -108,7 +108,7 @@ class UnauthorizedResponse(APIResponse):
         )
 
 
-class NotFoundResponse(APIResponse):
+class TalkoNotFoundResponse(TalkoAPIResponse):
     """
     A response class for handling 404 Not Found errors.
     """
@@ -131,7 +131,7 @@ class NotFoundResponse(APIResponse):
         )
 
 
-class InternalServerErrorResponse(APIResponse):
+class TalkoInternalServerErrorResponse(TalkoAPIResponse):
     """
     A response class for handling 500 Internal Server Error.
     """
@@ -154,7 +154,7 @@ class InternalServerErrorResponse(APIResponse):
         )
 
 
-class BadRequestResponse(APIResponse):
+class TalkoBadRequestResponse(TalkoAPIResponse):
     """
     A response class for handling 400 Bad Request errors.
     """
@@ -175,7 +175,7 @@ class BadRequestResponse(APIResponse):
         )
 
 
-class ForbiddenPermissionResponse(APIResponse):
+class TalkoForbiddenPermissionResponse(TalkoAPIResponse):
     """
     A response class for handling 403 Forbidden errors (Permission Denied).
     """
@@ -198,7 +198,7 @@ class ForbiddenPermissionResponse(APIResponse):
         )
 
 
-class ForbiddenResponse(APIResponse):
+class TalkoForbiddenResponse(TalkoAPIResponse):
     """
     A response class for handling 403 Forbidden Request errors.
     """
@@ -221,7 +221,7 @@ class ForbiddenResponse(APIResponse):
         )
 
 
-class ResourceCreatedResponse(JSONResponse):
+class TalkoResourceCreatedResponse(JSONResponse):
     """
     A standardized Resource created response with a customizable message and data.
     """
@@ -245,7 +245,7 @@ class ResourceCreatedResponse(JSONResponse):
         )
 
 
-class SuccessNoContentResponse(APIResponse):
+class TalkoSuccessNoContentResponse(TalkoAPIResponse):
     """
     A standardized success no content response with a customizable message.
     """
@@ -263,7 +263,7 @@ class SuccessNoContentResponse(APIResponse):
         )
 
 
-class ResourceConflictResponse(APIResponse):
+class TalkoResourceConflictResponse(TalkoAPIResponse):
     """
     A response class for handling 403 Forbidden Request errors.
     """
@@ -286,7 +286,7 @@ class ResourceConflictResponse(APIResponse):
         )
 
 
-class AcceptedResponse(JSONResponse):
+class TalkoAcceptedResponse(JSONResponse):
     """
     A standardized response for 202 Accepted, used for asynchronous processing.
     """
@@ -310,7 +310,7 @@ class AcceptedResponse(JSONResponse):
         )
 
 
-class InvalidFileFormat(APIResponse):
+class TalkoInvalidFileFormat(TalkoAPIResponse):
     """
     A response class for handling 500 Internal Server Error.
     """
@@ -333,7 +333,7 @@ class InvalidFileFormat(APIResponse):
         )
 
 
-class ResourceNotFoundResponse(APIResponse):
+class TalkoResourceNotFoundResponse(TalkoAPIResponse):
     """
     A response class for handling resource-specific 404 Not Found errors.
     """

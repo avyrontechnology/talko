@@ -3,10 +3,10 @@ from typing import List, Optional
 from bson import ObjectId
 from pydantic import ConfigDict
 
-from src.utils.timestamped_model import TimestampedModel
+from src.utils.timestamped_model import TalkoTimestampedModel
 
 
-class AgentDidMappingModel(TimestampedModel):
+class TalkoAgentDidMappingModel(TalkoTimestampedModel):
     partner_id: Optional[int] = None  # ID of the partner
     agent_id: Optional[int] = None  # ID of the agent
     did: Optional[List[str]] = None  # Direct Inward Dialing number from vendor
@@ -18,7 +18,7 @@ class AgentDidMappingModel(TimestampedModel):
     model_config: ConfigDict = ConfigDict(arbitrary_types_allowed=True)
 
 
-class AgentServiceBoardMappingModel(TimestampedModel):
+class TalkoAgentServiceBoardMappingModel(TalkoTimestampedModel):
     partner_id: Optional[int] = None  # Partner identifier
     service_board_id: int  # Service Board identifier
     agent_id: int  # Agent identifier

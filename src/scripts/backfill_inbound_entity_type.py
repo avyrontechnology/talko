@@ -1,8 +1,8 @@
 """
-One-time backfill for CDR rows created before entity_type/entity_id/entity_name
+One-time backfill for TalkoCDR rows created before entity_type/entity_id/entity_name
 existed (MGL-8214) or where the inbound lead-resolution flow never ran.
 
-For every CDR with action="inbound" and entity_type=None:
+For every TalkoCDR with action="inbound" and entity_type=None:
   - if lead_id is present, sets entity_type="Lead", entity_id=lead_id, entity_name=lead_name.
   - otherwise, sets entity_type="Lead" only (entity_id/entity_name stay None), matching
     the new default applied to newly-created inbound CDRs with no resolvable lead.
@@ -15,17 +15,17 @@ Usage:
 import argparse
 import asyncio
 
-from src.components.cdr.constants import EntityType
-from src.components.cdr.models import CDR
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.cdr.constants import TalkoEntityType
+from src.components.cdr.models import TalkoCDR
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 async def backfill(apply: bool) -> None:
-    logger = HollerServiceLogger()
-    db_manager = DocDatabaseSessionManager(logger)
+    logger = TalkoServiceLogger()
+    db_manager = TalkoDocDatabaseSessionManager(logger)
 
-    async with db_manager.collection(CDR.CollectionName.CDR) as collection:
+    async with db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
         query = {"action": "inbound", "entity_type": None}
         total = await collection.count_documents(query)
         with_lead = await collection.count_documents({**query, "lead_id": {"$ne": None}})
@@ -46,13 +46,13 @@ async def backfill(apply: bool) -> None:
             lead_id = doc.get("lead_id")
             if lead_id is not None:
                 update = {
-                    "entity_type": EntityType.LEAD.value,
+                    "entity_type": TalkoEntityType.LEAD.value,
                     "entity_id": lead_id,
                     "entity_name": doc.get("lead_name"),
                 }
                 updated_with_lead += 1
             else:
-                update = {"entity_type": EntityType.LEAD.value}
+                update = {"entity_type": TalkoEntityType.LEAD.value}
                 updated_without_lead += 1
             await collection.update_one({"_id": doc["_id"]}, {"$set": update})
 

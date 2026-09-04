@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from src.components.call_management.handlers.base_handler import VendorCallHandler
+from src.components.call_management.handlers.base_handler import TalkoVendorCallHandler
 from src.components.call_management.messages import (
     AGENT_NUMBER_IS_REQUIRED,
     HANGUP_URL_HANDLER_NOT_CONFIGURED,
@@ -14,7 +14,7 @@ from src.components.call_management.messages import (
 from src.utils.phone_number_utils import normalize_phone_number
 
 
-class TataTeleCallHandler(VendorCallHandler):
+class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
     """
     Handler for making calls via Tata Tele API.
     Supports both normal C2C (human agent) and AI Bridge (callback_url) modes.

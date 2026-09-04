@@ -8,101 +8,101 @@ import httpx
 from bson import ObjectId
 from bson.errors import InvalidId
 
-from src.components.cache.helper import CacheHelper
-from src.components.call_agent_map.repository import AgentMappingRepository
-from src.components.call_agent_map.services import AgentMappingService
+from src.components.cache.helper import TalkoCacheHelper
+from src.components.call_agent_map.repository import TalkoAgentMappingRepository
+from src.components.call_agent_map.services import TalkoAgentMappingService
 from src.components.call_management.agent_dialplan_resolver import (
-    AgentDialPlanResolver,
-    DialplanResponseBuilder,
+    TalkoAgentDialPlanResolver,
+    TalkoDialplanResponseBuilder,
 )
 from src.components.call_management.constant import AI_BRIDGE_VENDOR_CONFIG_ID
-from src.components.call_management.dto import Contract as call_contract
-from src.components.call_management.enums import InboundType
-from src.components.call_management.handlers.webhook_base_handler import WebhookHandler
-from src.components.call_management.helper import CallProcessorHelper
+from src.components.call_management.dto import TalkoContract as call_contract
+from src.components.call_management.enums import TalkoInboundType
+from src.components.call_management.handlers.webhook_base_handler import TalkoWebhookHandler
+from src.components.call_management.helper import TalkoCallProcessorHelper
 from src.components.call_management.messages import (
     CALL_HANGUP_INITIATED,
     CALL_PLACED_SUCCESSFULLY,
     NO_VENDOR_ID_ASSIGNED_TO_PARTNER,
 )
-from src.components.call_management.redis_helper import CallRedisHelper
-from src.components.call_management.repository import CallRepository
-from src.components.call_management.tata_tele.call_dialer import DialerWebhookHandler
-from src.components.call_management.tata_tele.call_webhook import TataTeleWebhookHandler
-from src.components.call_operation.cdr_update import CDRUpdateTask
-from src.components.call_operation.vendor_cdr_gateway import VendorCDRGateway
-from src.components.cdr.constants import EntityType
-from src.components.cdr.dto import Contract as cdr_contract
+from src.components.call_management.redis_helper import TalkoCallRedisHelper
+from src.components.call_management.repository import TalkoCallRepository
+from src.components.call_management.tata_tele.call_dialer import TalkoDialerWebhookHandler
+from src.components.call_management.tata_tele.call_webhook import TalkoTataTeleWebhookHandler
+from src.components.call_operation.cdr_update import TalkoCDRUpdateTask
+from src.components.call_operation.vendor_cdr_gateway import TalkoVendorCDRGateway
+from src.components.cdr.constants import TalkoEntityType
+from src.components.cdr.dto import TalkoContract as cdr_contract
 from src.components.cdr.entity_fields import derive_entity_fields
-from src.components.cdr.repository import CDRRepository
-from src.components.did_management.constants import DIDType
-from src.components.did_management.repositories import DidRepository
-from src.components.did_management.services import DidManagementService
-from src.components.inbound_call_events.publisher import InboundCallEventPublisher
-from src.components.integrations.console.maglo_client import MagloClient
-from src.components.partner_config.repository import PartnerConfigRepository
-from src.components.vendor_config.repository import VendorConfigRepository
-from src.core.environment import ENV
-from src.core.redis import RedisCache
-from src.exceptions import BadRequestError, ResourceNotFound
-from src.grpc_client.constants import GrpcServices
-from src.grpc_client.rpc_service_factory import RPCServiceFactory
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.assignment_strategy import RoundRobinAssignment
-from src.utils.datetime_util import DateTimeUtil
-from src.utils.enums import VendorType
+from src.components.cdr.repository import TalkoCDRRepository
+from src.components.did_management.constants import TalkoDIDType
+from src.components.did_management.repositories import TalkoDidRepository
+from src.components.did_management.services import TalkoDidManagementService
+from src.components.inbound_call_events.publisher import TalkoInboundCallEventPublisher
+from src.components.integrations.console.maglo_client import TalkoMagloClient
+from src.components.partner_config.repository import TalkoPartnerConfigRepository
+from src.components.vendor_config.repository import TalkoVendorConfigRepository
+from src.core.environment import TalkoENV
+from src.core.redis import TalkoRedisCache
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
+from src.grpc_client.constants import TalkoGrpcServices
+from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.assignment_strategy import TalkoRoundRobinAssignment
+from src.utils.datetime_util import TalkoDateTimeUtil
+from src.utils.enums import TalkoVendorType
 from src.utils.phone_number_utils import normalize_phone_number
-from src.utils.title_case_util import TitleCaseUtil
+from src.utils.title_case_util import TalkoTitleCaseUtil
 
 
-class CallService:
+class TalkoCallService:
     """
     Service responsible for initiating partner calls via vendor APIs, managing
-    partner configurations, DID assignments, and call logging (CDR).
+    partner configurations, DID assignments, and call logging (TalkoCDR).
     """
 
     def __init__(
         self,
-        repository: CallRepository,
-        logger: HollerServiceLogger,
-        datetime_util: DateTimeUtil,
-        partner_config_repository: PartnerConfigRepository,
-        vendor_config_repository: VendorConfigRepository,
-        agent_mapping_service: AgentMappingService,
-        agent_mapping_repository: AgentMappingRepository,
-        did_management_service: DidManagementService,
-        cdr_update_task: CDRUpdateTask,
-        vendor_cdr_gateway: VendorCDRGateway,
-        cdr_repository: CDRRepository,
-        call_redis_helper: CallRedisHelper,
-        did_repository: DidRepository,  # same as PSTNBridgeService — for agent_id resolution
-        inbound_call_event_publisher: InboundCallEventPublisher,
+        repository: TalkoCallRepository,
+        logger: TalkoServiceLogger,
+        datetime_util: TalkoDateTimeUtil,
+        partner_config_repository: TalkoPartnerConfigRepository,
+        vendor_config_repository: TalkoVendorConfigRepository,
+        agent_mapping_service: TalkoAgentMappingService,
+        agent_mapping_repository: TalkoAgentMappingRepository,
+        did_management_service: TalkoDidManagementService,
+        cdr_update_task: TalkoCDRUpdateTask,
+        vendor_cdr_gateway: TalkoVendorCDRGateway,
+        cdr_repository: TalkoCDRRepository,
+        call_redis_helper: TalkoCallRedisHelper,
+        did_repository: TalkoDidRepository,  # same as TalkoPSTNBridgeService — for agent_id resolution
+        inbound_call_event_publisher: TalkoInboundCallEventPublisher,
     ):
         """
-        Initializes the CallService with necessary repositories and utilities.
+        Initializes the TalkoCallService with necessary repositories and utilities.
 
         Args:
-            repository (CallRepository): Repository for CDR and related DB operations.
-            logger (HollerServiceLogger): Logger for logging.
-            datetime_util (DateTimeUtil): Utility for datetime operations.
-            partner_config_repository (PartnerConfigRepository): Repo for partner configs.
-            vendor_config_repository (VendorConfigRepository): Repo for vendor configs.
-            agent_mapping_service (AgentMappingService): Service for agent DID mapping.
+            repository (TalkoCallRepository): Repository for TalkoCDR and related DB operations.
+            logger (TalkoServiceLogger): Logger for logging.
+            datetime_util (TalkoDateTimeUtil): Utility for datetime operations.
+            partner_config_repository (TalkoPartnerConfigRepository): Repo for partner configs.
+            vendor_config_repository (TalkoVendorConfigRepository): Repo for vendor configs.
+            agent_mapping_service (TalkoAgentMappingService): Service for agent DID mapping.
         """
-        self.__repository: CallRepository = repository
-        self.__logger: HollerServiceLogger = logger
-        self.__datetime_util: DateTimeUtil = datetime_util
-        self.__round_robin: RoundRobinAssignment = RoundRobinAssignment()
-        self.__partner_config_repo: PartnerConfigRepository = partner_config_repository
-        self.__vendor_config_repository: VendorConfigRepository = (
+        self.__repository: TalkoCallRepository = repository
+        self.__logger: TalkoServiceLogger = logger
+        self.__datetime_util: TalkoDateTimeUtil = datetime_util
+        self.__round_robin: TalkoRoundRobinAssignment = TalkoRoundRobinAssignment()
+        self.__partner_config_repo: TalkoPartnerConfigRepository = partner_config_repository
+        self.__vendor_config_repository: TalkoVendorConfigRepository = (
             vendor_config_repository
         )
-        self.__agent_mapping_service: AgentMappingService = agent_mapping_service
-        self.__agent_mapping_repository: AgentMappingRepository = (
+        self.__agent_mapping_service: TalkoAgentMappingService = agent_mapping_service
+        self.__agent_mapping_repository: TalkoAgentMappingRepository = (
             agent_mapping_repository
         )
-        self.__did_management_service: DidManagementService = did_management_service
-        self.__helper: CallProcessorHelper = CallProcessorHelper(
+        self.__did_management_service: TalkoDidManagementService = did_management_service
+        self.__helper: TalkoCallProcessorHelper = TalkoCallProcessorHelper(
             repository=self.__repository,
             logger=self.__logger,
             datetime_util=self.__datetime_util,
@@ -112,24 +112,24 @@ class CallService:
             agent_mapping_repository=self.__agent_mapping_repository,
             did_management_service=self.__did_management_service,
         )
-        self.__maglo_client = MagloClient(
+        self.__maglo_client = TalkoMagloClient(
             logger=self.__logger,
         )
-        self.__dialplan_resolver = AgentDialPlanResolver(
+        self.__dialplan_resolver = TalkoAgentDialPlanResolver(
             maglo_client=self.__maglo_client,
             agent_mapping_repo=self.__agent_mapping_repository,
             logger=self.__logger,
-            user_service_client=RPCServiceFactory.get_service(GrpcServices.USER),
+            user_service_client=TalkoRPCServiceFactory.get_service(TalkoGrpcServices.USER),
         )
-        self.__response_builder = DialplanResponseBuilder()
-        self.__vendor_cdr_gateway: VendorCDRGateway = vendor_cdr_gateway
-        self.__cdr_update_task: CDRUpdateTask = cdr_update_task
+        self.__response_builder = TalkoDialplanResponseBuilder()
+        self.__vendor_cdr_gateway: TalkoVendorCDRGateway = vendor_cdr_gateway
+        self.__cdr_update_task: TalkoCDRUpdateTask = cdr_update_task
         self.__cdr_repository = cdr_repository
         self.__redis_helper = call_redis_helper
-        self.__did_repository: DidRepository = (
+        self.__did_repository: TalkoDidRepository = (
             did_repository  # for agent_id resolution in _pre_create_session
         )
-        self.__inbound_call_event_publisher: InboundCallEventPublisher = (
+        self.__inbound_call_event_publisher: TalkoInboundCallEventPublisher = (
             inbound_call_event_publisher
         )
 
@@ -144,15 +144,15 @@ class CallService:
         if call_data.entity_type is None and call_data.lead_id is not None:
             self.__logger.warning(
                 "DEPRECATED: outbound request using lead_id without entity_type/entity_id. "
-                "Normalizing to EntityType.LEAD."
+                "Normalizing to TalkoEntityType.LEAD."
             )
-            call_data.entity_type = EntityType.LEAD
+            call_data.entity_type = TalkoEntityType.LEAD
             call_data.entity_id = call_data.lead_id
 
         if (
             getattr(call_data, "entity_name", None) is None
             and getattr(call_data, "lead_name", None)
-            and call_data.entity_type == EntityType.LEAD
+            and call_data.entity_type == TalkoEntityType.LEAD
         ):
             call_data.entity_name = call_data.lead_name
 
@@ -169,9 +169,9 @@ class CallService:
         """
         Normalize inbound entity fields for compatibility.
         """
-        if entity_type is not None and not isinstance(entity_type, EntityType):
+        if entity_type is not None and not isinstance(entity_type, TalkoEntityType):
             try:
-                entity_type = EntityType(entity_type)
+                entity_type = TalkoEntityType(entity_type)
             except ValueError:
                 self.__logger.warning(
                     "Invalid entity_type '{}' received in inbound flow. Ignoring.".format(
@@ -202,7 +202,7 @@ class CallService:
         notify_outbound_event: bool = False,
     ) -> call_contract.CallResponse:
         """
-        Initiates an outbound call through the assigned vendor, logs a Call Detail Record (CDR),
+        Initiates an outbound call through the assigned vendor, logs a Call Detail Record (TalkoCDR),
         and returns call details.
 
         When enable_ai_bridge=True, fires a background task (_pre_create_session)
@@ -226,7 +226,7 @@ class CallService:
             call_contract.CallResponse: Call details including IDs, numbers, status, and timestamps.
 
         Raises:
-            ResourceNotFound: If no vendor is assigned to the partner.
+            TalkoResourceNotFound: If no vendor is assigned to the partner.
             Exception: For vendor errors or unexpected failures.
         """
         try:
@@ -259,7 +259,7 @@ class CallService:
 
             vendor_id: Optional[str] = partner_config.get("vendor_id")
             if not vendor_id:
-                raise ResourceNotFound(NO_VENDOR_ID_ASSIGNED_TO_PARTNER)
+                raise TalkoResourceNotFound(NO_VENDOR_ID_ASSIGNED_TO_PARTNER)
 
             vendor_config_id: Optional[str] = (
                 partner_config.get("ai_vendor_config_id")
@@ -267,7 +267,7 @@ class CallService:
                 else None
             ) or partner_config.get("vendor_config_id")
             if not vendor_config_id:
-                raise ResourceNotFound("No vendor_config_id assigned to partner.")
+                raise TalkoResourceNotFound("No vendor_config_id assigned to partner.")
             if call_data.dedicated_did and not call_data.enable_ai_bridge:
                 await self.__helper.validate_given_did(
                     call_data.dedicated_did, partner_id, call_data.service_board_id
@@ -352,10 +352,10 @@ class CallService:
                 vendor_config_id,
             )
 
-            self.__logger.debug("Prepared CDR for call initiation: {}".format(cdr_dict))
+            self.__logger.debug("Prepared TalkoCDR for call initiation: {}".format(cdr_dict))
             cdr_id: str = await self.__repository.insert_cdr(cdr_dict)
 
-            self.__logger.debug("CDR inserted with ID: {}".format(cdr_id))
+            self.__logger.debug("TalkoCDR inserted with ID: {}".format(cdr_id))
 
             response: dict[str, Any] = {
                 "id": cdr_id,
@@ -388,7 +388,7 @@ class CallService:
                     call_id if (call_id and call_id != "None") else normalized_to
                 )
 
-                # cdr_id (this CDR row's own _id, NOT Tata's call_id — that's
+                # cdr_id (this TalkoCDR row's own _id, NOT Tata's call_id — that's
                 # routinely empty here for AI-bridge calls, see above) rides
                 # along in context_data all the way to the voice worker and
                 # back over the LiveKit data channel (pstn/services.py
@@ -396,9 +396,9 @@ class CallService:
                 # vendor call_id is resolved, THIS row's call_id can be
                 # updated in place. Without it, get_cdr_by_call_id_or_uuid
                 # can never match this row when Tata's webhook later arrives
-                # (it has neither the empty call_id nor Holler's own
+                # (it has neither the empty call_id nor Talko's own
                 # self-generated call_uuid) — the webhook creates an orphan
-                # duplicate CDR instead of enriching the original one.
+                # duplicate TalkoCDR instead of enriching the original one.
                 context_data_with_cdr_id: dict[str, Any] = {
                     **(getattr(call_data, "context_data", None) or {}),
                     "cdr_id": cdr_id,
@@ -432,11 +432,11 @@ class CallService:
                 # to makun-ai /voice/sessions while Tata is dialing the customer
                 # (ringing typically takes 2-5 seconds). By the time the customer
                 # answers, the LiveKit room and makun-ai worker are already warm,
-                # so holler-service can join the existing room immediately instead
+                # so talko-service can join the existing room immediately instead
                 # of waiting for a cold session to spin up.
                 #
                 # The background task stores the room details in Redis under
-                # outbound_room:<to_number>. PSTNBridgeService.handle_call() reads
+                # outbound_room:<to_number>. TalkoPSTNBridgeService.handle_call() reads
                 # and deletes this key on the WebSocket start event.
                 #
                 # The existing pending_context store below is kept as a fallback:
@@ -517,7 +517,7 @@ class CallService:
                         customer_number=to_number,
                     )
                 except Exception as notify_error:
-                    # Notification must never fail call placement — CDR is
+                    # Notification must never fail call placement — TalkoCDR is
                     # already inserted and vendor call already placed.
                     self.__logger.error(
                         "Outbound call event notify failed (non-fatal): {}".format(
@@ -558,7 +558,7 @@ class CallService:
             if not (partner_id and service_board_id and customer_number and did_number):
                 self.__logger.warning(
                     "Missed-call callback skipped for call_uuid={}: missing "
-                    "partner_id/service_board_id/customer/did_number on CDR".format(
+                    "partner_id/service_board_id/customer/did_number on TalkoCDR".format(
                         call_uuid
                     )
                 )
@@ -567,7 +567,7 @@ class CallService:
             if not agent_id:
                 self.__logger.info(
                     "Missed-call callback skipped for call_uuid={}: no single "
-                    "assigned agent on the missed CDR".format(call_uuid)
+                    "assigned agent on the missed TalkoCDR".format(call_uuid)
                 )
                 return
 
@@ -593,7 +593,7 @@ class CallService:
             did_record = await self.__did_management_service.get_dids_by_number(
                 did_number
             )
-            if did_record and did_record.get("did_type") == DIDType.AI_AGENT.value:
+            if did_record and did_record.get("did_type") == TalkoDIDType.AI_AGENT.value:
                 self.__logger.info(
                     "Missed-call callback skipped for call_uuid={}: DID {} is "
                     "an AI-agent DID".format(call_uuid, did_number)
@@ -671,7 +671,7 @@ class CallService:
 
             # initiate_call has no notion of "this is a callback" — context_data
             # only ever reaches the AI-bridge/makun-ai session path (see
-            # _pre_create_session above), never the plain CDR document, so the
+            # _pre_create_session above), never the plain TalkoCDR document, so the
             # link back to the missed call has to be stamped on afterwards.
             if call_response and call_response.id:
                 await self.__repository.update_cdr(
@@ -718,7 +718,7 @@ class CallService:
             Dict[str, Any]: Vendor API response.
 
         Raises:
-            ResourceNotFound: If no vendor is assigned to the partner.
+            TalkoResourceNotFound: If no vendor is assigned to the partner.
             ValueError: For vendor errors.
         """
         try:
@@ -734,7 +734,7 @@ class CallService:
 
             vendor_id: Optional[str] = partner_config.get("vendor_id")
             if not vendor_id:
-                raise ResourceNotFound(NO_VENDOR_ID_ASSIGNED_TO_PARTNER)
+                raise TalkoResourceNotFound(NO_VENDOR_ID_ASSIGNED_TO_PARTNER)
 
             vendor_config_id: Optional[str] = (
                 AI_BRIDGE_VENDOR_CONFIG_ID
@@ -742,7 +742,7 @@ class CallService:
                 # else partner_config.get("vendor_config_id")
             )
             if not vendor_config_id:
-                raise ResourceNotFound("No vendor_config_id assigned to partner.")
+                raise TalkoResourceNotFound("No vendor_config_id assigned to partner.")
 
             vendor_handler: Any = await self.__helper.get_vendor_handler(
                 vendor_id, vendor_config_id
@@ -793,7 +793,7 @@ class CallService:
             vendor_config_id:   Stored in fallback payload.
             context_data:       Passed to makun-ai session.
             caller_did:         DID (from_number) — used to resolve agent_id,
-                                same way PSTNBridgeService._resolve_did() does.
+                                same way TalkoPSTNBridgeService._resolve_did() does.
             caller_phone:       Customer phone number with + prefix.
             fallback_payload:   Full pending_context dict to store on failure.
             fallback_store_key: Redis key for fallback pending_context store.
@@ -810,7 +810,7 @@ class CallService:
         t0 = time.perf_counter()
         try:
             # ── Step 1: Resolve agent_id from DID ────────────────────────────
-            # Exact same logic as PSTNBridgeService._resolve_did()
+            # Exact same logic as TalkoPSTNBridgeService._resolve_did()
             try:
                 did_record = await self.__did_repository.get_did_by_number(
                     call_to_number=caller_did, partner_id=None
@@ -825,8 +825,8 @@ class CallService:
                     "No active DID record for caller_did={}".format(caller_did)
                 )
 
-            did_type: str = did_record.get("did_type", DIDType.NORMAL.value)
-            if did_type == DIDType.AI_AGENT.value:
+            did_type: str = did_record.get("did_type", TalkoDIDType.NORMAL.value)
+            if did_type == TalkoDIDType.AI_AGENT.value:
                 agent_id = did_record.get("agent_bot_id")
             else:
                 agent_id = did_record.get("agent_id")
@@ -840,7 +840,7 @@ class CallService:
 
             # The DID's own assigned partner — NOT necessarily the caller's
             # partner_id. makun-ai scopes agent_id lookups to the DID's
-            # owning partner, same as PSTNBridgeService._resolve_did() does
+            # owning partner, same as TalkoPSTNBridgeService._resolve_did() does
             # (partner_id = did_record["partner_id"]). Using the caller's
             # partner_id here would 404 whenever a partner is (validly) using
             # a DID assigned to a different partner.
@@ -855,7 +855,7 @@ class CallService:
                 )
             )
 
-            # ── Step 2: Resolve partner API key (same cache as PSTNBridgeService) ──
+            # ── Step 2: Resolve partner API key (same cache as TalkoPSTNBridgeService) ──
             from redis import asyncio as aioredis
 
             from src.components.cache.redis_client import get_redis_client
@@ -863,8 +863,8 @@ class CallService:
                 API_KEY_CACHE_KEY,
                 API_KEY_CACHE_TTL_SECONDS,
             )
-            from src.grpc_client.constants import GrpcServices
-            from src.grpc_client.rpc_service_factory import RPCServiceFactory
+            from src.grpc_client.constants import TalkoGrpcServices
+            from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
 
             redis: aioredis.Redis = await get_redis_client()
             api_key_cache_key = API_KEY_CACHE_KEY.format(partner_id=did_partner_id)
@@ -884,7 +884,7 @@ class CallService:
                         did_partner_id
                     )
                 )
-                grpc_client = RPCServiceFactory.get_service(GrpcServices.AUTH)
+                grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
                 api_key = await grpc_client.get_partner_api_key(did_partner_id)
                 await redis.set(
                     api_key_cache_key, api_key, ex=API_KEY_CACHE_TTL_SECONDS
@@ -926,13 +926,13 @@ class CallService:
 
             self.__logger.info(
                 "[PreSession] POST {} to_number={} agent_id={}".format(
-                    ENV.MAKUNAI_SESSION_URL, to_number, agent_id
+                    TalkoENV.MAKUNAI_SESSION_URL, to_number, agent_id
                 )
             )
 
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.post(
-                    ENV.MAKUNAI_SESSION_URL, headers=headers, json=payload
+                    TalkoENV.MAKUNAI_SESSION_URL, headers=headers, json=payload
                 )
                 resp.raise_for_status()
 
@@ -1042,13 +1042,13 @@ class CallService:
 
     def get_webhook_handler(
         self, vendor: str, type: str = "standard"
-    ) -> WebhookHandler:
+    ) -> TalkoWebhookHandler:
         """
         Orchestrates a call initiation process by:
         - Validating and fetching partner and vendor configurations.
         - Selecting a DID using round-robin logic.
         - Making the outbound call via the vendor's API.
-        - Logging the call in a CDR.
+        - Logging the call in a TalkoCDR.
         - Returning a structured response.
 
         Args:
@@ -1058,17 +1058,17 @@ class CallService:
             CallResponse: Response containing call metadata and status.
 
         Raises:
-            ResourceNotFound: If any required config is missing.
-            BadRequestError: For unsupported vendors.
+            TalkoResourceNotFound: If any required config is missing.
+            TalkoBadRequestError: For unsupported vendors.
             ValueError: For invalid DID selection.
             Exception: For unexpected failures.
         """
         try:
             if (
-                vendor in [VendorType.TATA_TELE.value, VendorType.ACEFHONE.value]
+                vendor in [TalkoVendorType.TATA_TELE.value, TalkoVendorType.ACEFHONE.value]
                 and type == "standard"
             ):
-                return TataTeleWebhookHandler(
+                return TalkoTataTeleWebhookHandler(
                     self.__logger,
                     self.__repository,
                     vendor,
@@ -1076,10 +1076,10 @@ class CallService:
                 )
 
             if (
-                vendor in [VendorType.TATA_TELE.value, VendorType.ACEFHONE.value]
+                vendor in [TalkoVendorType.TATA_TELE.value, TalkoVendorType.ACEFHONE.value]
                 and type == "dialer"
             ):
-                return DialerWebhookHandler(
+                return TalkoDialerWebhookHandler(
                     self.__logger,
                     self.__repository,
                     self.__did_management_service,
@@ -1121,7 +1121,7 @@ class CallService:
 
             # This endpoint only ever runs when an inbound call needs redirecting to
             # an agent, so it's the single, reliable place to emit the websocket event
-            # — regardless of which flow (existing CDR vs no CDR) resolved the agent.
+            # — regardless of which flow (existing TalkoCDR vs no TalkoCDR) resolved the agent.
             # Fired as a background task (not awaited) so a slow/stuck dashboard
             # websocket can never delay the dialplan response back to Tata Tele.
             if event_metadata:
@@ -1143,9 +1143,9 @@ class CallService:
     async def _handle_existing_cdr_flow(
         self, request_data, cdr
     ) -> Tuple[list, Dict[str, Any]]:
-        """Handle dialplan generation when CDR exists"""
+        """Handle dialplan generation when TalkoCDR exists"""
         self.__logger.debug(
-            "CDR found dialplan: {}: request data: {}".format(cdr, request_data)
+            "TalkoCDR found dialplan: {}: request data: {}".format(cdr, request_data)
         )
 
         dedicated_did = request_data.get("call_to_number")
@@ -1154,13 +1154,13 @@ class CallService:
         )
 
         # For AI-agent DIDs, prefer the DID's current bot assignment over the
-        # CDR's, since the number may have been reassigned to a different bot
-        # since this CDR was created. Regular (human-agent) DIDs keep the
-        # existing behavior of trusting the CDR's agent. Only fall back to
-        # the CDR's agent if the DID lookup fails or doesn't yield a usable
+        # TalkoCDR's, since the number may have been reassigned to a different bot
+        # since this TalkoCDR was created. Regular (human-agent) DIDs keep the
+        # existing behavior of trusting the TalkoCDR's agent. Only fall back to
+        # the TalkoCDR's agent if the DID lookup fails or doesn't yield a usable
         # agent id.
         current_agent_id = cdr.get("agent")
-        if did_record and did_record.get("did_type") == DIDType.AI_AGENT.value:
+        if did_record and did_record.get("did_type") == TalkoDIDType.AI_AGENT.value:
             live_agent_id = did_record.get("agent_bot_id")
             if live_agent_id:
                 current_agent_id = live_agent_id
@@ -1172,7 +1172,7 @@ class CallService:
         )
         reassign_inactive_agent = self._should_reassign_inactive_agent(partner_config)
         self.__logger.debug(
-            "Existing-CDR flow: inactive-agent reassignment enabled: {} "
+            "Existing-TalkoCDR flow: inactive-agent reassignment enabled: {} "
             "for partner_id: {}, agent_id: {}".format(
                 reassign_inactive_agent, cdr.get("partner_id"), current_agent_id
             )
@@ -1189,7 +1189,7 @@ class CallService:
 
         self.__logger.debug("Dialplan target resolved: {}".format(target))
 
-        # Reflect a possible reassignment so the CDR and event metadata
+        # Reflect a possible reassignment so the TalkoCDR and event metadata
         # record the agent actually being dialed, not the stale owner.
         if target and target.resolved_agent_id:
             current_agent_id = target.resolved_agent_id
@@ -1207,10 +1207,10 @@ class CallService:
             self.__dialplan_resolver.map_transfer_to_inbound_fields(target)
         )
 
-        # Priority 1: whatever lead_id/entity_id the previous CDR already had
+        # Priority 1: whatever lead_id/entity_id the previous TalkoCDR already had
         # on record. Priority 2: if a reassignment happened this call and
         # Maglo confirmed a lead_request_id, that's the freshest data — use
-        # it instead. entity_id only gets overridden when the CDR's entity
+        # it instead. entity_id only gets overridden when the TalkoCDR's entity
         # actually represents a lead (or has none set yet) — if entity_type
         # is something else (e.g. a Contact), entity_id keeps pointing at
         # that other record and only the legacy lead_id field is refreshed.
@@ -1219,7 +1219,7 @@ class CallService:
         entity_id_override = cdr.get("entity_id")
         if target and target.reassigned_lead_id:
             lead_id = target.reassigned_lead_id
-            if old_entity_type is None or old_entity_type == EntityType.LEAD.value:
+            if old_entity_type is None or old_entity_type == TalkoEntityType.LEAD.value:
                 entity_id_override = target.reassigned_lead_id
 
         entity_type, entity_id, entity_name = self._derive_inbound_entity_fields(
@@ -1254,8 +1254,8 @@ class CallService:
     async def _handle_no_cdr_flow(
         self, request_data, caller_id_number, call_to_number
     ) -> Tuple[list, Optional[Dict[str, Any]]]:
-        """Handle dialplan generation when no CDR exists"""
-        self.__logger.info("No CDR found, proceeding with lead handling flow")
+        """Handle dialplan generation when no TalkoCDR exists"""
+        self.__logger.info("No TalkoCDR found, proceeding with lead handling flow")
 
         did_record = await self.__did_management_service.get_dids_by_number(
             call_to_number
@@ -1316,7 +1316,7 @@ class CallService:
             inbound_round_robin_index=inbound_round_robin_index,
         )
 
-        self.__logger.debug("Dialplan resolved for no CDR flow: {}".format(result))
+        self.__logger.debug("Dialplan resolved for no TalkoCDR flow: {}".format(result))
 
         target = result["target"]
 
@@ -1416,12 +1416,12 @@ class CallService:
         inbound_type_str,
         cloud_agent_number,
     ):
-        """Create CDR only if target is valid"""
-        self.__logger.debug("Evaluating CDR creation for target: {}".format(target))
+        """Create TalkoCDR only if target is valid"""
+        self.__logger.debug("Evaluating TalkoCDR creation for target: {}".format(target))
         should_create_cdr = bool(target and target.data)
 
         self.__logger.debug(
-            "Should create CDR: {} for target: {}".format(should_create_cdr, target)
+            "Should create TalkoCDR: {} for target: {}".format(should_create_cdr, target)
         )
 
         if should_create_cdr:
@@ -1443,7 +1443,7 @@ class CallService:
                 cloud_agent_number=cloud_agent_number,
             )
         else:
-            self.__logger.info("Skipping CDR creation — no valid transfer targets")
+            self.__logger.info("Skipping TalkoCDR creation — no valid transfer targets")
 
     async def get_call_details(
         self,
@@ -1456,7 +1456,7 @@ class CallService:
 
         Flow:
         1. Fetch full vendor config using vendor_config_id
-        2. Route through VendorCDRGateway (extensible for future vendors)
+        2. Route through TalkoVendorCDRGateway (extensible for future vendors)
         3. Returns raw_payload + processed_result
         """
         try:
@@ -1467,19 +1467,19 @@ class CallService:
             )
 
             if call_id is None and call_uuid is None:
-                raise BadRequestError(
+                raise TalkoBadRequestError(
                     "{} is required".format(
                         "call_id" if call_uuid is None else "call_uuid"
                     )
                 )
 
             if not vendor_config_id:
-                raise BadRequestError("vendor_config_id is required")
+                raise TalkoBadRequestError("vendor_config_id is required")
 
             try:
                 config_oid = ObjectId(vendor_config_id)
             except InvalidId:
-                raise BadRequestError(
+                raise TalkoBadRequestError(
                     "Invalid vendor_config_id format: {}".format(vendor_config_id)
                 )
 
@@ -1492,7 +1492,7 @@ class CallService:
                 self.__logger.error(
                     "Vendor config not found for id: {}".format(vendor_config_id)
                 )
-                raise ResourceNotFound(
+                raise TalkoResourceNotFound(
                     "Vendor configuration not found for id: {}".format(vendor_config_id)
                 )
 
@@ -1504,7 +1504,7 @@ class CallService:
                 "Vendor config fetched: {}".format(vendor_config.get("vendor_type"))
             )
 
-            # Delegate to VendorCDRGateway (this makes it extensible)
+            # Delegate to TalkoVendorCDRGateway (this makes it extensible)
             result: Dict[str, Any] = await self.__vendor_cdr_gateway.fetch_call_details(
                 call_id=call_id,
                 call_uuid=call_uuid,
@@ -1526,9 +1526,9 @@ class CallService:
             )
 
             if not response:
-                raise ResourceNotFound("CDR not found")
+                raise TalkoResourceNotFound("TalkoCDR not found")
 
-            formatted_response = TitleCaseUtil.convert_values_to_title_case(
+            formatted_response = TalkoTitleCaseUtil.convert_values_to_title_case(
                 response,
                 exclude_keys=[
                     "call_recording",
@@ -1546,12 +1546,12 @@ class CallService:
                 **formatted_response
             ).model_dump()
 
-        except BadRequestError as e:
+        except TalkoBadRequestError as e:
             self.__logger.error("BadRequest in get_call_details: {}".format(str(e)))
             raise
-        except ResourceNotFound as e:
+        except TalkoResourceNotFound as e:
             self.__logger.error(
-                "ResourceNotFound in get_call_details: {}".format(str(e))
+                "TalkoResourceNotFound in get_call_details: {}".format(str(e))
             )
             raise
         except Exception as e:
@@ -1572,8 +1572,8 @@ class CallService:
 
         Resolves the vendor the same way initiate_call does — from the caller's
         partner_id (already normalized for both token and API-KEY auth by
-        get_current_auth_context) — rather than looking up the CDR, so this
-        works even if the CDR write for the call hasn't landed yet. For the same
+        get_current_auth_context) — rather than looking up the TalkoCDR, so this
+        works even if the TalkoCDR write for the call hasn't landed yet. For the same
         reason, enable_ai_bridge must be supplied by the caller to pick the AI
         vendor_config instead of the partner's default.
 
@@ -1592,7 +1592,7 @@ class CallService:
             call_contract.HangupCallResponse: Vendor's hangup result.
 
         Raises:
-            ResourceNotFound: If no vendor is assigned to the partner.
+            TalkoResourceNotFound: If no vendor is assigned to the partner.
             ValueError: For vendor errors (missing config, unexpected response, etc).
         """
         try:
@@ -1608,7 +1608,7 @@ class CallService:
 
             vendor_id: Optional[str] = partner_config.get("vendor_id")
             if not vendor_id:
-                raise ResourceNotFound(NO_VENDOR_ID_ASSIGNED_TO_PARTNER)
+                raise TalkoResourceNotFound(NO_VENDOR_ID_ASSIGNED_TO_PARTNER)
 
             vendor_config_id: Optional[str] = (
                 AI_BRIDGE_VENDOR_CONFIG_ID
@@ -1616,7 +1616,7 @@ class CallService:
                 # else partner_config.get("vendor_config_id")
             )
             if not vendor_config_id:
-                raise ResourceNotFound("No vendor_config_id assigned to partner.")
+                raise TalkoResourceNotFound("No vendor_config_id assigned to partner.")
 
             vendor_handler: Any = await self.__helper.get_vendor_handler(
                 vendor_id, vendor_config_id
@@ -1641,8 +1641,8 @@ class CallService:
                 ),
             )
 
-        except ResourceNotFound as e:
-            self.__logger.error("ResourceNotFound in hangup_call: {}".format(str(e)))
+        except TalkoResourceNotFound as e:
+            self.__logger.error("TalkoResourceNotFound in hangup_call: {}".format(str(e)))
             raise
         except ValueError as e:
             self.__logger.error("Vendor error in hangup_call: {}".format(str(e)))

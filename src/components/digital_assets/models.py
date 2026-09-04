@@ -3,11 +3,11 @@ from datetime import datetime, timezone
 
 from sqlalchemy import JSON, BigInteger, Column, Enum, Integer, String
 
-from src.components.digital_assets.constants import DigitalAssetEnum
+from src.components.digital_assets.constants import TalkoDigitalAssetEnum
 from src.core.db import Base
 
 
-class DigitalAssets(Base):
+class TalkoDigitalAssets(Base):
     """
     Represents a digital asset in the database.
 
@@ -15,7 +15,7 @@ class DigitalAssets(Base):
         unique_id (str): A unique identifier (UUID) for the digital asset.
         partner_id (int): The ID of the partner associated with the asset.
         version (int): The version number of the digital asset.
-        asset_type (DigitalAssetEnum): The type of the asset, determined by the `DigitalAssetEnum` enum.
+        asset_type (TalkoDigitalAssetEnum): The type of the asset, determined by the `TalkoDigitalAssetEnum` enum.
         additional_info (dict, optional): Metadata or additional properties associated with the asset.
         created_by (int, optional): The ID of the user who created the asset.
         updated_by (int, optional): The ID of the user who last updated the asset.
@@ -35,7 +35,7 @@ class DigitalAssets(Base):
     partner_id = Column(Integer, nullable=False, index=True)
     version = Column(Integer, nullable=False)
     asset_type = Column(
-        Enum(DigitalAssetEnum, values_callable=lambda x: [e.name for e in x]),
+        Enum(TalkoDigitalAssetEnum, values_callable=lambda x: [e.name for e in x]),
         nullable=False,
     )
     additional_info = Column(JSON, nullable=True)

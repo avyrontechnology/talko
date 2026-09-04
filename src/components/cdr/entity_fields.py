@@ -1,29 +1,29 @@
 from typing import Any, Dict, Optional, Union
 
-from src.components.cdr.constants import EntityType
+from src.components.cdr.constants import TalkoEntityType
 
 
 def normalize_entity_type(
-    entity_type: Optional[Union[str, EntityType]],
+    entity_type: Optional[Union[str, TalkoEntityType]],
 ) -> Optional[str]:
     if entity_type is None:
         return None
-    if isinstance(entity_type, EntityType):
+    if isinstance(entity_type, TalkoEntityType):
         return entity_type.value
     return str(entity_type)
 
 
 def derive_entity_fields(
-    entity_type: Optional[Union[str, EntityType]] = None,
+    entity_type: Optional[Union[str, TalkoEntityType]] = None,
     entity_id: Optional[Any] = None,
     entity_name: Optional[str] = None,
     lead_id: Optional[Any] = None,
     lead_name: Optional[str] = None,
-    default_entity_type: Optional[EntityType] = None,
+    default_entity_type: Optional[TalkoEntityType] = None,
 ) -> Dict[str, Optional[Any]]:
     """
     Single source of truth for reconciling the new entity_type/entity_id/entity_name
-    fields with the legacy lead_id/lead_name fields on a CDR.
+    fields with the legacy lead_id/lead_name fields on a TalkoCDR.
 
     - Prefers explicit entity_* values when present.
     - Falls back to deriving entity_type="Lead"/entity_id=lead_id from legacy lead_id.
@@ -37,12 +37,12 @@ def derive_entity_fields(
     resolved_entity_name = entity_name
 
     if normalized_entity_type is None and lead_id is not None:
-        normalized_entity_type = EntityType.LEAD.value
+        normalized_entity_type = TalkoEntityType.LEAD.value
         resolved_entity_id = lead_id
 
     if (
         resolved_entity_name is None
-        and normalized_entity_type == EntityType.LEAD.value
+        and normalized_entity_type == TalkoEntityType.LEAD.value
         and lead_name
     ):
         resolved_entity_name = lead_name
@@ -52,12 +52,12 @@ def derive_entity_fields(
 
     derived_lead_id = (
         resolved_entity_id
-        if normalized_entity_type == EntityType.LEAD.value
+        if normalized_entity_type == TalkoEntityType.LEAD.value
         else lead_id
     )
     derived_lead_name = (
         resolved_entity_name
-        if normalized_entity_type == EntityType.LEAD.value
+        if normalized_entity_type == TalkoEntityType.LEAD.value
         else lead_name
     )
 

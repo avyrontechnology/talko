@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-class Contract:
+class TalkoContract:
     class LeadListItem(BaseModel):
         id: int = Field(..., description="Unique ID of the broadcast list")
         name: str = Field(..., description="Name of the broadcast list")
@@ -20,7 +20,7 @@ class Contract:
     class LeadListsFetchResponse(BaseModel):
         status: str = Field(..., description="Response status")
         message: str = Field(..., description="Response message")
-        data: Dict[str, List["Contract.LeadListItem"]] = Field(
+        data: Dict[str, List["TalkoContract.LeadListItem"]] = Field(
             ..., description="Data containing lists"
         )
 
@@ -30,7 +30,7 @@ class Contract:
         field_2: Optional[str] = None
 
     class BulkLeadsCreateRequest(BaseModel):
-        data: List["Contract.LeadObject"] = Field(
+        data: List["TalkoContract.LeadObject"] = Field(
             ..., description="Required array of leads (at least one)"
         )
         duplicate_option: str = Field(
@@ -70,8 +70,8 @@ class Contract:
         @field_validator("data")
         @classmethod
         def data_cannot_be_empty(
-            cls, v: List["Contract.LeadObject"]
-        ) -> List["Contract.LeadObject"]:
+            cls, v: List["TalkoContract.LeadObject"]
+        ) -> List["TalkoContract.LeadObject"]:
             if not v:
                 raise ValueError("data array cannot be empty")
             return v

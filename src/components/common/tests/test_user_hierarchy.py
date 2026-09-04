@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.components.common.user_hierarchy import UserHierarchy
+from src.components.common.user_hierarchy import TalkoUserHierarchy
 
 
 @pytest.mark.asyncio
@@ -20,7 +20,7 @@ class TestUserHierarchy:
 
     @pytest.fixture
     def user_hierarchy(self, mock_grpc_client, mock_logger):
-        return UserHierarchy(grpc_client=mock_grpc_client, logger=mock_logger)
+        return TalkoUserHierarchy(grpc_client=mock_grpc_client, logger=mock_logger)
 
     async def test_get_user_hierarchy_data_success(
         self, user_hierarchy, mock_grpc_client, mock_logger

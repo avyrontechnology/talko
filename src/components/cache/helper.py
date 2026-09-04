@@ -3,18 +3,18 @@ from typing import Any, Dict, List, Optional, Union
 
 from redis import asyncio as aioredis
 
-from src.core.redis import RedisCache
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.core.redis import TalkoRedisCache
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class CacheHelper:
+class TalkoCacheHelper:
     def __init__(
         self,
         redis_pool: aioredis.Redis,
-        holler_service_logger: HollerServiceLogger,
+        talko_service_logger: TalkoServiceLogger,
     ):
         self._redis_pool = redis_pool
-        self.__logger = holler_service_logger
+        self.__logger = talko_service_logger
 
     @property
     def redis(self) -> aioredis.Redis:
@@ -24,7 +24,7 @@ class CacheHelper:
         self,
         key: str,
         value: Any,
-        prefix: RedisCache.KeysPrefix = RedisCache.KeysPrefix.MAGLO,
+        prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO,
         ttl: Optional[int] = None,
     ) -> bool:
         try:
@@ -43,7 +43,7 @@ class CacheHelper:
             return False
 
     async def get_cache(
-        self, key: str, prefix: RedisCache.KeysPrefix = RedisCache.KeysPrefix.MAGLO
+        self, key: str, prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO
     ) -> Optional[Any]:
         try:
             full_key = f"{prefix.value}{key}"
@@ -60,7 +60,7 @@ class CacheHelper:
             return None
 
     async def delete_cache(
-        self, key: str, prefix: RedisCache.KeysPrefix = RedisCache.KeysPrefix.MAGLO
+        self, key: str, prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO
     ) -> bool:
         try:
             full_key = f"{prefix.value}{key}"
@@ -78,7 +78,7 @@ class CacheHelper:
     async def bulk_set_cache(
         self,
         data: Dict[str, Any],
-        prefix: RedisCache.KeysPrefix = RedisCache.KeysPrefix.MAGLO,
+        prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO,
         ttl: Optional[int] = None,
     ) -> bool:
         try:
@@ -108,7 +108,7 @@ class CacheHelper:
     async def bulk_get_cache(
         self,
         keys: List[str],
-        prefix: RedisCache.KeysPrefix = RedisCache.KeysPrefix.MAGLO,
+        prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO,
     ) -> Dict[str, Any]:
         try:
             full_keys = [f"{prefix.value}{key}" for key in keys]
@@ -136,7 +136,7 @@ class CacheHelper:
     async def bulk_delete_cache(
         self,
         keys: List[str],
-        prefix: RedisCache.KeysPrefix = RedisCache.KeysPrefix.MAGLO,
+        prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO,
     ) -> int:
         try:
             full_keys = [f"{prefix.value}{key}" for key in keys]
@@ -157,7 +157,7 @@ class CacheHelper:
 
     async def clear_pattern(
         self,
-        prefix: RedisCache.KeysPrefix,
+        prefix: TalkoRedisCache.KeysPrefix,
         pattern: Optional[Union[str, List[str]]] = None,
     ) -> bool:
         try:
@@ -198,7 +198,7 @@ class CacheHelper:
         self,
         key: str,
         ttl_seconds: int,
-        prefix: RedisCache.KeysPrefix = RedisCache.KeysPrefix.CONSOLE,
+        prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.CONSOLE,
     ) -> Optional[int]:
         full_key = f"{prefix.value}{key}"
         try:
@@ -214,10 +214,10 @@ class CacheHelper:
             return None
 
 
-class CentralizedCacheHelper(CacheHelper):
+class TalkoCentralizedCacheHelper(TalkoCacheHelper):
     def __init__(
         self,
         centralized_redis_pool: aioredis.Redis,
-        holler_service_logger: HollerServiceLogger,
+        talko_service_logger: TalkoServiceLogger,
     ):
-        super().__init__(centralized_redis_pool, holler_service_logger)
+        super().__init__(centralized_redis_pool, talko_service_logger)

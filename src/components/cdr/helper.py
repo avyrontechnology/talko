@@ -10,32 +10,32 @@ from src.components.cdr.constants import (
     IST,
     TALK_TIME_RANGES,
     VALID_CALL_STATUSES,
-    EntityType,
-    TalkTimeRange,
+    TalkoEntityType,
+    TalkoTalkTimeRange,
 )
-from src.components.cdr.dto import Contract
+from src.components.cdr.dto import TalkoContract
 from src.components.cdr.utils import mask_phone_number
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.crypto_utils import RSAKeyHandler
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.crypto_utils import TalkoRSAKeyHandler
 from src.utils.enums import (
-    CallStatus,
-    ConnectionStatus,
-    HangupCause,
-    NumberType,
-    ReasonKey,
-    TimeFilter,
+    TalkoCallStatus,
+    TalkoConnectionStatus,
+    TalkoHangupCause,
+    TalkoNumberType,
+    TalkoReasonKey,
+    TalkoTimeFilter,
 )
 from src.utils.phone_number_utils import normalize_phone_number
-from src.utils.title_case_util import TitleCaseUtil
+from src.utils.title_case_util import TalkoTitleCaseUtil
 
 
-class CommonCDRHelper:
+class TalkoCommonCDRHelper:
     """
-    Helper class for common CDR processing methods used across multiple service methods.
+    Helper class for common TalkoCDR processing methods used across multiple service methods.
     """
 
     @staticmethod
-    def parse_mongo_timestamp(value: Any, logger: HollerServiceLogger) -> Optional[int]:
+    def parse_mongo_timestamp(value: Any, logger: TalkoServiceLogger) -> Optional[int]:
         """
         Convert MongoDB extended JSON timestamp to int.
         """
@@ -68,16 +68,16 @@ class CommonCDRHelper:
 
     @staticmethod
     def create_filtered_cdr(
-        cdr: Dict[str, Any], logger: HollerServiceLogger
+        cdr: Dict[str, Any], logger: TalkoServiceLogger
     ) -> Dict[str, Any]:
         """
-        Create a filtered CDR dictionary with default values for missing fields.
+        Create a filtered TalkoCDR dictionary with default values for missing fields.
         """
-        logger.info("Creating filtered CDR in common cdr helper")
-        logger.debug("Input CDR in common cdr helper: {}".format(cdr))
+        logger.info("Creating filtered TalkoCDR in common cdr helper")
+        logger.debug("Input TalkoCDR in common cdr helper: {}".format(cdr))
 
         created_at_raw = cdr.get("created_at")
-        created_at_parsed = CommonCDRHelper.parse_mongo_timestamp(
+        created_at_parsed = TalkoCommonCDRHelper.parse_mongo_timestamp(
             created_at_raw, logger
         )
 
@@ -115,15 +115,15 @@ class CommonCDRHelper:
             "vendor_config_id": cdr.get("vendor_config_id") or "",
             "custom_fields": cdr.get("custom_fields"),
         }
-        logger.debug("Filtered CDR in common cdr helper: {}".format(filtered_cdr))
+        logger.debug("Filtered TalkoCDR in common cdr helper: {}".format(filtered_cdr))
         return filtered_cdr
 
     @staticmethod
-    def mask_sensitive_data(cdr: dict, logger: HollerServiceLogger) -> None:
+    def mask_sensitive_data(cdr: dict, logger: TalkoServiceLogger) -> None:
         """
-        Mask sensitive phone number fields in CDR.
+        Mask sensitive phone number fields in TalkoCDR.
         """
-        logger.info("Masking sensitive data in CDR in common cdr helper.")
+        logger.info("Masking sensitive data in TalkoCDR in common cdr helper.")
         for key in ["customer", "caller_id_number"]:
             value = cdr.get(key)
             if value is not None and value != "":
@@ -135,38 +135,38 @@ class CommonCDRHelper:
 
     @staticmethod
     def attach_agent_names(
-        cdr_responses: list, agent_data: dict, logger: HollerServiceLogger
+        cdr_responses: list, agent_data: dict, logger: TalkoServiceLogger
     ) -> None:
         """
-        Attach agent names to CDR responses using agent data lookup.
+        Attach agent names to TalkoCDR responses using agent data lookup.
         """
-        logger.info("Attaching agent names to CDR responses in common cdr helper.")
+        logger.info("Attaching agent names to TalkoCDR responses in common cdr helper.")
         logger.debug("Agent data in common cdr helper: {}".format(agent_data))
         for cdr_response in cdr_responses:
             agent_name = agent_data.get(cdr_response.agent, {}).get("name", "")
             cdr_response.action_performed_by = agent_name
             logger.debug(
-                "Attached agent name {} to CDR with agent id {}".format(
+                "Attached agent name {} to TalkoCDR with agent id {}".format(
                     agent_name, cdr_response.agent
                 )
             )
 
     @staticmethod
     def attach_display_names(
-        cdr_responses: list, display_name_map: dict, logger: HollerServiceLogger
+        cdr_responses: list, display_name_map: dict, logger: TalkoServiceLogger
     ) -> None:
         """
-        Attach display_name to CDR responses using a did_number -> display_name
-        lookup. The map is keyed by normalized did_number (no '+'), so the CDR's
-        did_number is normalized the same way before lookup — CDR documents may
+        Attach display_name to TalkoCDR responses using a did_number -> display_name
+        lookup. The map is keyed by normalized did_number (no '+'), so the TalkoCDR's
+        did_number is normalized the same way before lookup — TalkoCDR documents may
         store did_number with a leading '+' while phone_number_management does
         not.
 
-        Falls back to the CDR's original (un-normalized) did_number when the
+        Falls back to the TalkoCDR's original (un-normalized) did_number when the
         DID has no display_name set or is missing from the map entirely. If
-        did_number itself is missing/empty on the CDR, display_name is "".
+        did_number itself is missing/empty on the TalkoCDR, display_name is "".
         """
-        logger.info("Attaching display names to CDR responses in common cdr helper.")
+        logger.info("Attaching display names to TalkoCDR responses in common cdr helper.")
         for cdr_response in cdr_responses:
             raw_did_number = getattr(cdr_response, "did_number", None) or ""
             normalized_did_number = (
@@ -177,21 +177,21 @@ class CommonCDRHelper:
             display_name = display_name_map.get(normalized_did_number) or raw_did_number
             cdr_response.display_name = display_name
             logger.debug(
-                "Attached display_name {} to CDR with did_number {} (normalized: {})".format(
+                "Attached display_name {} to TalkoCDR with did_number {} (normalized: {})".format(
                     display_name, raw_did_number, normalized_did_number
                 )
             )
 
 
-class GetCDRsHelper:
+class TalkoGetCDRsHelper:
     """
     Helper class for processing CDRs in get_cdrs service method.
     """
 
     @staticmethod
     def process_cdrs(
-        cdrs: list[dict], logger: HollerServiceLogger
-    ) -> list[Contract.CDRResponse]:
+        cdrs: list[dict], logger: TalkoServiceLogger
+    ) -> list[TalkoContract.CDRResponse]:
         """
         Transform raw CDRs into CDRResponse objects for get_cdrs.
         """
@@ -212,7 +212,7 @@ class GetCDRsHelper:
                 cdr["customer"] = str(cdr["customer"])
 
             try:
-                cdr_response = Contract.CDRResponse(**cdr)
+                cdr_response = TalkoContract.CDRResponse(**cdr)
                 cdr_responses.append(cdr_response)
                 logger.debug(
                     "Created CDRResponse in get cdr helper: {}".format(cdr_response)
@@ -227,7 +227,7 @@ class GetCDRsHelper:
         return cdr_responses
 
 
-class GetAgentCallLogsHelper:
+class TalkoGetAgentCallLogsHelper:
     """
     Helper class for processing CDRs in get_agent_call_logs service method.
     """
@@ -236,8 +236,8 @@ class GetAgentCallLogsHelper:
     def process_cdrs(
         cdrs: list[dict],
         is_masking_enabled: bool,
-        logger: HollerServiceLogger,
-    ) -> tuple[list[int], list[Contract.CallLogResponse]]:
+        logger: TalkoServiceLogger,
+    ) -> tuple[list[int], list[TalkoContract.CallLogResponse]]:
         """
         Clean and transform raw CDRs into CallLogResponse objects.
         """
@@ -278,21 +278,21 @@ class GetAgentCallLogsHelper:
                 cdr["customer"] = str(cdr["customer"])
 
             if is_masking_enabled:
-                CommonCDRHelper.mask_sensitive_data(cdr, logger)
+                TalkoCommonCDRHelper.mask_sensitive_data(cdr, logger)
 
             if "hangup_cause" in cdr:
-                cdr["hangup_cause"] = GetAgentCallLogsHelper.handle_hangup_cause(
+                cdr["hangup_cause"] = TalkoGetAgentCallLogsHelper.handle_hangup_cause(
                     cdr, logger
                 )
 
             if "reason_key" in cdr:
-                cdr["reason_key"] = GetAgentCallLogsHelper.handle_reason_key(
+                cdr["reason_key"] = TalkoGetAgentCallLogsHelper.handle_reason_key(
                     cdr, logger
                 )
 
             logger.debug("cdr data in get agent call logs helper: {}".format(cdr))
             try:
-                response = Contract.CallLogResponse(**cdr)
+                response = TalkoContract.CallLogResponse(**cdr)
                 responses.append(response)
                 logger.debug(
                     "Created CallLogResponse in get agent call logs helper: {}".format(
@@ -311,13 +311,13 @@ class GetAgentCallLogsHelper:
         return agent_ids, responses
 
     @staticmethod
-    def handle_hangup_cause(cdr: dict, logger: HollerServiceLogger) -> Optional[str]:
+    def handle_hangup_cause(cdr: dict, logger: TalkoServiceLogger) -> Optional[str]:
         """
         Convert hangup_cause field to its enum value.
         """
         logger.info("Handling hangup_cause in get agent call logs helper")
         try:
-            hangup_cause = HangupCause.from_raw(cdr["hangup_cause"]).value
+            hangup_cause = TalkoHangupCause.from_raw(cdr["hangup_cause"]).value
             logger.debug(
                 "Converted hangup_cause in get agent call logs helper: {}".format(
                     hangup_cause
@@ -330,17 +330,17 @@ class GetAgentCallLogsHelper:
                     str(e)
                 )
             )
-            cdr["hangup_cause"] = CallStatus.UNKNOWN.value
-            return CallStatus.UNKNOWN.value
+            cdr["hangup_cause"] = TalkoCallStatus.UNKNOWN.value
+            return TalkoCallStatus.UNKNOWN.value
 
     @staticmethod
-    def handle_reason_key(cdr: dict, logger: HollerServiceLogger) -> Optional[str]:
+    def handle_reason_key(cdr: dict, logger: TalkoServiceLogger) -> Optional[str]:
         """
         Convert reason_key field to its enum value.
         """
         logger.info("Handling reason_key in get agent call logs helper")
         try:
-            reason_key = ReasonKey.from_raw(cdr["reason_key"]).value
+            reason_key = TalkoReasonKey.from_raw(cdr["reason_key"]).value
             logger.debug(
                 "Converted reason_key in get agent call logs helper: {}".format(
                     reason_key
@@ -353,14 +353,14 @@ class GetAgentCallLogsHelper:
                     str(e)
                 )
             )
-            cdr["reason_key"] = CallStatus.UNKNOWN.value
-            return CallStatus.UNKNOWN.value
+            cdr["reason_key"] = TalkoCallStatus.UNKNOWN.value
+            return TalkoCallStatus.UNKNOWN.value
 
     @staticmethod
     def agent_call_log_response(
-        cdr_responses: list[Contract.CallLogResponse],
+        cdr_responses: list[TalkoContract.CallLogResponse],
         total_count: int,
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ) -> dict:
         """
         Return a single response object for agent call logs.
@@ -369,7 +369,7 @@ class GetAgentCallLogsHelper:
             "Formatting agent call log response in get agent call logs response helper"
         )
         logger.debug(
-            "CDR responses: {}, total_count: {} in get agent call logs response helper".format(
+            "TalkoCDR responses: {}, total_count: {} in get agent call logs response helper".format(
                 cdr_responses, total_count
             )
         )
@@ -382,7 +382,7 @@ class GetAgentCallLogsHelper:
         }
 
         try:
-            formatted_response = TitleCaseUtil.convert_values_to_title_case(
+            formatted_response = TalkoTitleCaseUtil.convert_values_to_title_case(
                 response,
                 exclude_keys=[
                     "call_recording",
@@ -407,14 +407,14 @@ class GetAgentCallLogsHelper:
             raise
 
 
-class GetCallRecordHistoryHelper:
+class TalkoGetCallRecordHistoryHelper:
     """
     Helper class for processing CDRs in get_call_record_history service method.
     """
 
     @staticmethod
     def validate_call_status(
-        call_status: Optional[Any], logger: HollerServiceLogger
+        call_status: Optional[Any], logger: TalkoServiceLogger
     ) -> None:
         """
         Validate call_status field.
@@ -457,7 +457,7 @@ class GetCallRecordHistoryHelper:
     @staticmethod
     def build_status_match(
         call_status: Optional[list[str]],
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ) -> Optional[dict]:
         """
         Build a Mongo $match condition for derived agent/lead connection
@@ -469,8 +469,8 @@ class GetCallRecordHistoryHelper:
         by add_call_status_filter, since those map directly to a real
         stored field (call_status) and don't need an $addFields stage.
 
-        IMPORTANT: uses ConnectionStatus enum values directly (note that
-        ConnectionStatus.NOT_CONNECTED == "not connected", with a space,
+        IMPORTANT: uses TalkoConnectionStatus enum values directly (note that
+        TalkoConnectionStatus.NOT_CONNECTED == "not connected", with a space,
         not "not_connected") rather than deriving the expected value by
         string-splitting the status key, which was the source of a prior
         bug where *_not_connected filters never matched anything.
@@ -483,15 +483,15 @@ class GetCallRecordHistoryHelper:
             return None
 
         status_field_mapping = {
-            "lead_connected": ("lead_call_status", ConnectionStatus.CONNECTED.value),
+            "lead_connected": ("lead_call_status", TalkoConnectionStatus.CONNECTED.value),
             "lead_not_connected": (
                 "lead_call_status",
-                ConnectionStatus.NOT_CONNECTED.value,
+                TalkoConnectionStatus.NOT_CONNECTED.value,
             ),
-            "agent_connected": ("agent_call_status", ConnectionStatus.CONNECTED.value),
+            "agent_connected": ("agent_call_status", TalkoConnectionStatus.CONNECTED.value),
             "agent_not_connected": (
                 "agent_call_status",
-                ConnectionStatus.NOT_CONNECTED.value,
+                TalkoConnectionStatus.NOT_CONNECTED.value,
             ),
         }
 
@@ -555,27 +555,27 @@ class GetCallRecordHistoryHelper:
         }
 
     @staticmethod
-    def get_agent_status(cdr_data: dict, mode: str, logger: HollerServiceLogger) -> str:
+    def get_agent_status(cdr_data: dict, mode: str, logger: TalkoServiceLogger) -> str:
         """
-        Determine agent status based on CDR data and calling mode.
+        Determine agent status based on TalkoCDR data and calling mode.
         """
         logger.debug(
-            "Determining agent status for mode {}, CDR data in get call record history agent status helper: {}".format(
+            "Determining agent status for mode {}, TalkoCDR data in get call record history agent status helper: {}".format(
                 mode, cdr_data
             )
         )
         if mode == CLICK_TO_CALL:
             status = (
-                ConnectionStatus.CONNECTED.value
+                TalkoConnectionStatus.CONNECTED.value
                 if cdr_data.get("total_call_duration", 0) > 0
-                else ConnectionStatus.NOT_CONNECTED.value
+                else TalkoConnectionStatus.NOT_CONNECTED.value
             )
         else:
             status = (
-                ConnectionStatus.CONNECTED.value
+                TalkoConnectionStatus.CONNECTED.value
                 if cdr_data.get("call_connected") == 1
                 or cdr_data.get("talk_time", 0) > 0
-                else ConnectionStatus.NOT_CONNECTED.value
+                else TalkoConnectionStatus.NOT_CONNECTED.value
             )
 
         logger.debug(
@@ -586,26 +586,26 @@ class GetCallRecordHistoryHelper:
         return status
 
     @staticmethod
-    def get_lead_status(cdr_data: dict, mode: str, logger: HollerServiceLogger) -> str:
+    def get_lead_status(cdr_data: dict, mode: str, logger: TalkoServiceLogger) -> str:
         """
-        Determine lead status based on CDR data and calling mode.
+        Determine lead status based on TalkoCDR data and calling mode.
         """
         logger.debug(
-            "Determining lead status for mode {}, CDR data in get call record history lead status helper: {}".format(
+            "Determining lead status for mode {}, TalkoCDR data in get call record history lead status helper: {}".format(
                 mode, cdr_data
             )
         )
         if mode == CLICK_TO_CALL:
             status = (
-                ConnectionStatus.CONNECTED.value
+                TalkoConnectionStatus.CONNECTED.value
                 if cdr_data.get("talk_time", 0) > 0
-                else ConnectionStatus.NOT_CONNECTED.value
+                else TalkoConnectionStatus.NOT_CONNECTED.value
             )
         else:
             status = (
-                ConnectionStatus.CONNECTED.value
+                TalkoConnectionStatus.CONNECTED.value
                 if cdr_data.get("total_call_duration", 0) > 0
-                else ConnectionStatus.NOT_CONNECTED.value
+                else TalkoConnectionStatus.NOT_CONNECTED.value
             )
 
         logger.debug(
@@ -620,10 +620,10 @@ class GetCallRecordHistoryHelper:
         cdr: dict,
         call_status: list[str],
         is_masking_enabled: bool,
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ) -> Optional[dict]:
         """
-        Process CDR data for call record history.
+        Process TalkoCDR data for call record history.
 
         NOTE: derived-status filtering (lead_connected, lead_not_connected,
         agent_connected, agent_not_connected) is now applied at the DB
@@ -635,10 +635,10 @@ class GetCallRecordHistoryHelper:
         risks the two implementations drifting out of sync.
         """
         logger.info(
-            "Processing CDR for call record history in get call record history data helper"
+            "Processing TalkoCDR for call record history in get call record history data helper"
         )
         logger.debug(
-            "Input CDR: {}, call_status: {}, is_masking_enabled: {} in get call record history data helper".format(
+            "Input TalkoCDR: {}, call_status: {}, is_masking_enabled: {} in get call record history data helper".format(
                 cdr, call_status, is_masking_enabled
             )
         )
@@ -646,22 +646,22 @@ class GetCallRecordHistoryHelper:
         phone_number_data = {"phone_number": cdr.get("customer")}
 
         if is_masking_enabled:
-            CommonCDRHelper.mask_sensitive_data(cdr, logger)
+            TalkoCommonCDRHelper.mask_sensitive_data(cdr, logger)
 
-        filtered_cdr = CommonCDRHelper.create_filtered_cdr(cdr, logger)
+        filtered_cdr = TalkoCommonCDRHelper.create_filtered_cdr(cdr, logger)
 
         calling_mode = cdr.get("calling_mode", CLICK_TO_CALL)
-        filtered_cdr["agent_call_status"] = GetCallRecordHistoryHelper.get_agent_status(
+        filtered_cdr["agent_call_status"] = TalkoGetCallRecordHistoryHelper.get_agent_status(
             filtered_cdr, calling_mode, logger
         )
-        filtered_cdr["lead_call_status"] = GetCallRecordHistoryHelper.get_lead_status(
+        filtered_cdr["lead_call_status"] = TalkoGetCallRecordHistoryHelper.get_lead_status(
             filtered_cdr, calling_mode, logger
         )
 
         try:
-            public_key: rsa.RSAPublicKey = RSAKeyHandler.load_public_key()
-            filtered_cdr["number_type"] = NumberType.PRIMARY_NUMBER.value
-            filtered_cdr["lead_secret"] = RSAKeyHandler.encrypt_with_public_key(
+            public_key: rsa.RSAPublicKey = TalkoRSAKeyHandler.load_public_key()
+            filtered_cdr["number_type"] = TalkoNumberType.PRIMARY_NUMBER.value
+            filtered_cdr["lead_secret"] = TalkoRSAKeyHandler.encrypt_with_public_key(
                 phone_number_data, public_key
             )
             logger.debug(
@@ -678,7 +678,7 @@ class GetCallRecordHistoryHelper:
             raise
 
         logger.debug(
-            "Processed CDR in get call record history data helper: {}".format(
+            "Processed TalkoCDR in get call record history data helper: {}".format(
                 filtered_cdr
             )
         )
@@ -697,7 +697,7 @@ class GetCallRecordHistoryHelper:
         talk_time_range: Optional[list[str]] = None,
         call_type: Optional[str] = None,
         did_number: Optional[str] = None,
-        logger: HollerServiceLogger = None,
+        logger: TalkoServiceLogger = None,
         entity_type: Optional[str] = None,
         entity_id: Optional[int] = None,
         custom_fields: Optional[Dict[str, Any]] = None,
@@ -708,7 +708,7 @@ class GetCallRecordHistoryHelper:
         logger.info("Building call record history query")
         query: dict = {"partner_id": partner_id}
 
-        GetCallRecordHistoryHelper.add_basic_filters(
+        TalkoGetCallRecordHistoryHelper.add_basic_filters(
             query=query,
             lead_id=lead_id,
             service_board_id=service_board_id,
@@ -719,13 +719,13 @@ class GetCallRecordHistoryHelper:
             entity_type=entity_type,
             entity_id=entity_id,
         )
-        GetCallRecordHistoryHelper.add_call_status_filter(query, call_status, logger)
-        GetCallRecordHistoryHelper.add_number_filter(
+        TalkoGetCallRecordHistoryHelper.add_call_status_filter(query, call_status, logger)
+        TalkoGetCallRecordHistoryHelper.add_number_filter(
             query, phone_number, did_number, logger
         )
-        GetCallRecordHistoryHelper.add_talk_time_filter(query, talk_time_range, logger)
-        GetCallRecordHistoryHelper.add_call_type_filter(query, call_type, logger)
-        GetCallRecordHistoryHelper.add_custom_fields_filter(
+        TalkoGetCallRecordHistoryHelper.add_talk_time_filter(query, talk_time_range, logger)
+        TalkoGetCallRecordHistoryHelper.add_call_type_filter(query, call_type, logger)
+        TalkoGetCallRecordHistoryHelper.add_custom_fields_filter(
             query, custom_fields, logger
         )
 
@@ -740,7 +740,7 @@ class GetCallRecordHistoryHelper:
     def add_custom_fields_filter(
         query: dict,
         custom_fields: Optional[Dict[str, Any]],
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ) -> None:
         """
         Add exact-match filters on custom field values, e.g.
@@ -761,7 +761,7 @@ class GetCallRecordHistoryHelper:
 
     @staticmethod
     def _append_and_condition(
-        query: dict, condition: dict, logger: Optional[HollerServiceLogger] = None
+        query: dict, condition: dict, logger: Optional[TalkoServiceLogger] = None
     ) -> None:
         """
         Append a condition safely using $and without overwriting existing query pieces.
@@ -788,13 +788,13 @@ class GetCallRecordHistoryHelper:
             return None
 
         normalized = (
-            entity_type.value if isinstance(entity_type, EntityType) else entity_type
+            entity_type.value if isinstance(entity_type, TalkoEntityType) else entity_type
         )
         normalized = str(normalized).strip().lower()
 
         mapping = {
-            "lead": EntityType.LEAD.value,
-            "contact": EntityType.CONTACT.value,
+            "lead": TalkoEntityType.LEAD.value,
+            "contact": TalkoEntityType.CONTACT.value,
         }
         return mapping.get(normalized)
 
@@ -816,7 +816,7 @@ class GetCallRecordHistoryHelper:
         normalized_entity_type: Optional[str],
         entity_id: Optional[Union[int, List[int]]],
         lead_id: Optional[Union[int, List[int]]],
-        logger: Optional[HollerServiceLogger] = None,
+        logger: Optional[TalkoServiceLogger] = None,
     ) -> Optional[dict]:
         """
         Build entity-aware query filter.
@@ -828,7 +828,7 @@ class GetCallRecordHistoryHelper:
         - legacy lead rows without entity_type support can still be matched only when lead_id path is used
         - entity_id/lead_id may each be a single ID or a list of IDs (matched via $in)
         """
-        effective_entity_type = GetCallRecordHistoryHelper._normalize_entity_type(
+        effective_entity_type = TalkoGetCallRecordHistoryHelper._normalize_entity_type(
             normalized_entity_type
         )
         effective_entity_id = entity_id
@@ -838,18 +838,18 @@ class GetCallRecordHistoryHelper:
             and effective_entity_id is None
             and lead_id is not None
         ):
-            effective_entity_type = EntityType.LEAD.value
+            effective_entity_type = TalkoEntityType.LEAD.value
             effective_entity_id = lead_id
 
-        if effective_entity_type == EntityType.LEAD.value:
+        if effective_entity_type == TalkoEntityType.LEAD.value:
             if effective_entity_id is not None:
-                query_value = GetCallRecordHistoryHelper._to_query_value(
+                query_value = TalkoGetCallRecordHistoryHelper._to_query_value(
                     effective_entity_id
                 )
                 condition = {
                     "$or": [
                         {
-                            "entity_type": EntityType.LEAD.value,
+                            "entity_type": TalkoEntityType.LEAD.value,
                             "entity_id": query_value,
                         },
                         {
@@ -859,16 +859,16 @@ class GetCallRecordHistoryHelper:
                     ]
                 }
             else:
-                condition = {"entity_type": EntityType.LEAD.value}
+                condition = {"entity_type": TalkoEntityType.LEAD.value}
 
             if logger:
                 logger.debug("Built lead entity filter: {}".format(condition))
             return condition
 
-        if effective_entity_type == EntityType.CONTACT.value:
-            condition = {"entity_type": EntityType.CONTACT.value}
+        if effective_entity_type == TalkoEntityType.CONTACT.value:
+            condition = {"entity_type": TalkoEntityType.CONTACT.value}
             if effective_entity_id is not None:
-                condition["entity_id"] = GetCallRecordHistoryHelper._to_query_value(
+                condition["entity_id"] = TalkoGetCallRecordHistoryHelper._to_query_value(
                     effective_entity_id
                 )
             return condition
@@ -883,7 +883,7 @@ class GetCallRecordHistoryHelper:
         start_time: Optional[int],
         end_time: Optional[int],
         board_agent_ids: Optional[list[int]] = None,
-        logger: HollerServiceLogger = None,
+        logger: TalkoServiceLogger = None,
         entity_type: Optional[str] = None,
         entity_id: Optional[int] = None,
     ) -> None:
@@ -895,11 +895,11 @@ class GetCallRecordHistoryHelper:
         query["is_dialer_call"] = False
         logger.debug("Added is_dialer_call=False filter")
 
-        normalized_entity_type = GetCallRecordHistoryHelper._normalize_entity_type(
+        normalized_entity_type = TalkoGetCallRecordHistoryHelper._normalize_entity_type(
             entity_type
         )
 
-        entity_filter = GetCallRecordHistoryHelper._build_entity_filter(
+        entity_filter = TalkoGetCallRecordHistoryHelper._build_entity_filter(
             normalized_entity_type=normalized_entity_type,
             entity_id=entity_id,
             lead_id=lead_id,
@@ -907,7 +907,7 @@ class GetCallRecordHistoryHelper:
         )
         if entity_filter:
             if "$or" in entity_filter or "$and" in entity_filter:
-                GetCallRecordHistoryHelper._append_and_condition(
+                TalkoGetCallRecordHistoryHelper._append_and_condition(
                     query, entity_filter, logger
                 )
             else:
@@ -955,7 +955,7 @@ class GetCallRecordHistoryHelper:
     def add_call_status_filter(
         query: dict,
         call_status: Optional[list[str]],
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ) -> None:
         """
         Add call status filter to the query.
@@ -976,7 +976,7 @@ class GetCallRecordHistoryHelper:
         query: dict,
         phone_number: Optional[str],
         did_number: Optional[str],
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ) -> None:
         """
         Add phone number and DID number filters to the query.
@@ -1005,7 +1005,7 @@ class GetCallRecordHistoryHelper:
     def add_talk_time_filter(
         query: dict,
         talk_time_range: Optional[list[str]],
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ) -> None:
         """
         Add talk time range filter to the query.
@@ -1039,7 +1039,7 @@ class GetCallRecordHistoryHelper:
                     )
                 )
 
-            min_val, max_val = TALK_TIME_RANGES[TalkTimeRange(trange)]
+            min_val, max_val = TALK_TIME_RANGES[TalkoTalkTimeRange(trange)]
             if max_val is None:
                 or_conditions.append({"talk_time": {"$gte": min_val}})
                 logger.debug(
@@ -1056,7 +1056,7 @@ class GetCallRecordHistoryHelper:
                 )
 
         if or_conditions:
-            GetCallRecordHistoryHelper._append_and_condition(
+            TalkoGetCallRecordHistoryHelper._append_and_condition(
                 query, {"$or": or_conditions}, logger
             )
             logger.debug(
@@ -1069,7 +1069,7 @@ class GetCallRecordHistoryHelper:
     def add_call_type_filter(
         query: dict,
         call_type: Optional[str],
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ) -> None:
         """
         Add call type filter to the query.
@@ -1099,9 +1099,9 @@ class GetCallRecordHistoryHelper:
 
     @staticmethod
     def agent_call_record_history_response(
-        cdr_responses: list[Contract.AgentCallRecordHistoryResponse],
+        cdr_responses: list[TalkoContract.AgentCallRecordHistoryResponse],
         total_count: int,
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ) -> dict:
         """
         Return a single response object for agent call logs.
@@ -1110,7 +1110,7 @@ class GetCallRecordHistoryHelper:
             "Formatting agent call record history response in get call record history response helper"
         )
         logger.debug(
-            "CDR responses: {}, total_count: {} in get call record history response helper".format(
+            "TalkoCDR responses: {}, total_count: {} in get call record history response helper".format(
                 cdr_responses, total_count
             )
         )
@@ -1146,7 +1146,7 @@ class GetCallRecordHistoryHelper:
         }
 
         try:
-            formatted_response = TitleCaseUtil.convert_values_to_title_case(
+            formatted_response = TalkoTitleCaseUtil.convert_values_to_title_case(
                 response,
                 exclude_keys=[
                     "call_recording",
@@ -1173,15 +1173,15 @@ class GetCallRecordHistoryHelper:
             raise
 
 
-class CallLogQueryHelper:
+class TalkoCallLogQueryHelper:
     """
     Utility class for constructing call log queries.
     """
 
     @staticmethod
     def get_time_filter_query(
-        filter_by: Optional[TimeFilter],
-        logger: HollerServiceLogger,
+        filter_by: Optional[TalkoTimeFilter],
+        logger: TalkoServiceLogger,
     ) -> Optional[dict]:
         """
         Generate time filter query for Today, Last week, or Last month in UTC.
@@ -1208,7 +1208,7 @@ class CallLogQueryHelper:
             )
         )
 
-        if filter_by == TimeFilter.TODAY:
+        if filter_by == TalkoTimeFilter.TODAY:
             logger.debug(
                 "Returning TODAY filter in call log query helper: {}".format(
                     start_timestamp
@@ -1216,7 +1216,7 @@ class CallLogQueryHelper:
             )
             return {"$gte": start_timestamp}
 
-        if filter_by == TimeFilter.LAST_WEEK:
+        if filter_by == TalkoTimeFilter.LAST_WEEK:
             start_time = start_of_day_utc - timedelta(days=7)
             timestamp = int(start_time.timestamp() * 1000)
             logger.debug(
@@ -1226,7 +1226,7 @@ class CallLogQueryHelper:
             )
             return {"$gte": timestamp}
 
-        if filter_by == TimeFilter.LAST_MONTH:
+        if filter_by == TalkoTimeFilter.LAST_MONTH:
             start_time = start_of_day_utc - timedelta(days=30)
             timestamp = int(start_time.timestamp() * 1000)
             logger.debug(
@@ -1243,8 +1243,8 @@ class CallLogQueryHelper:
     def build_call_log_query(
         lead_id: Optional[Union[int, List[int]]],
         created_at: Optional[int] = None,
-        filter_by: Optional[TimeFilter] = None,
-        logger: HollerServiceLogger = None,
+        filter_by: Optional[TalkoTimeFilter] = None,
+        logger: TalkoServiceLogger = None,
         partner_id: Optional[int] = None,
         entity_type: Optional[str] = None,
         entity_id: Optional[Union[int, List[int]]] = None,
@@ -1255,7 +1255,7 @@ class CallLogQueryHelper:
         """
         logger.info("Building call log query in call log query helper")
 
-        normalized_entity_type = GetCallRecordHistoryHelper._normalize_entity_type(
+        normalized_entity_type = TalkoGetCallRecordHistoryHelper._normalize_entity_type(
             entity_type
         )
 
@@ -1263,7 +1263,7 @@ class CallLogQueryHelper:
         if partner_id is not None:
             query["partner_id"] = partner_id
 
-        entity_filter = GetCallRecordHistoryHelper._build_entity_filter(
+        entity_filter = TalkoGetCallRecordHistoryHelper._build_entity_filter(
             normalized_entity_type=normalized_entity_type,
             entity_id=entity_id,
             lead_id=lead_id,
@@ -1275,7 +1275,7 @@ class CallLogQueryHelper:
             else:
                 query.update(entity_filter)
 
-        time_filter = CallLogQueryHelper.get_time_filter_query(filter_by, logger)
+        time_filter = TalkoCallLogQueryHelper.get_time_filter_query(filter_by, logger)
         time_query = {}
 
         if created_at is not None:
@@ -1316,7 +1316,7 @@ class CallLogQueryHelper:
         # upstream (controller-enforced), so this always narrows an
         # already-tiny per-entity candidate set rather than scanning the
         # full collection.
-        GetCallRecordHistoryHelper.add_custom_fields_filter(
+        TalkoGetCallRecordHistoryHelper.add_custom_fields_filter(
             query, custom_fields, logger
         )
 

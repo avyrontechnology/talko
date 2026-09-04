@@ -2,23 +2,23 @@ from typing import Any, Dict, List, Optional, Union
 
 from bson import ObjectId
 
-from src.components.did_management.services import DidManagementService
-from src.components.partner_config.dto import Contract
-from src.components.partner_config.repository import PartnerConfigRepository
-from src.components.vendor_config.repository import VendorConfigRepository
-from src.components.vendor_config.services import VendorConfigService
-from src.exceptions import BadRequestError, ConflictError
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.did_management.services import TalkoDidManagementService
+from src.components.partner_config.dto import TalkoContract
+from src.components.partner_config.repository import TalkoPartnerConfigRepository
+from src.components.vendor_config.repository import TalkoVendorConfigRepository
+from src.components.vendor_config.services import TalkoVendorConfigService
+from src.exceptions import TalkoBadRequestError, TalkoConflictError
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class PartnerConfigHelper:
+class TalkoPartnerConfigHelper:
     @staticmethod
     async def validate_and_prepare_config(
-        config: Contract.PartnerConfigCreate,
+        config: TalkoContract.PartnerConfigCreate,
         vendor_config_validator: Any,
         partner_config_validator: Any,
-        repository: PartnerConfigRepository,
-        logger: HollerServiceLogger,
+        repository: TalkoPartnerConfigRepository,
+        logger: TalkoServiceLogger,
     ) -> ObjectId:
         """
         Validates the initial configuration and prepares the vendor ID.
@@ -51,18 +51,18 @@ class PartnerConfigHelper:
                     config.partner_id
                 )
             )
-            raise ConflictError("Partner config with partner_id already exists.")
+            raise TalkoConflictError("Partner config with partner_id already exists.")
 
         return vendor_id
 
     @staticmethod
     async def handle_did_assignment(
-        config: Contract.PartnerConfigCreate,
+        config: TalkoContract.PartnerConfigCreate,
         vendor_id: ObjectId,
-        vendor_config_repository: VendorConfigRepository,
-        vendor_config_service: VendorConfigService,
-        did_management_service: DidManagementService,
-        logger: HollerServiceLogger,
+        vendor_config_repository: TalkoVendorConfigRepository,
+        vendor_config_service: TalkoVendorConfigService,
+        did_management_service: TalkoDidManagementService,
+        logger: TalkoServiceLogger,
     ) -> Dict[str, Union[str, bool, List[str], Dict[str, List[str]], int]]:
         """
         Handles the assignment of DIDs based on configuration by updating existing records.
@@ -83,9 +83,9 @@ class PartnerConfigHelper:
             logger.warning("No available DIDs for vendor_id {}".format(vendor_id))
             return {"vendor_id": str(vendor_id), "is_active": True}
 
-        num_dids: int = PartnerConfigHelper._calculate_num_dids(config)
+        num_dids: int = TalkoPartnerConfigHelper._calculate_num_dids(config)
         if len(available_dids) < num_dids:
-            raise BadRequestError(
+            raise TalkoBadRequestError(
                 "Insufficient available DIDs. Required: {}, Available: {}".format(
                     num_dids, len(available_dids)
                 )
@@ -96,7 +96,7 @@ class PartnerConfigHelper:
 
         if config.enable_service_board and config.board_did_counts:
             service_board_mapping: Dict[str, Any] = (
-                await PartnerConfigHelper._assign_service_board_dids(
+                await TalkoPartnerConfigHelper._assign_service_board_dids(
                     config,
                     assigned_dids,
                     vendor_id,
@@ -109,7 +109,7 @@ class PartnerConfigHelper:
 
         if config.enable_agent_mapping and config.agent_mapping_ids:
             agent_mapping_data: Dict[str, Any] = (
-                await PartnerConfigHelper._assign_agent_mapping_dids(
+                await TalkoPartnerConfigHelper._assign_agent_mapping_dids(
                     config,
                     assigned_dids,
                     vendor_id,
@@ -122,7 +122,7 @@ class PartnerConfigHelper:
 
         if config.enable_round_robin:
             round_robin_data: Dict[str, Any] = (
-                await PartnerConfigHelper._assign_round_robin_dids(
+                await TalkoPartnerConfigHelper._assign_round_robin_dids(
                     config,
                     assigned_dids,
                     vendor_id,
@@ -142,11 +142,11 @@ class PartnerConfigHelper:
 
     @staticmethod
     async def _assign_service_board_dids(
-        config: Contract.PartnerConfigCreate,
+        config: TalkoContract.PartnerConfigCreate,
         assigned_dids: List[str],
         vendor_id: ObjectId,
-        did_management_service: DidManagementService,
-        logger: HollerServiceLogger,
+        did_management_service: TalkoDidManagementService,
+        logger: TalkoServiceLogger,
         vendor_config_id: Optional[ObjectId] = None,
     ) -> Dict[str, Any]:
         """
@@ -176,11 +176,11 @@ class PartnerConfigHelper:
 
     @staticmethod
     async def _assign_agent_mapping_dids(
-        config: Contract.PartnerConfigCreate,
+        config: TalkoContract.PartnerConfigCreate,
         assigned_dids: List[str],
         vendor_id: ObjectId,
-        did_management_service: DidManagementService,
-        logger: HollerServiceLogger,
+        did_management_service: TalkoDidManagementService,
+        logger: TalkoServiceLogger,
         vendor_config_id: Optional[ObjectId] = None,
     ) -> Dict[str, Any]:
         """
@@ -207,20 +207,20 @@ class PartnerConfigHelper:
 
     @staticmethod
     async def _assign_round_robin_dids(
-        config: Contract.PartnerConfigCreate,
+        config: TalkoContract.PartnerConfigCreate,
         assigned_dids: List[str],
         vendor_id: ObjectId,
-        did_management_service: DidManagementService,
-        logger: HollerServiceLogger,
+        did_management_service: TalkoDidManagementService,
+        logger: TalkoServiceLogger,
         vendor_config_id: Optional[ObjectId] = None,
     ) -> Dict[str, Any]:
         """
         Assigns DIDs for round-robin configurations.
         """
         if config.enable_service_board:
-            raise BadRequestError("Round-robin cannot be enabled with service board.")
+            raise TalkoBadRequestError("Round-robin cannot be enabled with service board.")
         if not config.round_robin_did_count:
-            raise BadRequestError(
+            raise TalkoBadRequestError(
                 "round_robin_did_count is required when enable_round_robin is true."
             )
 
@@ -245,7 +245,7 @@ class PartnerConfigHelper:
         return {"round_robin_did_count": config.round_robin_did_count}
 
     @staticmethod
-    def _calculate_num_dids(config: Contract.PartnerConfigCreate) -> int:
+    def _calculate_num_dids(config: TalkoContract.PartnerConfigCreate) -> int:
         """
         Calculates the total number of DIDs required internally.
         """
@@ -260,19 +260,19 @@ class PartnerConfigHelper:
 
     @staticmethod
     async def update_default_attendance(
-        config: Contract.PartnerConfigCreate,
+        config: TalkoContract.PartnerConfigCreate,
         vendor_id: ObjectId,
-        did_management_service: DidManagementService,
-        logger: HollerServiceLogger,
+        did_management_service: TalkoDidManagementService,
+        logger: TalkoServiceLogger,
     ) -> Dict[str, Any]:
         """
         Update default attendance for service board or round-robin.
 
         Args:
-            config (Contract.PartnerConfigCreate): Partner config data.
+            config (TalkoContract.PartnerConfigCreate): Partner config data.
             vendor_id (ObjectId): Vendor ID.
-            did_management_service (DidManagementService): Service to manage DIDs.
-            logger (HollerServiceLogger): Logger for tracking events.
+            did_management_service (TalkoDidManagementService): Service to manage DIDs.
+            logger (TalkoServiceLogger): Logger for tracking events.
 
         Returns:
             Dict[str, Any]: Updated attendance data to merge into config_dict.

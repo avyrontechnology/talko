@@ -2,10 +2,10 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
-from src.utils.timestamped_model import TimestampedModel
+from src.utils.timestamped_model import TalkoTimestampedModel
 
 
-class CDR(TimestampedModel):
+class TalkoCDR(TalkoTimestampedModel):
     # Call identifiers and context
     entity_type: Optional[str] = None  # "Lead" or "Contact"
     entity_id: Optional[int] = None  # the actual ID regardless of type
@@ -162,9 +162,9 @@ class CDR(TimestampedModel):
     # src.components.custom_field for field definitions)
     custom_fields: Optional[Dict[str, Any]] = None
 
-    # Set on an outbound CDR created by the missed-call auto-callback flow —
-    # points back at the call_uuid of the missed inbound CDR that triggered it.
+    # Set on an outbound TalkoCDR created by the missed-call auto-callback flow —
+    # points back at the call_uuid of the missed inbound TalkoCDR that triggered it.
     callback_for_call_uuid: Optional[str] = None
 
     class CollectionName:
-        CDR = "cdr"
+        TalkoCDR = "cdr"

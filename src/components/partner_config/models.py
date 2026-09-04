@@ -3,11 +3,11 @@ from typing import Any, Dict, List, Optional
 from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from src.utils.enums import RingType
-from src.utils.timestamped_model import TimestampedModel
+from src.utils.enums import TalkoRingType
+from src.utils.timestamped_model import TalkoTimestampedModel
 
 
-class PartnerConfigModel(TimestampedModel):
+class TalkoPartnerConfigModel(TalkoTimestampedModel):
     partner_id: Optional[int] = None  # ID of the partner
     is_active: bool  # Active status
     vendor_id: ObjectId  # Associated vendor ID
@@ -35,12 +35,12 @@ class PartnerConfigModel(TimestampedModel):
     round_robin_default_attendance: Dict[str, List[Dict[str, Any]]] = Field(
         default_factory=lambda: {"default": []}
     )  # Default attendance for round-robin
-    ring_type: Optional[RingType] = None
+    ring_type: Optional[TalkoRingType] = None
     dialer_enabled: bool = Field(False, description="Enable dialer for this partner")
     enable_inbound_lead_creation: bool = Field(
         default=True,
         description=(
-            "When True and no CDR exists for an inbound call, "
+            "When True and no TalkoCDR exists for an inbound call, "
             "attempt to create a new lead in Maglo/CRM before routing"
         ),
     )
@@ -85,7 +85,7 @@ class PartnerConfigModel(TimestampedModel):
     model_config: ConfigDict = ConfigDict(arbitrary_types_allowed=True)
 
     @model_validator(mode="after")
-    def check_mutual_exclusivity_and_config(self) -> "PartnerConfigModel":
+    def check_mutual_exclusivity_and_config(self) -> "TalkoPartnerConfigModel":
         if self.enable_round_robin and self.enable_service_board:
             raise ValueError(
                 "Round-robin and service board cannot be enabled simultaneously."

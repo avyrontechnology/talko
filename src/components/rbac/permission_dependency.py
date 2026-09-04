@@ -5,15 +5,15 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import HTTPException, Request
 
 # from src.components.common.auth import AuthUtility
-from src.components.rbac.constants import PermissionErrorText
-from src.core.container import Container
-from src.core.redis import RedisCache
-from src.grpc_client.constants import GrpcServices
-from src.grpc_client.rpc_service_factory import RPCServiceFactory
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.rbac.constants import TalkoPermissionErrorText
+from src.core.container import TalkoContainer
+from src.core.redis import TalkoRedisCache
+from src.grpc_client.constants import TalkoGrpcServices
+from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class PermissionDependency:
+class TalkoPermissionDependency:
     """
     This dependency dynamically checks the permission based on its own class name.
     """
@@ -25,8 +25,8 @@ class PermissionDependency:
     async def __call__(
         self,
         request: Request,
-        redis_pool: RedisCache = Provide[Container.redis_pool],
-        logger: HollerServiceLogger = Provide[Container.logger],
+        redis_pool: TalkoRedisCache = Provide[TalkoContainer.redis_pool],
+        logger: TalkoServiceLogger = Provide[TalkoContainer.logger],
     ):
 
         logger.debug("checking permission: {}".format(self.permission_name))
@@ -46,7 +46,7 @@ class PermissionDependency:
                 )
                 return
             current_user_id = current_user_details.get("user_id")
-            grpc_client = RPCServiceFactory.get_service(GrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
             user_permissions = await grpc_client.get_user_permissions(current_user_id)
             logger.info(
                 "user-{} have permissions {}".format(current_user_id, user_permissions)
@@ -60,7 +60,7 @@ class PermissionDependency:
                     )
                 )
                 raise HTTPException(
-                    status_code=403, detail=PermissionErrorText.PERMISSION_DENIED
+                    status_code=403, detail=TalkoPermissionErrorText.PERMISSION_DENIED
                 )
 
             logger.info(
@@ -74,5 +74,5 @@ class PermissionDependency:
         except Exception as exc:
             logger.error("Permission check failed: {}".format(str(exc)))
             raise HTTPException(
-                status_code=404, detail=PermissionErrorText.INTERNAL_SERVER_ERROR
+                status_code=404, detail=TalkoPermissionErrorText.INTERNAL_SERVER_ERROR
             )

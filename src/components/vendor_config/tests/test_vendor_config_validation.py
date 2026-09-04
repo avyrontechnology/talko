@@ -5,31 +5,31 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from bson import ObjectId
 
-from src.components.vendor.repository import VendorRepository
-from src.components.vendor_config.repository import VendorConfigRepository
-from src.components.vendor_config.validation import VendorConfigValidator
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.vendor.repository import TalkoVendorRepository
+from src.components.vendor_config.repository import TalkoVendorConfigRepository
+from src.components.vendor_config.validation import TalkoVendorConfigValidator
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 @pytest.mark.asyncio
 class TestVendorConfigValidator:
     @pytest.fixture
     def mock_vendor_repository(self):
-        return MagicMock(spec=VendorRepository)
+        return MagicMock(spec=TalkoVendorRepository)
 
     @pytest.fixture
     def mock_logger(self):
-        return MagicMock(spec=HollerServiceLogger)
+        return MagicMock(spec=TalkoServiceLogger)
 
     @pytest.fixture
     def mock_vendor_config_repository(self):
-        return MagicMock(spec=VendorConfigRepository)
+        return MagicMock(spec=TalkoVendorConfigRepository)
 
     @pytest.fixture
     def validator(
         self, mock_vendor_repository, mock_logger, mock_vendor_config_repository
     ):
-        return VendorConfigValidator(
+        return TalkoVendorConfigValidator(
             repository=mock_vendor_repository,
             logger=mock_logger,
             vendor_config_repository=mock_vendor_config_repository,

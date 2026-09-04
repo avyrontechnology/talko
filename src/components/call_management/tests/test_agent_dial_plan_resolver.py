@@ -5,11 +5,11 @@ import pytest
 import pytest_asyncio
 
 from src.components.call_management.agent_dialplan_resolver import (
-    AgentDialPlanResolver,
-    DialplanResponseBuilder,
-    TransferTarget,
+    TalkoAgentDialPlanResolver,
+    TalkoDialplanResponseBuilder,
+    TalkoTransferTarget,
 )
-from src.components.call_management.enums import InboundType
+from src.components.call_management.enums import TalkoInboundType
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def mock_logger():
 
 @pytest.fixture
 def mock_maglo_client():
-    """Mock MagloClient"""
+    """Mock TalkoMagloClient"""
     client = MagicMock()
     client.get_agent_details = AsyncMock()
     client.upsert_ivr_lead = AsyncMock()
@@ -35,7 +35,7 @@ def mock_maglo_client():
 
 @pytest.fixture
 def mock_agent_mapping_repo():
-    """Mock AgentMappingRepository"""
+    """Mock TalkoAgentMappingRepository"""
     repo = MagicMock()
     repo.get_agents_by_service_board_id_and_partner_id = AsyncMock()
     return repo
@@ -43,7 +43,7 @@ def mock_agent_mapping_repo():
 
 @pytest.fixture
 def mock_user_service_client():
-    """Mock UserServiceClient"""
+    """Mock TalkoUserServiceClient"""
     client = MagicMock()
     client.get_users_availability_status = AsyncMock()
     return client
@@ -51,8 +51,8 @@ def mock_user_service_client():
 
 @pytest_asyncio.fixture
 async def resolver(mock_maglo_client, mock_agent_mapping_repo, mock_logger):
-    """Create AgentDialPlanResolver instance"""
-    return AgentDialPlanResolver(
+    """Create TalkoAgentDialPlanResolver instance"""
+    return TalkoAgentDialPlanResolver(
         maglo_client=mock_maglo_client,
         agent_mapping_repo=mock_agent_mapping_repo,
         logger=mock_logger,
@@ -63,8 +63,8 @@ async def resolver(mock_maglo_client, mock_agent_mapping_repo, mock_logger):
 async def resolver_with_availability(
     mock_maglo_client, mock_agent_mapping_repo, mock_logger, mock_user_service_client
 ):
-    """Create AgentDialPlanResolver instance wired with a user_service_client"""
-    return AgentDialPlanResolver(
+    """Create TalkoAgentDialPlanResolver instance wired with a user_service_client"""
+    return TalkoAgentDialPlanResolver(
         maglo_client=mock_maglo_client,
         agent_mapping_repo=mock_agent_mapping_repo,
         logger=mock_logger,
@@ -73,11 +73,11 @@ async def resolver_with_availability(
 
 
 class TestTransferTarget:
-    """Tests for TransferTarget dataclass"""
+    """Tests for TalkoTransferTarget dataclass"""
 
     def test_transfer_target_creation(self):
-        """Test creating a TransferTarget with all fields"""
-        target = TransferTarget(
+        """Test creating a TalkoTransferTarget with all fields"""
+        target = TalkoTransferTarget(
             type="agent",
             data=["ext123"],
             ring_type="simultaneous",
@@ -90,22 +90,22 @@ class TestTransferTarget:
         assert target.skip_active is True
 
     def test_transfer_target_defaults(self):
-        """Test TransferTarget default values"""
-        target = TransferTarget(type="number", data=["1234567890"])
+        """Test TalkoTransferTarget default values"""
+        target = TalkoTransferTarget(type="number", data=["1234567890"])
 
         assert target.ring_type == "simultaneous"
         assert target.skip_active is False
 
     def test_transfer_target_empty_data(self):
-        """Test TransferTarget with empty data list"""
-        target = TransferTarget(type="number", data=[])
+        """Test TalkoTransferTarget with empty data list"""
+        target = TalkoTransferTarget(type="number", data=[])
 
         assert target.data == []
         assert target.type == "number"
 
 
 class TestAgentDialPlanResolver:
-    """Tests for AgentDialPlanResolver"""
+    """Tests for TalkoAgentDialPlanResolver"""
 
     @pytest.mark.asyncio
     async def test_resolve_for_single_agent_with_cloud_enabled(
@@ -207,7 +207,7 @@ class TestAgentDialPlanResolver:
     async def test_resolve_for_single_agent_prefers_live_number_over_stale_fallback(
         self, resolver, mock_maglo_client
     ):
-        """Regression test: the CDR-cached fallback number can go stale (e.g.
+        """Regression test: the TalkoCDR-cached fallback number can go stale (e.g.
         after the assigned agent changes) while Maglo still has the current
         agent's real number — the live number must win."""
         mock_maglo_client.get_agent_details.return_value = {
@@ -222,7 +222,7 @@ class TestAgentDialPlanResolver:
             partner_id=12,
             service_board_id=70,
             agent_id=33,
-            # Stale number left over from a previous agent/CDR — must be
+            # Stale number left over from a previous agent/TalkoCDR — must be
             # ignored in favor of the live Maglo number above.
             fallback_agent_number="+919311634345",
         )
@@ -779,45 +779,45 @@ class TestAgentDialPlanResolver:
 
     def test_map_transfer_to_inbound_fields_number_type(self, resolver):
         """Test mapping transfer target with type 'number'"""
-        target = TransferTarget(type="number", data=["+919876543210"])
+        target = TalkoTransferTarget(type="number", data=["+919876543210"])
 
         inbound_type, cloud_number = resolver.map_transfer_to_inbound_fields(target)
 
-        assert inbound_type == InboundType.PHONE_NUMBER.value
+        assert inbound_type == TalkoInboundType.PHONE_NUMBER.value
         assert cloud_number is None
 
     def test_map_transfer_to_inbound_fields_agent_type(self, resolver):
         """Test mapping transfer target with type 'agent'"""
-        target = TransferTarget(type="agent", data=["ext123"])
+        target = TalkoTransferTarget(type="agent", data=["ext123"])
 
         inbound_type, cloud_number = resolver.map_transfer_to_inbound_fields(target)
 
-        assert inbound_type == InboundType.SOFT_PHONE.value
+        assert inbound_type == TalkoInboundType.SOFT_PHONE.value
         assert cloud_number == "ext123"
 
     def test_map_transfer_to_inbound_fields_agent_empty_data(self, resolver):
         """Test mapping transfer target with agent type but empty data"""
-        target = TransferTarget(type="agent", data=[])
+        target = TalkoTransferTarget(type="agent", data=[])
 
         inbound_type, cloud_number = resolver.map_transfer_to_inbound_fields(target)
 
-        assert inbound_type == InboundType.SOFT_PHONE.value
+        assert inbound_type == TalkoInboundType.SOFT_PHONE.value
         assert cloud_number is None
 
     def test_map_transfer_to_inbound_fields_none_target(self, resolver):
         """Test mapping when target is None"""
         inbound_type, cloud_number = resolver.map_transfer_to_inbound_fields(None)
 
-        assert inbound_type == InboundType.PHONE_NUMBER.value
+        assert inbound_type == TalkoInboundType.PHONE_NUMBER.value
         assert cloud_number is None
 
     def test_map_transfer_to_inbound_fields_unknown_type(self, resolver, mock_logger):
         """Test mapping transfer target with unknown type"""
-        target = TransferTarget(type="unknown", data=["data"])
+        target = TalkoTransferTarget(type="unknown", data=["data"])
 
         inbound_type, cloud_number = resolver.map_transfer_to_inbound_fields(target)
 
-        assert inbound_type == InboundType.PHONE_NUMBER.value
+        assert inbound_type == TalkoInboundType.PHONE_NUMBER.value
         assert cloud_number is None
         mock_logger.warning.assert_called()
 
@@ -942,7 +942,7 @@ class TestAgentDialPlanResolver:
 
 
 class TestIsAgentInactive:
-    """Tests for AgentDialPlanResolver._is_agent_inactive"""
+    """Tests for TalkoAgentDialPlanResolver._is_agent_inactive"""
 
     @pytest.mark.asyncio
     async def test_no_user_service_client_defaults_to_not_inactive(self, resolver):
@@ -990,7 +990,7 @@ class TestIsAgentInactive:
 
 
 class TestReassignToActiveAgent:
-    """Tests for AgentDialPlanResolver._reassign_to_active_agent"""
+    """Tests for TalkoAgentDialPlanResolver._reassign_to_active_agent"""
 
     @pytest.mark.asyncio
     async def test_no_other_agents_on_board_keeps_original(
@@ -1049,7 +1049,7 @@ class TestReassignToActiveAgent:
 
         assert new_agent_id == 34
         # The Maglo call is now awaited inline so its confirmed lead_request_id
-        # can flow back onto the current call's CDR.
+        # can flow back onto the current call's TalkoCDR.
         assert reassigned_lead_id == 179245
 
         mock_maglo_client.reassign_lead_by_phone.assert_awaited_once_with(
@@ -1271,7 +1271,7 @@ class TestResolveSingleAssignedAgentReassignment:
 
 class TestResolveForSingleAgentReassignment:
     """Tests for the reassign_inactive_agent branch of resolve_for_single_agent
-    (the existing-CDR path)"""
+    (the existing-TalkoCDR path)"""
 
     @pytest.mark.asyncio
     async def test_flag_off_never_checks_availability(
@@ -1375,7 +1375,7 @@ class TestResolveForSingleAgentReassignment:
         assert result.data == ["+919876543211"]
         assert result.resolved_agent_id == 34
         # Maglo's confirmed lead_request_id must flow back onto the target so
-        # the caller can prioritize it over whatever the old CDR had on record.
+        # the caller can prioritize it over whatever the old TalkoCDR had on record.
         assert result.reassigned_lead_id == 179245
         # Agent details should have been fetched for the *new* agent, not
         # the original inactive one.
@@ -1465,7 +1465,7 @@ class TestResolveInboundNoCdrReassignment:
             reassign_inactive_agent=True,
         )
 
-        # agent_id in the result (used for CDR + websocket event metadata)
+        # agent_id in the result (used for TalkoCDR + websocket event metadata)
         # must be the new agent, not the stale Maglo-assigned owner.
         assert result["agent_id"] == 34
         assert result["agent_ids"][0]["agent_id"] == 34
@@ -1473,18 +1473,18 @@ class TestResolveInboundNoCdrReassignment:
 
 
 class TestDialplanResponseBuilder:
-    """Tests for DialplanResponseBuilder"""
+    """Tests for TalkoDialplanResponseBuilder"""
 
     def test_build_transfer_response_agent_type(self):
         """Test building transfer response for agent type"""
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="agent",
             data=["ext123"],
             ring_type="simultaneous",
             skip_active=False,
         )
 
-        response = DialplanResponseBuilder.build_transfer_response(target)
+        response = TalkoDialplanResponseBuilder.build_transfer_response(target)
 
         assert len(response) == 1
         assert "transfer" in response[0]
@@ -1495,14 +1495,14 @@ class TestDialplanResponseBuilder:
 
     def test_build_transfer_response_number_type(self):
         """Test building transfer response for number type"""
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="number",
             data=["+919876543210"],
             ring_type="order_by",
             skip_active=True,
         )
 
-        response = DialplanResponseBuilder.build_transfer_response(target)
+        response = TalkoDialplanResponseBuilder.build_transfer_response(target)
 
         assert response[0]["transfer"]["type"] == "number"
         assert response[0]["transfer"]["data"] == ["+919876543210"]
@@ -1511,15 +1511,15 @@ class TestDialplanResponseBuilder:
 
     def test_build_transfer_response_empty_data(self):
         """Test building transfer response with empty data"""
-        target = TransferTarget(type="number", data=[])
+        target = TalkoTransferTarget(type="number", data=[])
 
-        response = DialplanResponseBuilder.build_transfer_response(target)
+        response = TalkoDialplanResponseBuilder.build_transfer_response(target)
 
         assert response[0]["transfer"]["data"] == []
 
     def test_build_transfer_response_none_target(self):
         """Test building transfer response when target is None"""
-        response = DialplanResponseBuilder.build_transfer_response(None)
+        response = TalkoDialplanResponseBuilder.build_transfer_response(None)
 
         assert len(response) == 1
         assert response[0]["transfer"]["type"] == "number"
@@ -1527,7 +1527,7 @@ class TestDialplanResponseBuilder:
 
     def test_build_empty_response(self):
         """Test building empty response"""
-        response = DialplanResponseBuilder.build_empty_response()
+        response = TalkoDialplanResponseBuilder.build_empty_response()
 
         assert len(response) == 1
         assert "transfer" in response[0]
@@ -1538,13 +1538,13 @@ class TestDialplanResponseBuilder:
 
     def test_build_transfer_response_multiple_data_items(self):
         """Test building transfer response with multiple data items"""
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="agent",
             data=["ext123", "ext456", "ext789"],
             ring_type="order_by",
         )
 
-        response = DialplanResponseBuilder.build_transfer_response(target)
+        response = TalkoDialplanResponseBuilder.build_transfer_response(target)
 
         assert len(response[0]["transfer"]["data"]) == 3
         assert "ext123" in response[0]["transfer"]["data"]
@@ -1553,9 +1553,9 @@ class TestDialplanResponseBuilder:
 
     def test_build_transfer_response_none_data(self):
         """Test building transfer response when data is None"""
-        target = TransferTarget(type="number", data=None)
+        target = TalkoTransferTarget(type="number", data=None)
 
-        response = DialplanResponseBuilder.build_transfer_response(target)
+        response = TalkoDialplanResponseBuilder.build_transfer_response(target)
 
         assert response[0]["transfer"]["data"] == []
 

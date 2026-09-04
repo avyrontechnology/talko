@@ -2,22 +2,22 @@ from typing import Any, Dict, Optional
 
 import aiohttp
 
-from src.components.integrations.console.console_constants import ConsoleApiConstants
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.integrations.console.console_constants import TalkoConsoleApiConstants
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class ConsoleClient:
+class TalkoConsoleClient:
     def __init__(
         self,
-        logger: HollerServiceLogger,
+        logger: TalkoServiceLogger,
     ):
-        self.logger: HollerServiceLogger = logger
+        self.logger: TalkoServiceLogger = logger
         self.session: aiohttp.ClientSession = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(
-                total=ConsoleApiConstants.REQUEST_TIMEOUT_SECONDS
+                total=TalkoConsoleApiConstants.REQUEST_TIMEOUT_SECONDS
             )
         )
-        self.api_key: Optional[str] = ConsoleApiConstants.CONSOLE_API_KEY
+        self.api_key: Optional[str] = TalkoConsoleApiConstants.CONSOLE_API_KEY
 
         if not self.api_key:
             self.logger.warning("Console API key is missing — agent lookup will fail")
@@ -56,14 +56,14 @@ class ConsoleClient:
             self.logger.error("Console API key missing — cannot fetch agent")
             return {}
 
-        url: str = ConsoleApiConstants.get_agent_by_ivr_phone_url(
+        url: str = TalkoConsoleApiConstants.get_agent_by_ivr_phone_url(
             partner_id=partner_id,
             ivr_phone=ivr_phone,
         )
 
         headers: Dict[str, str] = {
             "accept": "application/json",
-            ConsoleApiConstants.API_KEY_HEADER: self.api_key,
+            TalkoConsoleApiConstants.API_KEY_HEADER: self.api_key,
         }
 
         self.logger.debug(
@@ -92,24 +92,24 @@ class ConsoleClient:
                     return {}
 
                 if (
-                    response.get(ConsoleApiConstants.FIELD_STATUS)
-                    == ConsoleApiConstants.STATUS_SUCCESS
-                    and isinstance(response.get(ConsoleApiConstants.FIELD_DATA), dict)
+                    response.get(TalkoConsoleApiConstants.FIELD_STATUS)
+                    == TalkoConsoleApiConstants.STATUS_SUCCESS
+                    and isinstance(response.get(TalkoConsoleApiConstants.FIELD_DATA), dict)
                 ):
                     agent_data: Dict[str, Any] = response[
-                        ConsoleApiConstants.FIELD_DATA
+                        TalkoConsoleApiConstants.FIELD_DATA
                     ]
                     self.logger.debug(
                         "Agent found: id={}, name={}".format(
-                            agent_data.get(ConsoleApiConstants.FIELD_AGENT_ID),
-                            agent_data.get(ConsoleApiConstants.FIELD_AGENT_NAME),
+                            agent_data.get(TalkoConsoleApiConstants.FIELD_AGENT_ID),
+                            agent_data.get(TalkoConsoleApiConstants.FIELD_AGENT_NAME),
                         )
                     )
                     return agent_data
 
                 self.logger.info(
                     "Console returned non-success: {}".format(
-                        response.get(ConsoleApiConstants.FIELD_MESSAGE, "no message")
+                        response.get(TalkoConsoleApiConstants.FIELD_MESSAGE, "no message")
                     )
                 )
                 return {}
@@ -126,4 +126,4 @@ class ConsoleClient:
         """Close session when app shuts down."""
         if not self.session.closed:
             await self.session.close()
-            self.logger.debug("ConsoleClient session closed")
+            self.logger.debug("TalkoConsoleClient session closed")

@@ -3,17 +3,17 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from src.components.custom_field.constants import (
-    CustomFieldDataType,
-    CustomFieldEntityType,
+    TalkoCustomFieldDataType,
+    TalkoCustomFieldEntityType,
 )
 
 
-class Contract:
+class TalkoContract:
     class CustomFieldCreate(BaseModel):
-        entity_type: CustomFieldEntityType
+        entity_type: TalkoCustomFieldEntityType
         field_name: str
         field_slug: Optional[str] = None
-        data_type: CustomFieldDataType
+        data_type: TalkoCustomFieldDataType
         choice_options: Optional[List[str]] = None
         is_required: bool = False
         sequence: Optional[int] = None
@@ -28,10 +28,10 @@ class Contract:
     class CustomFieldResponse(BaseModel):
         id: str
         partner_id: int
-        entity_type: CustomFieldEntityType
+        entity_type: TalkoCustomFieldEntityType
         field_name: str
         field_slug: str
-        data_type: CustomFieldDataType
+        data_type: TalkoCustomFieldDataType
         choice_options: Optional[List[str]] = None
         is_required: bool = False
         sequence: Optional[int] = None

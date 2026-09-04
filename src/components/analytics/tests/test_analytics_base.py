@@ -2,15 +2,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.components.analytics.base import AnalyticsBase
+from src.components.analytics.base import TalkoAnalyticsBase
 from src.components.analytics.dto import (
-    AgentCallAnalyticsRequest,
-    AnalyticsResponse,
-    DashboardFollowupTrendsRequest,
-    PartnerServiceBoardRequest,
+    TalkoAgentCallAnalyticsRequest,
+    TalkoAnalyticsResponse,
+    TalkoDashboardFollowupTrendsRequest,
+    TalkoPartnerServiceBoardRequest,
 )
-from src.components.analytics.enums import AnalyticsType, Metric, TimeInterval
-from src.exceptions import InvalidAnalyticTypeError, PayloadValidationError
+from src.components.analytics.enums import TalkoAnalyticsType, TalkoMetric, TalkoTimeInterval
+from src.exceptions import TalkoInvalidAnalyticTypeError, TalkoPayloadValidationError
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ class TestAnalyticsBase:
     def setup_analytics_base(self):
         mock_processor = AsyncMock()
         mock_logger = MagicMock()
-        service = AnalyticsBase(analytics_processor=mock_processor, logger=mock_logger)
+        service = TalkoAnalyticsBase(analytics_processor=mock_processor, logger=mock_logger)
         # Mock user_hierarchy_data to simulate user_role == 3
         mock_processor.user_hierarchy_data.return_value = ([1, 2, 3], 3)
         return service, mock_processor, mock_logger
@@ -31,7 +31,7 @@ class TestAnalyticsBase:
         mock_processor._get_agent_call_analytics.return_value = expected_data
 
         request = {
-            "analytics_type": AnalyticsType.AGENT_CALL_ANALYTICS.value,
+            "analytics_type": TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value,
             "data": {
                 "time_range": "1735689600000-1738272000000",  # 2025-01-01 to 2025-01-31
                 "agents": [1, 2],
@@ -41,13 +41,13 @@ class TestAnalyticsBase:
 
         result = await service.process_analytics(1, 123, request, limit=10, offset=1)
 
-        assert isinstance(result, AnalyticsResponse)
-        assert result.analytics_type == AnalyticsType.AGENT_CALL_ANALYTICS.value
+        assert isinstance(result, TalkoAnalyticsResponse)
+        assert result.analytics_type == TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value
         assert result.data == expected_data
         mock_processor._get_agent_call_analytics.assert_awaited_once_with(
             current_user_id=1,
             partner_id=123,
-            request_data=AgentCallAnalyticsRequest(
+            request_data=TalkoAgentCallAnalyticsRequest(
                 time_range="1735689600000-1738272000000",
                 agents=[1, 2],
                 service_board_id=[1, 3],
@@ -56,7 +56,7 @@ class TestAnalyticsBase:
             offset=1,
         )
         mock_logger.info.assert_any_call(
-            f"Successfully generated analytics for {AnalyticsType.AGENT_CALL_ANALYTICS.value}"
+            f"Successfully generated analytics for {TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value}"
         )
 
     async def test_process_analytics_invalid_type(self, setup_analytics_base):
@@ -64,7 +64,7 @@ class TestAnalyticsBase:
 
         request = {"analytics_type": "invalid_type", "data": {}}
 
-        with pytest.raises(InvalidAnalyticTypeError) as exc_info:
+        with pytest.raises(TalkoInvalidAnalyticTypeError) as exc_info:
             await service.process_analytics(1, 123, request, limit=10, offset=1)
 
         assert str(exc_info.value) == "Invalid analytics type: invalid_type"
@@ -78,24 +78,24 @@ class TestAnalyticsBase:
         )
 
         request = {
-            "analytics_type": AnalyticsType.TOTAL_AGENT_TALK_TIME.value,
+            "analytics_type": TalkoAnalyticsType.TOTAL_AGENT_TALK_TIME.value,
             "data": {
                 "time_range": 12345,  # invalid type
                 "agents": "not-a-list",  # invalid type
             },
         }
 
-        with pytest.raises(PayloadValidationError) as exc_info:
+        with pytest.raises(TalkoPayloadValidationError) as exc_info:
             await service.process_analytics(1, 123, request, limit=10, offset=1)
 
         mock_processor._get_total_agent_talk_time.assert_not_awaited()
         assert (
-            f"Invalid payload for analytics type '{AnalyticsType.TOTAL_AGENT_TALK_TIME.value}'"
+            f"Invalid payload for analytics type '{TalkoAnalyticsType.TOTAL_AGENT_TALK_TIME.value}'"
             in str(exc_info.value)
         )
 
         assert any(
-            f"Invalid payload for analytics type {AnalyticsType.TOTAL_AGENT_TALK_TIME.value}:"
+            f"Invalid payload for analytics type {TalkoAnalyticsType.TOTAL_AGENT_TALK_TIME.value}:"
             in str(call)
             for call in mock_logger.error.call_args_list
         )
@@ -106,7 +106,7 @@ class TestAnalyticsBase:
         mock_processor._get_partner_service_board.side_effect = Exception("boom")
 
         request = {
-            "analytics_type": AnalyticsType.PARTNER_SERVICE_BOARD.value,
+            "analytics_type": TalkoAnalyticsType.PARTNER_SERVICE_BOARD.value,
             "data": {
                 "time_range": "1743465600000-1746057600000",  # 2025-04-01 to 2025-04-30
             },
@@ -119,14 +119,14 @@ class TestAnalyticsBase:
         mock_processor._get_partner_service_board.assert_awaited_once_with(
             current_user_id=1,
             partner_id=123,
-            request_data=PartnerServiceBoardRequest(
+            request_data=TalkoPartnerServiceBoardRequest(
                 time_range="1743465600000-1746057600000"
             ),
             limit=10,
             offset=1,
         )
         mock_logger.error.assert_any_call(
-            f"Error processing analytics {AnalyticsType.PARTNER_SERVICE_BOARD.value}: boom"
+            f"Error processing analytics {TalkoAnalyticsType.PARTNER_SERVICE_BOARD.value}: boom"
         )
 
     async def test_process_analytics_dashboard_call_trends_success(
@@ -146,24 +146,24 @@ class TestAnalyticsBase:
         mock_processor._get_dashboard_call_trends.return_value = expected_data
 
         request = {
-            "analytics_type": AnalyticsType.DASHBOARD_CALL_TRENDS.value,
+            "analytics_type": TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value,
             "data": {
                 "time_range": "1722470400000-1726444800000",  # 2025-08-01 to 2025-09-15
                 "service_board_id": [40, 41],
                 "metric_filter": "agent_missed_calls",
-                "trend_basis": TimeInterval.WEEKS.value,
+                "trend_basis": TalkoTimeInterval.WEEKS.value,
             },
         }
 
         result = await service.process_analytics(1, 123, request, limit=10, offset=0)
 
-        assert isinstance(result, AnalyticsResponse)
-        assert result.analytics_type == AnalyticsType.DASHBOARD_CALL_TRENDS.value
+        assert isinstance(result, TalkoAnalyticsResponse)
+        assert result.analytics_type == TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value
         assert result.data == expected_data
         mock_processor._get_dashboard_call_trends.assert_awaited_once_with(
             current_user_id=1,
             partner_id=123,
-            request_data=DashboardFollowupTrendsRequest(
+            request_data=TalkoDashboardFollowupTrendsRequest(
                 time_range="1722470400000-1726444800000",
                 service_board_id=[40, 41],
                 metric_filter="agent_missed_calls",
@@ -173,7 +173,7 @@ class TestAnalyticsBase:
             offset=0,
         )
         mock_logger.info.assert_any_call(
-            f"Successfully generated analytics for {AnalyticsType.DASHBOARD_CALL_TRENDS.value}"
+            f"Successfully generated analytics for {TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value}"
         )
 
     async def test_process_analytics_dashboard_call_trends_invalid_payload(
@@ -186,7 +186,7 @@ class TestAnalyticsBase:
         )
 
         request = {
-            "analytics_type": AnalyticsType.DASHBOARD_CALL_TRENDS.value,
+            "analytics_type": TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value,
             "data": {
                 "time_range": 12345,  # invalid type
                 "service_board_id": "wrong",  # invalid type
@@ -195,16 +195,16 @@ class TestAnalyticsBase:
             },
         }
 
-        with pytest.raises(PayloadValidationError) as exc_info:
+        with pytest.raises(TalkoPayloadValidationError) as exc_info:
             await service.process_analytics(1, 123, request, limit=10, offset=0)
 
         assert (
-            f"Invalid payload for analytics type '{AnalyticsType.DASHBOARD_CALL_TRENDS.value}'"
+            f"Invalid payload for analytics type '{TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value}'"
             in str(exc_info.value)
         )
 
         assert any(
-            f"Invalid payload for analytics type {AnalyticsType.DASHBOARD_CALL_TRENDS.value}:"
+            f"Invalid payload for analytics type {TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value}:"
             in str(call)
             for call in mock_logger.error.call_args_list
         )

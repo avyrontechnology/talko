@@ -8,16 +8,16 @@ timezone: Sets the timezone for scheduling tasks (typically UTC).
 enable_utc: Ensures UTC is used for all time-related operations in Celery.
 """
 
-from src.core.environment import ENV
+from src.core.environment import TalkoENV
 
 # Celery configuration constants
-REDIS_URL = f"{ENV.CACHE_PROTOCOL}://{ENV.CACHE_USERNAME}:{ENV.CACHE_PASSWORD}@{ENV.CACHE_HOST}:{ENV.CACHE_PORT}/{ENV.CACHE_DB}?ssl_cert_reqs=CERT_NONE"
+REDIS_URL = f"{TalkoENV.CACHE_PROTOCOL}://{TalkoENV.CACHE_USERNAME}:{TalkoENV.CACHE_PASSWORD}@{TalkoENV.CACHE_HOST}:{TalkoENV.CACHE_PORT}/{TalkoENV.CACHE_DB}?ssl_cert_reqs=CERT_NONE"
 
-APP_NAME = ENV.SERVICE_NAME
+APP_NAME = TalkoENV.SERVICE_NAME
 
 # Task modules for auto-discovery
 TASK_MODULES = [
-    "src.holler_celery.tasks",
+    "src.talko_celery.tasks",
     "src.components.call_operation.tasks",
     "src.components.call_assets.tasks",
     "src.components.did_management.tasks",
@@ -27,7 +27,7 @@ TASK_MODULES = [
 task_routes = {
     # Time-sensitive missed-call callbacks get their own queue + dedicated
     # worker so 100s ETAs never queue behind minute-long bulk batches
-    # (CDR reconciler, recordings). Exact names first — Celery matches
+    # (TalkoCDR reconciler, recordings). Exact names first — Celery matches
     # exact task names before globs.
     "src.components.call_management.tasks.missed_call_callback_task": {
         "queue": "missed_callback_queue"
@@ -39,7 +39,7 @@ task_routes = {
     "src.components.call_operation.*": {
         "queue": "call_operation_queue"
     },  # Dedicated queue for call operation tasks
-    "src.holler_celery.*": {"queue": "default_queue"},
+    "src.talko_celery.*": {"queue": "default_queue"},
     "src.components.call_assets.*": {"queue": "call_assets_queue"},
     "src.components.did_management.*": {"queue": "did_management_queue"},
     "src.components.call_management.*": {"queue": "call_management_queue"},

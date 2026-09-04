@@ -2,10 +2,10 @@ import enum
 
 from pydantic import BaseModel, Field
 
-from src.exceptions import LoggerException
+from src.exceptions import TalkoLoggerException
 
 
-class LogLevel:
+class TalkoLogLevel:
     class Level(enum.IntEnum):
         DEBUG = 1
         INFO = 2
@@ -17,20 +17,20 @@ class LogLevel:
     def get_log_level(level: int) -> Level:
         match level:
             case 1:
-                return LogLevel.Level.DEBUG
+                return TalkoLogLevel.Level.DEBUG
             case 2:
-                return LogLevel.Level.INFO
+                return TalkoLogLevel.Level.INFO
             case 3:
-                return LogLevel.Level.WARNING
+                return TalkoLogLevel.Level.WARNING
             case 4:
-                return LogLevel.Level.CRITICAL
+                return TalkoLogLevel.Level.CRITICAL
             case 5:
-                return LogLevel.Level.ERROR
+                return TalkoLogLevel.Level.ERROR
             case _:
-                raise LoggerException(f"log level not found - {level}")
+                raise TalkoLoggerException(f"log level not found - {level}")
 
 
-class LoggerFormatConfig(BaseModel):
+class TalkoLoggerFormatConfig(BaseModel):
     class Attribute(enum.IntEnum):
         # check for attributes:
         # https://docs.python.org/3/library/logging.html#logrecord-attributes
@@ -96,29 +96,29 @@ class LoggerFormatConfig(BaseModel):
         return value
 
 
-class LoggerType(enum.Enum):
+class TalkoLoggerType(enum.Enum):
     DEFAULT = 1
     CELERY = 2
 
 
-class LogConfig:
-    log_level: LogLevel.Level
+class TalkoLogConfig:
+    log_level: TalkoLogLevel.Level
     log_name: str
     log_path: str
-    logger_type: LoggerType
+    logger_type: TalkoLoggerType
 
     def __init__(self, logger_info: dict) -> None:
-        self.log_level = LogLevel.get_log_level(logger_info["level"])
+        self.log_level = TalkoLogLevel.get_log_level(logger_info["level"])
         self.log_name = logger_info["name"]
         self.log_path = logger_info["path"]
-        self.logger_type = LoggerType(logger_info["log_type"])
+        self.logger_type = TalkoLoggerType(logger_info["log_type"])
 
 
-class LogConfigs:
+class TalkoLogConfigs:
     def __init__(self, logger_info: dict) -> None:
-        self.__voice_log = LogConfig(logger_info["voice"])
-        self.__requests_log = LogConfig(logger_info["requests"])
-        self.__celery_log = LogConfig(logger_info["celery"])
+        self.__voice_log = TalkoLogConfig(logger_info["voice"])
+        self.__requests_log = TalkoLogConfig(logger_info["requests"])
+        self.__celery_log = TalkoLogConfig(logger_info["celery"])
 
     @property
     def voice_log_config(self):

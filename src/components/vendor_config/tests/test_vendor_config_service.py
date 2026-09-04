@@ -3,13 +3,13 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from src.components.vendor_config.dto import Contract
+from src.components.vendor_config.dto import TalkoContract
 from src.components.vendor_config.message import (
     NO_FIELDS_PROVIDED_FOR_UPDATE,
     VENDOR_CONFIG_CREATED_SUCCESSFULLY,
 )
-from src.components.vendor_config.services import VendorConfigService
-from src.exceptions import BadRequestError, ResourceNotFound
+from src.components.vendor_config.services import TalkoVendorConfigService
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 
 
 @pytest.mark.asyncio
@@ -21,7 +21,7 @@ class TestVendorConfigService:
         datetime_util = MagicMock()
         datetime_util.get_current_time.return_value = 1735689600
 
-        svc = VendorConfigService(
+        svc = TalkoVendorConfigService(
             repository=repo,
             logger=logger,
             datetime_util=datetime_util,
@@ -32,7 +32,7 @@ class TestVendorConfigService:
         return svc
 
     def get_private(self, obj, attr):
-        return getattr(obj, f"_VendorConfigService__{attr}")
+        return getattr(obj, f"_TalkoVendorConfigService__{attr}")
 
     async def test_get_all_configs_success(self, service):
         self.get_private(service, "repository").find_all_configs.return_value = [
@@ -96,7 +96,7 @@ class TestVendorConfigService:
 
     async def test_create_vendor_config_success(self, service):
         vendor_id = ObjectId()
-        config_dto = Contract.VendorConfigCreate(
+        config_dto = TalkoContract.VendorConfigCreate(
             vendor_id=str(vendor_id),
             available_did=["+91999"],
             generic_url_handler={"endpoint": "test"},
@@ -125,7 +125,7 @@ class TestVendorConfigServiceCoverage:
         datetime_util = MagicMock()
         datetime_util.get_current_time.return_value = 123456789
 
-        svc = VendorConfigService(
+        svc = TalkoVendorConfigService(
             repository=repo,
             logger=logger,
             datetime_util=datetime_util,
@@ -136,11 +136,11 @@ class TestVendorConfigServiceCoverage:
         return svc
 
     def get_private(self, obj, attr):
-        return getattr(obj, f"_VendorConfigService__{attr}")
+        return getattr(obj, f"_TalkoVendorConfigService__{attr}")
 
     async def test_create_vendor_config_did_loop_coverage(self, service):
         vendor_id = ObjectId()
-        config = Contract.VendorConfigCreate(
+        config = TalkoContract.VendorConfigCreate(
             vendor_id=str(vendor_id),
             available_did=["+911", "+912"],
             generic_url_handler={"url": "test"},
@@ -175,7 +175,7 @@ class TestVendorConfigServiceCoverage:
 
     async def test_get_config_by_id_not_found(self, service):
         self.get_private(service, "repository").find_config_by_id.return_value = None
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await service.get_config_by_id(str(ObjectId()))
 
     async def test_get_config_by_id_exception_logging(self, service):
@@ -192,7 +192,7 @@ class TestVendorConfigServiceCoverage:
     async def test_update_vendor_config_no_fields(self, service):
         config_id = str(ObjectId())
 
-        update_dto = Contract.VendorConfigUpdate(
+        update_dto = TalkoContract.VendorConfigUpdate(
             generic_url_handler=None,
             available_did=None,
             cdr_url_handler=None,
@@ -203,12 +203,12 @@ class TestVendorConfigServiceCoverage:
             service, "validator"
         ).validate_vendor_config_exists.return_value = None
 
-        with pytest.raises(BadRequestError, match=NO_FIELDS_PROVIDED_FOR_UPDATE):
+        with pytest.raises(TalkoBadRequestError, match=NO_FIELDS_PROVIDED_FOR_UPDATE):
             await service.update_vendor_config(config_id, update_dto)
 
     async def test_update_vendor_config_did_loop(self, service):
         config_id = ObjectId()
-        update = MagicMock(spec=Contract.VendorConfigUpdate)
+        update = MagicMock(spec=TalkoContract.VendorConfigUpdate)
         update.model_dump.return_value = {"available_did": ["+913"]}
         update.available_did = ["+913"]
 
@@ -235,7 +235,7 @@ class TestVendorConfigServiceCoverage:
     async def test_update_did_lists_config_not_found(self, service):
         vendor_id = ObjectId()
         self.get_private(service, "repository").find_config_by_id.return_value = None
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await service.update_did_lists(str(vendor_id))
 
     async def test_update_did_lists_invalid_id_format(self, service):

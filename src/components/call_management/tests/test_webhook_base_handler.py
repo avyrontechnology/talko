@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.components.call_management.handlers.webhook_base_handler import WebhookHandler
+from src.components.call_management.handlers.webhook_base_handler import TalkoWebhookHandler
 
 
 class TestWebhookHandler:
@@ -11,7 +11,7 @@ class TestWebhookHandler:
     async def test_abstract_base_functionality(self):
         """Test basic initialization and hit the 'pass' lines via super()."""
 
-        class MockWebhookHandler(WebhookHandler):
+        class MockWebhookHandler(TalkoWebhookHandler):
             async def process_webhook(self, payload):
                 await super().process_webhook(payload)
                 return {"status": "mocked"}
@@ -38,6 +38,6 @@ class TestWebhookHandler:
         Ensures the class remains abstract.
         """
         with pytest.raises(TypeError) as excinfo:
-            WebhookHandler(MagicMock(), MagicMock(), "vendor")
+            TalkoWebhookHandler(MagicMock(), MagicMock(), "vendor")
 
-        assert "Can't instantiate abstract class WebhookHandler" in str(excinfo.value)
+        assert "Can't instantiate abstract class TalkoWebhookHandler" in str(excinfo.value)

@@ -4,27 +4,27 @@ from typing import Any, Awaitable, Callable, Dict, Type, Union
 from pydantic import BaseModel, ValidationError
 
 from src.components.analytics.dto import (
-    AgentCallAnalyticsRequest,
-    AgentTalkTimeDistributionRequest,
-    AnalyticsResponse,
-    DashboardFollowupTrendsRequest,
-    PartnerServiceBoardRequest,
-    TotalAgentTalkTimeRequest,
+    TalkoAgentCallAnalyticsRequest,
+    TalkoAgentTalkTimeDistributionRequest,
+    TalkoAnalyticsResponse,
+    TalkoDashboardFollowupTrendsRequest,
+    TalkoPartnerServiceBoardRequest,
+    TalkoTotalAgentTalkTimeRequest,
 )
-from src.components.analytics.enums import AnalyticsType
-from src.components.analytics.processor import AnalyticsProcessor
-from src.exceptions import InvalidAnalyticTypeError, PayloadValidationError
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.analytics.enums import TalkoAnalyticsType
+from src.components.analytics.processor import TalkoAnalyticsProcessor
+from src.exceptions import TalkoInvalidAnalyticTypeError, TalkoPayloadValidationError
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class AnalyticsBase:
+class TalkoAnalyticsBase:
     def __init__(
         self,
-        analytics_processor: "AnalyticsProcessor",
-        logger: HollerServiceLogger,
+        analytics_processor: "TalkoAnalyticsProcessor",
+        logger: TalkoServiceLogger,
     ) -> None:
-        self.__analytics_processor: AnalyticsProcessor = analytics_processor
-        self.__holler_service_logger: HollerServiceLogger = logger
+        self.__analytics_processor: TalkoAnalyticsProcessor = analytics_processor
+        self.__talko_service_logger: TalkoServiceLogger = logger
 
     async def process_analytics(
         self,
@@ -33,29 +33,29 @@ class AnalyticsBase:
         analytics_request: Dict[str, Any],
         limit: int,
         offset: int,
-    ) -> AnalyticsResponse:
+    ) -> TalkoAnalyticsResponse:
         analytics_type: Union[str, None] = analytics_request.get("analytics_type")
         data: Dict[str, Any] = analytics_request.get("data", {})
 
         mappings: Dict[str, Dict[str, Any]] = {
-            AnalyticsType.AGENT_CALL_ANALYTICS.value: {
-                "schema": AgentCallAnalyticsRequest,
+            TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value: {
+                "schema": TalkoAgentCallAnalyticsRequest,
                 "method": self.__analytics_processor._get_agent_call_analytics,
             },
-            AnalyticsType.TOTAL_AGENT_TALK_TIME.value: {
-                "schema": TotalAgentTalkTimeRequest,
+            TalkoAnalyticsType.TOTAL_AGENT_TALK_TIME.value: {
+                "schema": TalkoTotalAgentTalkTimeRequest,
                 "method": self.__analytics_processor._get_total_agent_talk_time,
             },
-            AnalyticsType.AGENT_TALK_TIME_DISTRIBUTION.value: {
-                "schema": AgentTalkTimeDistributionRequest,
+            TalkoAnalyticsType.AGENT_TALK_TIME_DISTRIBUTION.value: {
+                "schema": TalkoAgentTalkTimeDistributionRequest,
                 "method": self.__analytics_processor._get_agent_talk_time_distribution,
             },
-            AnalyticsType.PARTNER_SERVICE_BOARD.value: {
-                "schema": PartnerServiceBoardRequest,
+            TalkoAnalyticsType.PARTNER_SERVICE_BOARD.value: {
+                "schema": TalkoPartnerServiceBoardRequest,
                 "method": self.__analytics_processor._get_partner_service_board,
             },
-            AnalyticsType.DASHBOARD_CALL_TRENDS.value: {
-                "schema": DashboardFollowupTrendsRequest,
+            TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value: {
+                "schema": TalkoDashboardFollowupTrendsRequest,
                 "method": self.__analytics_processor._get_dashboard_call_trends,
             },
         }
@@ -63,10 +63,10 @@ class AnalyticsBase:
         try:
             mapping: Union[Dict[str, Any], None] = mappings.get(analytics_type)
             if not mapping:
-                self.__holler_service_logger.error(
+                self.__talko_service_logger.error(
                     "Invalid analytics type: {}".format(analytics_type)
                 )
-                raise InvalidAnalyticTypeError(
+                raise TalkoInvalidAnalyticTypeError(
                     "Invalid analytics type: {}".format(analytics_type)
                 )
 
@@ -76,12 +76,12 @@ class AnalyticsBase:
                 example_payload: Dict[str, Any] = (
                     mapping["schema"].model_json_schema().get("example", {})
                 )
-                self.__holler_service_logger.error(
+                self.__talko_service_logger.error(
                     "Invalid payload for analytics type {}: {}".format(
                         analytics_type, str(e)
                     )
                 )
-                raise PayloadValidationError(
+                raise TalkoPayloadValidationError(
                     message="Invalid payload for analytics type '{}'. Expected schema: {}".format(
                         analytics_type, json.dumps(example_payload)
                     ),
@@ -96,18 +96,18 @@ class AnalyticsBase:
                 limit=limit,
                 offset=offset,
             )
-            self.__holler_service_logger.debug(
+            self.__talko_service_logger.debug(
                 "Analytics data: {}".format(analytics_data)
             )
-            self.__holler_service_logger.info(
+            self.__talko_service_logger.info(
                 "Successfully generated analytics for {}".format(analytics_type)
             )
-            return AnalyticsResponse(
+            return TalkoAnalyticsResponse(
                 analytics_type=analytics_type,
                 data=analytics_data,
             )
         except Exception as e:
-            self.__holler_service_logger.error(
+            self.__talko_service_logger.error(
                 "Error processing analytics {}: {}".format(analytics_type, str(e))
             )
             raise

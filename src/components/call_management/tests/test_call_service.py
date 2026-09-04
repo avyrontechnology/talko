@@ -3,16 +3,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.components.call_management.agent_dialplan_resolver import TransferTarget
+from src.components.call_management.agent_dialplan_resolver import TalkoTransferTarget
 from src.components.call_management.constant import AI_BRIDGE_VENDOR_CONFIG_ID
-from src.components.call_management.dto import Contract as call_contract
-from src.components.call_management.services import CallService
-from src.exceptions import ResourceNotFound
-from src.utils.enums import VendorType
+from src.components.call_management.dto import TalkoContract as call_contract
+from src.components.call_management.services import TalkoCallService
+from src.exceptions import TalkoResourceNotFound
+from src.utils.enums import TalkoVendorType
 
 
 def make_service(**overrides):
-    """Helper to instantiate CallService with default AsyncMock dependencies."""
+    """Helper to instantiate TalkoCallService with default AsyncMock dependencies."""
     defaults = dict(
         repository=AsyncMock(),
         logger=MagicMock(),
@@ -30,7 +30,7 @@ def make_service(**overrides):
         inbound_call_event_publisher=AsyncMock(),
     )
     defaults.update(overrides)
-    return CallService(**defaults), defaults
+    return TalkoCallService(**defaults), defaults
 
 
 class TestCallService:
@@ -54,7 +54,7 @@ class TestCallService:
             "vendor_config_id": "config456",
         }
 
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="number",
             data=["9999999999"],
             ring_type="simultaneous",
@@ -82,13 +82,13 @@ class TestCallService:
         partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value={"enable_inbound_lead_creation": False}
         )
-        service._CallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
+        service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
             return_value=resolve_result
         )
-        service._CallService__dialplan_resolver.map_transfer_to_inbound_fields = (
+        service._TalkoCallService__dialplan_resolver.map_transfer_to_inbound_fields = (
             MagicMock(return_value=("INBOUND", "9999999999"))
         )
-        service._CallService__helper.create_incoming_cdr = AsyncMock()
+        service._TalkoCallService__helper.create_incoming_cdr = AsyncMock()
 
         result = await service.generate_dialplan_response(request)
 
@@ -96,7 +96,7 @@ class TestCallService:
         assert "transfer" in result[0]
         assert result[0]["transfer"]["data"] == ["9999999999"]
 
-        create_cdr_call = service._CallService__helper.create_incoming_cdr.call_args
+        create_cdr_call = service._TalkoCallService__helper.create_incoming_cdr.call_args
         assert create_cdr_call[1]["agent_id"] is None
         assert create_cdr_call[1]["agent_number"] is None
         assert create_cdr_call[1]["lead_id"] is None
@@ -146,16 +146,16 @@ class TestCallService:
         }
         vendor_response = {"call_id": str(uuid.uuid4()), "status": "initiated"}
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value=partner_config
         )
-        service._CallService__helper.select_did = AsyncMock(return_value="111")
+        service._TalkoCallService__helper.select_did = AsyncMock(return_value="111")
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.make_call.return_value = vendor_response
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
-        service._CallService__helper.prepare_cdr = MagicMock(
+        service._TalkoCallService__helper.prepare_cdr = MagicMock(
             return_value={
                 "id": "cdr123",
                 "call_uuid": vendor_response["call_id"],
@@ -187,16 +187,16 @@ class TestCallService:
             encryption_enabled=True,
         )
 
-        service._CallService__helper.get_partner_config = AsyncMock(return_value={})
-        service._CallService__helper.select_did = AsyncMock(return_value="111")
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(return_value={})
+        service._TalkoCallService__helper.select_did = AsyncMock(return_value="111")
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await service.initiate_call(call_data, 123, 456)
 
     @pytest.mark.asyncio
     async def test_get_webhook_handler_valid(self):
         service, _ = make_service()
-        handler = service.get_webhook_handler(VendorType.TATA_TELE.value)
+        handler = service.get_webhook_handler(TalkoVendorType.TATA_TELE.value)
         assert handler is not None
 
     @pytest.mark.asyncio
@@ -227,13 +227,13 @@ class TestCallService:
             "enable_agent_mapping": True,
         }
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value=partner_config
         )
-        service._CallService__helper.select_did = AsyncMock(return_value="111")
+        service._TalkoCallService__helper.select_did = AsyncMock(return_value="111")
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.make_call.side_effect = ValueError("Some vendor error")
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
 
@@ -264,7 +264,7 @@ class TestCallService:
             encryption_enabled=True,
         )
 
-        service._CallService__helper.decrypt_lead_data = MagicMock(
+        service._TalkoCallService__helper.decrypt_lead_data = MagicMock(
             side_effect=RuntimeError("Unexpected decryption error")
         )
 
@@ -293,16 +293,16 @@ class TestCallService:
         partner_config = {"vendor_id": "vendor123", "vendor_config_id": "config456"}
         vendor_response = {"call_id": str(uuid.uuid4()), "status": "initiated"}
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value=partner_config
         )
-        service._CallService__helper.select_did = AsyncMock(return_value="111")
+        service._TalkoCallService__helper.select_did = AsyncMock(return_value="111")
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.make_call.return_value = vendor_response
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
-        service._CallService__helper.prepare_cdr = MagicMock(return_value={})
+        service._TalkoCallService__helper.prepare_cdr = MagicMock(return_value={})
         repository.insert_cdr.return_value = "cdr123"
         datetime_util.get_current_time.return_value = 1722945600
 
@@ -329,16 +329,16 @@ class TestCallService:
         partner_config = {"vendor_id": "vendor123", "vendor_config_id": "config456"}
         vendor_response = {"call_id": str(uuid.uuid4()), "status": "initiated"}
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value=partner_config
         )
-        service._CallService__helper.select_did = AsyncMock(return_value="111")
+        service._TalkoCallService__helper.select_did = AsyncMock(return_value="111")
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.make_call.return_value = vendor_response
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
-        service._CallService__helper.prepare_cdr = MagicMock(return_value={})
+        service._TalkoCallService__helper.prepare_cdr = MagicMock(return_value={})
         repository.insert_cdr.return_value = "cdr123"
         datetime_util.get_current_time.return_value = 1722945600
 
@@ -370,17 +370,17 @@ class TestCallService:
         partner_config = {"vendor_id": "vendor123", "vendor_config_id": "config456"}
         vendor_response = {"status": "initiated", "ref_id": str(uuid.uuid4())}
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value=partner_config
         )
-        service._CallService__helper.select_did = AsyncMock(return_value="111")
-        service._CallService__helper.validate_given_did = AsyncMock()
+        service._TalkoCallService__helper.select_did = AsyncMock(return_value="111")
+        service._TalkoCallService__helper.validate_given_did = AsyncMock()
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.make_call.return_value = vendor_response
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
-        service._CallService__helper.prepare_cdr = MagicMock(return_value={})
+        service._TalkoCallService__helper.prepare_cdr = MagicMock(return_value={})
         repository.insert_cdr.return_value = "cdr123"
         datetime_util.get_current_time.return_value = 1722945600
 
@@ -389,7 +389,7 @@ class TestCallService:
         await service.initiate_call(call_data, 123, 456)
         await asyncio.sleep(0)  # let the fire-and-forget pre-session task run
 
-        service._CallService__helper.validate_given_did.assert_called_once()
+        service._TalkoCallService__helper.validate_given_did.assert_called_once()
         service._pre_create_session.assert_called_once()
         _, kwargs = service._pre_create_session.call_args
         assert kwargs["call_id"] == ""
@@ -397,7 +397,7 @@ class TestCallService:
 
     @pytest.mark.asyncio
     async def test_initiate_call_injects_cdr_id_into_context_data(self):
-        """cdr_id (this CDR row's own _id, not Tata's call_id) must ride
+        """cdr_id (this TalkoCDR row's own _id, not Tata's call_id) must ride
         along in context_data all the way to _pre_create_session — it's
         what _backfill_real_vendor_call_id later uses to fix up this exact
         row once the real vendor call_id resolves (pstn/services.py)."""
@@ -416,20 +416,20 @@ class TestCallService:
             context_data={"campaign_id": "7", "recipient_id": "92"},
         )
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value={"vendor_id": "vendor123", "vendor_config_id": "config456"}
         )
-        service._CallService__helper.select_did = AsyncMock(return_value="111")
-        service._CallService__helper.validate_given_did = AsyncMock()
+        service._TalkoCallService__helper.select_did = AsyncMock(return_value="111")
+        service._TalkoCallService__helper.validate_given_did = AsyncMock()
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.make_call.return_value = {
             "status": "initiated",
             "ref_id": str(uuid.uuid4()),
         }
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
-        service._CallService__helper.prepare_cdr = MagicMock(return_value={})
+        service._TalkoCallService__helper.prepare_cdr = MagicMock(return_value={})
         repository.insert_cdr.return_value = "cdr-xyz-789"
         datetime_util.get_current_time.return_value = 1722945600
 
@@ -458,18 +458,18 @@ class TestCallService:
             service_board_id=1,
         )
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value={"vendor_id": "vendor123"}
         )
-        service._CallService__helper.select_did = AsyncMock(return_value="111")
+        service._TalkoCallService__helper.select_did = AsyncMock(return_value="111")
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await service.initiate_call(call_data, 123, 456)
 
     @pytest.mark.asyncio
     async def test_get_webhook_handler_acefhone(self):
         service, _ = make_service()
-        handler = service.get_webhook_handler(VendorType.ACEFHONE.value)
+        handler = service.get_webhook_handler(TalkoVendorType.ACEFHONE.value)
         assert handler is not None
 
     @pytest.mark.asyncio
@@ -499,7 +499,7 @@ class TestCallService:
             "vendor_config_id": "config456",
         }
 
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="number",
             data=["9999999999"],
             ring_type="simultaneous",
@@ -507,13 +507,13 @@ class TestCallService:
         )
 
         repository.find_cdr_by_numbers = AsyncMock(return_value=cdr_data)
-        service._CallService__dialplan_resolver.resolve_for_single_agent = AsyncMock(
+        service._TalkoCallService__dialplan_resolver.resolve_for_single_agent = AsyncMock(
             return_value=target
         )
-        service._CallService__dialplan_resolver.map_transfer_to_inbound_fields = (
+        service._TalkoCallService__dialplan_resolver.map_transfer_to_inbound_fields = (
             MagicMock(return_value=("OUTBOUND", "9999999999"))
         )
-        service._CallService__helper.create_incoming_cdr = AsyncMock()
+        service._TalkoCallService__helper.create_incoming_cdr = AsyncMock()
 
         result = await service.generate_dialplan_response(request)
 
@@ -524,7 +524,7 @@ class TestCallService:
         repository.find_cdr_by_numbers.assert_called_once_with(
             "+911234567890", "+919876543210"
         )
-        service._CallService__helper.create_incoming_cdr.assert_called_once()
+        service._TalkoCallService__helper.create_incoming_cdr.assert_called_once()
         did_management_service.get_dids_by_number.assert_called_once_with(
             "+919876543210"
         )
@@ -543,9 +543,9 @@ class TestCallService:
     async def test_generate_dialplan_existing_cdr_reassigned_lead_overrides_stale_lead_id(
         self,
     ):
-        """Priority 1: the old CDR's lead_id is the baseline. Priority 2: if
+        """Priority 1: the old TalkoCDR's lead_id is the baseline. Priority 2: if
         resolve_for_single_agent reassigned the agent and Maglo confirmed a
-        lead_request_id, that overrides the stale value on the new CDR."""
+        lead_request_id, that overrides the stale value on the new TalkoCDR."""
         service, deps = make_service()
         repository = deps["repository"]
         did_management_service = deps["did_management_service"]
@@ -577,7 +577,7 @@ class TestCallService:
             "vendor_config_id": "config456",
         }
 
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="number",
             data=["9999999999"],
             ring_type="simultaneous",
@@ -587,21 +587,21 @@ class TestCallService:
         )
 
         repository.find_cdr_by_numbers = AsyncMock(return_value=cdr_data)
-        service._CallService__dialplan_resolver.resolve_for_single_agent = AsyncMock(
+        service._TalkoCallService__dialplan_resolver.resolve_for_single_agent = AsyncMock(
             return_value=target
         )
-        service._CallService__dialplan_resolver.map_transfer_to_inbound_fields = (
+        service._TalkoCallService__dialplan_resolver.map_transfer_to_inbound_fields = (
             MagicMock(return_value=("OUTBOUND", "9999999999"))
         )
-        service._CallService__helper.create_incoming_cdr = AsyncMock()
+        service._TalkoCallService__helper.create_incoming_cdr = AsyncMock()
 
         await service.generate_dialplan_response(request)
 
-        service._CallService__helper.create_incoming_cdr.assert_called_once()
-        call_kwargs = service._CallService__helper.create_incoming_cdr.call_args.kwargs
+        service._TalkoCallService__helper.create_incoming_cdr.assert_called_once()
+        call_kwargs = service._TalkoCallService__helper.create_incoming_cdr.call_args.kwargs
         assert call_kwargs["agent_id"] == 4957
         assert call_kwargs["lead_id"] == 179245
-        # Regression guard: entity_type was already "Lead" on the old CDR
+        # Regression guard: entity_type was already "Lead" on the old TalkoCDR
         # (with entity_id never populated) — the override must still reach
         # entity_id, not just the legacy lead_id field.
         assert call_kwargs["entity_id"] == 179245
@@ -638,7 +638,7 @@ class TestCallService:
             "display_name": "Support Line",
         }
 
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="number",
             data=["9999999999"],
             ring_type="simultaneous",
@@ -666,13 +666,13 @@ class TestCallService:
         partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value={"enable_inbound_lead_creation": False}
         )
-        service._CallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
+        service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
             return_value=resolve_result
         )
-        service._CallService__dialplan_resolver.map_transfer_to_inbound_fields = (
+        service._TalkoCallService__dialplan_resolver.map_transfer_to_inbound_fields = (
             MagicMock(return_value=("INBOUND", "9999999999"))
         )
-        service._CallService__helper.create_incoming_cdr = AsyncMock()
+        service._TalkoCallService__helper.create_incoming_cdr = AsyncMock()
 
         result = await service.generate_dialplan_response(request)
 
@@ -683,7 +683,7 @@ class TestCallService:
         did_management_service.get_dids_by_number.assert_called_once_with(
             "+919876543210"
         )
-        service._CallService__dialplan_resolver.resolve_inbound_no_cdr.assert_called_once()
+        service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr.assert_called_once()
 
         publisher = deps["inbound_call_event_publisher"]
         publisher.publish_inbound_call.assert_called_once_with(
@@ -720,7 +720,7 @@ class TestCallService:
             "display_name": "Support Line",
         }
 
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="number",
             data=["9999999999"],
             ring_type="order_by",
@@ -752,17 +752,17 @@ class TestCallService:
                 "inbound_round_robin_index": 2,
             }
         )
-        service._CallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
+        service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
             return_value=resolve_result
         )
-        service._CallService__dialplan_resolver.map_transfer_to_inbound_fields = (
+        service._TalkoCallService__dialplan_resolver.map_transfer_to_inbound_fields = (
             MagicMock(return_value=("INBOUND", None))
         )
-        service._CallService__helper.create_incoming_cdr = AsyncMock()
+        service._TalkoCallService__helper.create_incoming_cdr = AsyncMock()
 
         await service.generate_dialplan_response(request)
 
-        service._CallService__dialplan_resolver.resolve_inbound_no_cdr.assert_called_once_with(
+        service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr.assert_called_once_with(
             customer_number="+911234567890",
             call_to_number="+919876543210",
             partner_id=100,
@@ -900,7 +900,7 @@ class TestCallService:
             "vendor_config_id": "config456",
         }
 
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="number", data=[], ring_type="simultaneous", skip_active=False
         )
 
@@ -922,18 +922,18 @@ class TestCallService:
         partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value={"enable_inbound_lead_creation": False}
         )
-        service._CallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
+        service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
             return_value=resolve_result
         )
-        service._CallService__dialplan_resolver.map_transfer_to_inbound_fields = (
+        service._TalkoCallService__dialplan_resolver.map_transfer_to_inbound_fields = (
             MagicMock(return_value=("INBOUND", None))
         )
-        service._CallService__helper.create_incoming_cdr = AsyncMock()
+        service._TalkoCallService__helper.create_incoming_cdr = AsyncMock()
 
         result = await service.generate_dialplan_response(request)
 
-        service._CallService__helper.create_incoming_cdr.assert_not_called()
-        logger.info.assert_any_call("Skipping CDR creation — no valid transfer targets")
+        service._TalkoCallService__helper.create_incoming_cdr.assert_not_called()
+        logger.info.assert_any_call("Skipping TalkoCDR creation — no valid transfer targets")
 
     @pytest.mark.asyncio
     async def test_create_cdr_if_valid_target_with_none_target(self):
@@ -959,18 +959,18 @@ class TestCallService:
         }
 
         repository.find_cdr_by_numbers = AsyncMock(return_value=cdr_data)
-        service._CallService__dialplan_resolver.resolve_for_single_agent = AsyncMock(
+        service._TalkoCallService__dialplan_resolver.resolve_for_single_agent = AsyncMock(
             return_value=None
         )
-        service._CallService__dialplan_resolver.map_transfer_to_inbound_fields = (
+        service._TalkoCallService__dialplan_resolver.map_transfer_to_inbound_fields = (
             MagicMock(return_value=("OUTBOUND", None))
         )
-        service._CallService__helper.create_incoming_cdr = AsyncMock()
+        service._TalkoCallService__helper.create_incoming_cdr = AsyncMock()
 
         result = await service.generate_dialplan_response(request)
 
-        service._CallService__helper.create_incoming_cdr.assert_not_called()
-        logger.info.assert_any_call("Skipping CDR creation — no valid transfer targets")
+        service._TalkoCallService__helper.create_incoming_cdr.assert_not_called()
+        logger.info.assert_any_call("Skipping TalkoCDR creation — no valid transfer targets")
 
     @pytest.mark.asyncio
     async def test_should_create_lead_with_none_partner_config(self):
@@ -992,7 +992,7 @@ class TestCallService:
             "vendor_config_id": "config456",
         }
 
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="number",
             data=["9999999999"],
             ring_type="simultaneous",
@@ -1017,18 +1017,18 @@ class TestCallService:
         partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value=None
         )
-        service._CallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
+        service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
             return_value=resolve_result
         )
-        service._CallService__dialplan_resolver.map_transfer_to_inbound_fields = (
+        service._TalkoCallService__dialplan_resolver.map_transfer_to_inbound_fields = (
             MagicMock(return_value=("INBOUND", None))
         )
-        service._CallService__helper.create_incoming_cdr = AsyncMock()
+        service._TalkoCallService__helper.create_incoming_cdr = AsyncMock()
 
         await service.generate_dialplan_response(request)
 
         call_args = (
-            service._CallService__dialplan_resolver.resolve_inbound_no_cdr.call_args
+            service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr.call_args
         )
         assert call_args[1]["create_lead"] is False
 
@@ -1084,7 +1084,7 @@ class TestCallService:
             "vendor_config_id": "config456",
         }
 
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="number",
             data=["9999999999"],
             ring_type="simultaneous",
@@ -1109,18 +1109,18 @@ class TestCallService:
         partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value={"enable_inbound_lead_creation": False}
         )
-        service._CallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
+        service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
             return_value=resolve_result
         )
-        service._CallService__dialplan_resolver.map_transfer_to_inbound_fields = (
+        service._TalkoCallService__dialplan_resolver.map_transfer_to_inbound_fields = (
             MagicMock(return_value=("INBOUND", None))
         )
-        service._CallService__helper.create_incoming_cdr = AsyncMock()
+        service._TalkoCallService__helper.create_incoming_cdr = AsyncMock()
 
         await service.generate_dialplan_response(request)
 
         call_args = (
-            service._CallService__dialplan_resolver.resolve_inbound_no_cdr.call_args
+            service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr.call_args
         )
         assert call_args[1]["create_lead"] is False
 
@@ -1144,7 +1144,7 @@ class TestCallService:
             "vendor_config_id": "config456",
         }
 
-        target = TransferTarget(
+        target = TalkoTransferTarget(
             type="number",
             data=["9999999999"],
             ring_type="simultaneous",
@@ -1169,18 +1169,18 @@ class TestCallService:
         partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value={"some_other_key": "some_value"}
         )
-        service._CallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
+        service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr = AsyncMock(
             return_value=resolve_result
         )
-        service._CallService__dialplan_resolver.map_transfer_to_inbound_fields = (
+        service._TalkoCallService__dialplan_resolver.map_transfer_to_inbound_fields = (
             MagicMock(return_value=("INBOUND", None))
         )
-        service._CallService__helper.create_incoming_cdr = AsyncMock()
+        service._TalkoCallService__helper.create_incoming_cdr = AsyncMock()
 
         await service.generate_dialplan_response(request)
 
         call_args = (
-            service._CallService__dialplan_resolver.resolve_inbound_no_cdr.call_args
+            service._TalkoCallService__dialplan_resolver.resolve_inbound_no_cdr.call_args
         )
         assert call_args[1]["create_lead"] is False
 
@@ -1196,12 +1196,12 @@ class TestCallServiceHangupCall:
         }
         vendor_response = {"Success": True, "Message": "Call hangup successfully"}
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value=partner_config
         )
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.hangup_call.return_value = vendor_response
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
 
@@ -1210,7 +1210,7 @@ class TestCallServiceHangupCall:
         assert result.success is True
         assert result.message == "Call hangup successfully"
         mock_vendor_handler.hangup_call.assert_awaited_once_with("abc123")
-        service._CallService__helper.get_vendor_handler.assert_awaited_once_with(
+        service._TalkoCallService__helper.get_vendor_handler.assert_awaited_once_with(
             "vendor123", "config456"
         )
 
@@ -1224,12 +1224,12 @@ class TestCallServiceHangupCall:
         }
         vendor_response = {"success": True, "message": "ok"}
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value=partner_config
         )
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.hangup_call.return_value = vendor_response
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
 
@@ -1242,22 +1242,22 @@ class TestCallServiceHangupCall:
     async def test_hangup_call_missing_vendor_id(self):
         service, _ = make_service()
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value={"vendor_config_id": "config456"}
         )
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await service.hangup_call("abc123", user_id=123, partner_id=456)
 
     @pytest.mark.asyncio
     async def test_hangup_call_missing_vendor_config_id(self):
         service, _ = make_service()
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value={"vendor_id": "vendor123"}
         )
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await service.hangup_call("abc123", user_id=123, partner_id=456)
 
     @pytest.mark.asyncio
@@ -1271,12 +1271,12 @@ class TestCallServiceHangupCall:
         }
         vendor_response = {"Success": True, "Message": "Call hangup successfully"}
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value=partner_config
         )
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.hangup_call.return_value = vendor_response
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
 
@@ -1284,7 +1284,7 @@ class TestCallServiceHangupCall:
             "abc123", user_id=123, partner_id=456, enable_ai_bridge=True
         )
 
-        service._CallService__helper.get_vendor_handler.assert_awaited_once_with(
+        service._TalkoCallService__helper.get_vendor_handler.assert_awaited_once_with(
             "vendor123", AI_BRIDGE_VENDOR_CONFIG_ID
         )
 
@@ -1292,12 +1292,12 @@ class TestCallServiceHangupCall:
     async def test_hangup_call_vendor_raises_value_error(self):
         service, _ = make_service()
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value={"vendor_id": "vendor123", "vendor_config_id": "config456"}
         )
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.hangup_call.side_effect = ValueError("vendor error")
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
 
@@ -1310,18 +1310,18 @@ class TestCallServiceTransferCall:
     async def test_transfer_call_uses_partner_vendor_config_id(self):
         service, _ = make_service()
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value={"vendor_id": "vendor123", "vendor_config_id": "config456"}
         )
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.transfer_call.return_value = {"Success": True}
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
 
         await service.transfer_call("abc123", "9999999999", partner_id=456)
 
-        service._CallService__helper.get_vendor_handler.assert_awaited_once_with(
+        service._TalkoCallService__helper.get_vendor_handler.assert_awaited_once_with(
             "vendor123", "config456"
         )
         mock_vendor_handler.transfer_call.assert_awaited_once_with(
@@ -1337,12 +1337,12 @@ class TestCallServiceTransferCall:
             "vendor_config_id": "config456",
             "ai_vendor_config_id": "should-be-ignored",
         }
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value=partner_config
         )
         mock_vendor_handler = AsyncMock()
         mock_vendor_handler.transfer_call.return_value = {"Success": True}
-        service._CallService__helper.get_vendor_handler = AsyncMock(
+        service._TalkoCallService__helper.get_vendor_handler = AsyncMock(
             return_value=mock_vendor_handler
         )
 
@@ -1350,7 +1350,7 @@ class TestCallServiceTransferCall:
             "abc123", "9999999999", partner_id=456, enable_ai_bridge=True
         )
 
-        service._CallService__helper.get_vendor_handler.assert_awaited_once_with(
+        service._TalkoCallService__helper.get_vendor_handler.assert_awaited_once_with(
             "vendor123", AI_BRIDGE_VENDOR_CONFIG_ID
         )
 
@@ -1358,28 +1358,28 @@ class TestCallServiceTransferCall:
     async def test_transfer_call_missing_vendor_id(self):
         service, _ = make_service()
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value={"vendor_config_id": "config456"}
         )
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await service.transfer_call("abc123", "9999999999", partner_id=456)
 
     @pytest.mark.asyncio
     async def test_transfer_call_missing_vendor_config_id(self):
         service, _ = make_service()
 
-        service._CallService__helper.get_partner_config = AsyncMock(
+        service._TalkoCallService__helper.get_partner_config = AsyncMock(
             return_value={"vendor_id": "vendor123"}
         )
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await service.transfer_call("abc123", "9999999999", partner_id=456)
 
 
 class TestPreCreateSessionCallId:
     """
-    _pre_create_session no longer polls live_calls or backfills the CDR —
+    _pre_create_session no longer polls live_calls or backfills the TalkoCDR —
     the real vendor call_id is now resolved and injected entirely from the
     PSTN side (best-effort live_calls poll + LiveKit data-channel backfill
     in pstn/services.py Step 6, merged into context_data by the makun-ai
@@ -1418,7 +1418,7 @@ class TestPreCreateSessionCallId:
             return_value=self._make_did_record()
         )
 
-        service._CallService__redis_helper.store_outbound_room = AsyncMock()
+        service._TalkoCallService__redis_helper.store_outbound_room = AsyncMock()
 
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=b"cached-api-key")
@@ -1456,7 +1456,7 @@ class TestPreCreateSessionCallId:
             return_value=self._make_did_record()
         )
 
-        service._CallService__redis_helper.store_outbound_room = AsyncMock()
+        service._TalkoCallService__redis_helper.store_outbound_room = AsyncMock()
 
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=b"cached-api-key")
@@ -1498,7 +1498,7 @@ class TestPreCreateSessionCallId:
         )
 
         mock_store = AsyncMock()
-        service._CallService__redis_helper.store_outbound_room = mock_store
+        service._TalkoCallService__redis_helper.store_outbound_room = mock_store
 
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=b"cached-api-key")

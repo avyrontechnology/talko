@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import UploadFile
 
 from src.components.call_assets.messages import MISSING_FILE_PATH, SOMETHING_WENT_WRONG
-from src.components.common.responses import InternalServerErrorResponse
-from src.components.digital_assets.storage.helper import StorageHelper
-from src.exceptions import BadRequestError
-from src.components.call_assets.helper import AssetsHelper
+from src.components.common.responses import TalkoInternalServerErrorResponse
+from src.components.digital_assets.storage.helper import TalkoStorageHelper
+from src.exceptions import TalkoBadRequestError
+from src.components.call_assets.helper import TalkoAssetsHelper
 
 
 @pytest.fixture
@@ -20,11 +20,11 @@ def mock_logger():
 
 @pytest.mark.asyncio
 class TestAssetsHelper:
-    """Test suite for AssetsHelper class."""
+    """Test suite for TalkoAssetsHelper class."""
 
     async def test_url_to_upload_file_success(self, mock_logger):
         """Should convert a URL to UploadFile successfully."""
-        helper = AssetsHelper(logger=mock_logger)
+        helper = TalkoAssetsHelper(logger=mock_logger)
 
         mock_response = MagicMock()
         mock_response.content = b"fake audio data"
@@ -42,7 +42,7 @@ class TestAssetsHelper:
 
     async def test_url_to_upload_file_failure(self, mock_logger):
         """Should raise RuntimeError if the request fails."""
-        helper = AssetsHelper(logger=mock_logger)
+        helper = TalkoAssetsHelper(logger=mock_logger)
 
         with patch("src.components.call_assets.helper.requests.get", side_effect=Exception("Network error")):
             with pytest.raises(RuntimeError, match="Failed to convert URL to UploadFile: Network error"):
@@ -50,13 +50,13 @@ class TestAssetsHelper:
 
     async def test_store_media_to_digital_ocean_success(self, mock_logger):
         """Should upload media to DigitalOcean and return file path."""
-        helper = AssetsHelper(logger=mock_logger)
+        helper = TalkoAssetsHelper(logger=mock_logger)
 
         file_obj = UploadFile(filename="sample.mp3", file=io.BytesIO(b"12345"))
 
         mock_presigned_url = "https://do-test-url.com/path"
-        with patch.object(StorageHelper, "upload_file", new=AsyncMock()) as mock_upload, \
-             patch.object(StorageHelper, "get_presigned_url", return_value=mock_presigned_url):
+        with patch.object(TalkoStorageHelper, "upload_file", new=AsyncMock()) as mock_upload, \
+             patch.object(TalkoStorageHelper, "get_presigned_url", return_value=mock_presigned_url):
             path = await helper.store_media_to_digital_ocean(file_obj, partner_id=123, asset_type="recording")
 
         assert isinstance(path, str)
@@ -66,7 +66,7 @@ class TestAssetsHelper:
 
     async def test_store_media_to_digital_ocean_no_file(self, mock_logger):
         """Should skip upload if file object is missing."""
-        helper = AssetsHelper(logger=mock_logger)
+        helper = TalkoAssetsHelper(logger=mock_logger)
 
         path = await helper.store_media_to_digital_ocean(None, partner_id=123, asset_type="recording")
 
@@ -75,10 +75,10 @@ class TestAssetsHelper:
 
     async def test_store_media_to_digital_ocean_exception(self, mock_logger):
         """Should log error and raise when upload fails."""
-        helper = AssetsHelper(logger=mock_logger)
+        helper = TalkoAssetsHelper(logger=mock_logger)
         file_obj = UploadFile(filename="bad.mp3", file=io.BytesIO(b"12345"))
 
-        with patch.object(StorageHelper, "upload_file", new=AsyncMock(side_effect=Exception("Upload failed"))):
+        with patch.object(TalkoStorageHelper, "upload_file", new=AsyncMock(side_effect=Exception("Upload failed"))):
             with pytest.raises(Exception, match="Upload failed"):
                 await helper.store_media_to_digital_ocean(file_obj, partner_id=123, asset_type="recording")
 
@@ -86,10 +86,10 @@ class TestAssetsHelper:
 
     async def test_get_recording_url_from_path_success(self, mock_logger):
         """Should return presigned URL successfully."""
-        helper = AssetsHelper(logger=mock_logger)
+        helper = TalkoAssetsHelper(logger=mock_logger)
 
         mock_url = "https://digital-ocean.com/test.mp3"
-        with patch.object(StorageHelper, "get_presigned_url", return_value=mock_url):
+        with patch.object(TalkoStorageHelper, "get_presigned_url", return_value=mock_url):
             result = await helper.get_recording_url_from_path("partner1/service/test.mp3")
 
         assert result == mock_url
@@ -97,19 +97,19 @@ class TestAssetsHelper:
         mock_logger.debug.assert_any_call("Generated recording URL: {}".format(mock_url))
 
     async def test_get_recording_url_from_path_missing_path(self, mock_logger):
-        """Should raise BadRequestError if file_path is missing."""
-        helper = AssetsHelper(logger=mock_logger)
+        """Should raise TalkoBadRequestError if file_path is missing."""
+        helper = TalkoAssetsHelper(logger=mock_logger)
 
-        with pytest.raises(BadRequestError, match=MISSING_FILE_PATH):
+        with pytest.raises(TalkoBadRequestError, match=MISSING_FILE_PATH):
             await helper.get_recording_url_from_path("")
 
         mock_logger.warning.assert_any_call("FilePath not found for recording URL generation")
 
     async def test_get_recording_url_from_path_failure(self, mock_logger):
         """Should raise the original exception on presigned URL generation failure."""
-        helper = AssetsHelper(logger=mock_logger)
+        helper = TalkoAssetsHelper(logger=mock_logger)
 
-        with patch.object(StorageHelper, "get_presigned_url", side_effect=Exception("DO failure")):
+        with patch.object(TalkoStorageHelper, "get_presigned_url", side_effect=Exception("DO failure")):
             with pytest.raises(Exception) as exc_info:
                 await helper.get_recording_url_from_path("some/path.mp3")
 
@@ -123,7 +123,7 @@ class TestAssetsHelper:
 
 
     async def test_url_to_upload_file_query_special_chars(self, mock_logger):
-        helper = AssetsHelper(logger=mock_logger)
+        helper = TalkoAssetsHelper(logger=mock_logger)
 
         mock_response = MagicMock()
         mock_response.content = b"audio data"
@@ -139,7 +139,7 @@ class TestAssetsHelper:
         assert upload_file.file.read() == b"audio data"
 
     async def test_file_pointer_reset_after_read(self, mock_logger):
-        helper = AssetsHelper(logger=mock_logger)
+        helper = TalkoAssetsHelper(logger=mock_logger)
 
         mock_response = MagicMock()
         mock_response.content = b"data"
@@ -155,7 +155,7 @@ class TestAssetsHelper:
         assert content_first == content_second == b"data"
 
     async def test_url_to_upload_file_unexpected_exception(self, mock_logger):
-        helper = AssetsHelper(logger=mock_logger)
+        helper = TalkoAssetsHelper(logger=mock_logger)
 
         with patch("src.components.call_assets.helper.requests.get", side_effect=ValueError("Boom")):
             with pytest.raises(RuntimeError, match="Failed to convert URL to UploadFile: Boom"):

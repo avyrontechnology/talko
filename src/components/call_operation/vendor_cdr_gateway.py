@@ -1,23 +1,23 @@
 from typing import Any, Dict, Optional
 
-from src.components.call_operation.cdr_update import CDRUpdateTask
-from src.exceptions import BadRequestError
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.call_operation.cdr_update import TalkoCDRUpdateTask
+from src.exceptions import TalkoBadRequestError
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class VendorCDRGateway:
+class TalkoVendorCDRGateway:
     """
-    Vendor CDR Gateway - Central dispatcher for fetching call details.
+    Vendor TalkoCDR Gateway - Central dispatcher for fetching call details.
 
     This gateway makes the system extensible:
-    - When a new vendor is added in future, create a new *CDRUpdateTask class
+    - When a new vendor is added in future, create a new *TalkoCDRUpdateTask class
       and register it here. No changes needed in controller or API.
     """
 
     def __init__(
         self,
-        cdr_update_task: CDRUpdateTask,
-        logger: HollerServiceLogger,
+        cdr_update_task: TalkoCDRUpdateTask,
+        logger: TalkoServiceLogger,
     ):
         self.__cdr_update_task = cdr_update_task
         self.__logger = logger
@@ -50,14 +50,14 @@ class VendorCDRGateway:
             vendor_type: str = vendor_config.get("vendor_type")
             if not vendor_type:
                 self.__logger.error("vendor_type missing in vendor_config")
-                raise BadRequestError("vendor_type missing in vendor configuration")
+                raise TalkoBadRequestError("vendor_type missing in vendor configuration")
 
             cdr_config: Dict[str, Any] = vendor_config.get("cdr_url_handler", {})
             if not cdr_config:
                 self.__logger.error(
                     "cdr_url_handler missing for vendor_type: {}".format(vendor_type)
                 )
-                raise BadRequestError("CDR configuration missing")
+                raise TalkoBadRequestError("TalkoCDR configuration missing")
 
             self.__logger.info(
                 "Routing call details request for call_id={}, call_uuid={} to vendor_type={}".format(
@@ -69,12 +69,12 @@ class VendorCDRGateway:
             handler = self._handlers.get(vendor_type)
             if not handler:
                 self.__logger.error("Unsupported vendor_type: {}".format(vendor_type))
-                raise BadRequestError("Unsupported vendor: {}".format(vendor_type))
+                raise TalkoBadRequestError("Unsupported vendor: {}".format(vendor_type))
 
             return await handler(call_id, call_uuid, cdr_config, vendor_type)
 
         except Exception as e:
-            self.__logger.error("Error in VendorCDRGateway: {}".format(str(e)))
+            self.__logger.error("Error in TalkoVendorCDRGateway: {}".format(str(e)))
             raise
 
     # Vendor Specific Handlers
@@ -86,8 +86,8 @@ class VendorCDRGateway:
         cdr_config: Dict[str, Any],
         vendor_type: str,
     ) -> Dict[str, Any]:
-        """Handle Tata Tele using existing CDRUpdateTask"""
-        self.__logger.debug("Using TataTele handler via CDRUpdateTask")
+        """Handle Tata Tele using existing TalkoCDRUpdateTask"""
+        self.__logger.debug("Using TataTele handler via TalkoCDRUpdateTask")
 
         return await self.__cdr_update_task.fetch_single_cdr(
             call_id=call_id,

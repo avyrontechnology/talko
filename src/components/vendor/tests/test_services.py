@@ -3,14 +3,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from src.components.vendor.dto import Contract
+from src.components.vendor.dto import TalkoContract
 from src.components.vendor.message import (
     VENDOR_ACTIVATED_SUCCESSFULLY,
     VENDOR_CREATED_SUCCESSFULLY,
     VENDOR_DEACTIVATED_SUCCESSFULLY,
 )
-from src.components.vendor.services import VendorService
-from src.exceptions import ConflictError, ResourceNotFound
+from src.components.vendor.services import TalkoVendorService
+from src.exceptions import TalkoConflictError, TalkoResourceNotFound
 from src.utils.common_messages import VENDOR_NOT_FOUND
 
 
@@ -38,7 +38,7 @@ def mock_validator():
 
 @pytest.fixture
 def vendor_service(mock_repo, mock_logger, mock_datetime_util, mock_validator):
-    return VendorService(
+    return TalkoVendorService(
         vendor_repo=mock_repo,
         logger=mock_logger,
         datetime_util=mock_datetime_util,
@@ -47,13 +47,13 @@ def vendor_service(mock_repo, mock_logger, mock_datetime_util, mock_validator):
 
 
 class TestVendorService:
-    """Test suite for VendorService class"""
+    """Test suite for TalkoVendorService class"""
 
     @pytest.mark.asyncio
     async def test_create_vendor_success(
         self, vendor_service, mock_repo, mock_validator
     ):
-        vendor_input = Contract.VendorCreate(name="Test Vendor", vendor_type="airtel")
+        vendor_input = TalkoContract.VendorCreate(name="Test Vendor", vendor_type="airtel")
         mock_repo.insert_vendor.return_value = ObjectId("64ab9fbfe7f4f5b4a10ebc88")
 
         result = await vendor_service.create_vendor(vendor_input)
@@ -64,7 +64,7 @@ class TestVendorService:
 
     @pytest.mark.asyncio
     async def test_create_vendor_failure_logs_error(self, vendor_service, mock_repo):
-        vendor_input = Contract.VendorCreate(name="Vendor Error", vendor_type="airtel")
+        vendor_input = TalkoContract.VendorCreate(name="Vendor Error", vendor_type="airtel")
         mock_repo.insert_vendor.side_effect = Exception("DB Error")
 
         with pytest.raises(Exception):
@@ -118,7 +118,7 @@ class TestVendorService:
         vendor_id = "64ab9fbfe7f4f5b4a10ebc88"
         mock_repo.find_vendor_by_id.return_value = None
 
-        with pytest.raises(ResourceNotFound) as e:
+        with pytest.raises(TalkoResourceNotFound) as e:
             await vendor_service.get_vendor_by_id(vendor_id)
 
         assert VENDOR_NOT_FOUND.format(vendor_id) in str(e.value)
@@ -156,7 +156,7 @@ class TestVendorService:
             "is_active": True,
         }
 
-        with pytest.raises(ConflictError):
+        with pytest.raises(TalkoConflictError):
             await vendor_service.activate_vendor(vendor_id)
 
     @pytest.mark.asyncio
@@ -164,7 +164,7 @@ class TestVendorService:
         mock_repo.find_vendor_by_id_all.return_value = None
         vendor_id = "64ab9fbfe7f4f5b4a10ebc88"
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await vendor_service.activate_vendor(vendor_id)
 
     @pytest.mark.asyncio
@@ -200,14 +200,14 @@ class TestVendorService:
             "is_active": False,
         }
 
-        with pytest.raises(ConflictError):
+        with pytest.raises(TalkoConflictError):
             await vendor_service.deactivate_vendor(vendor_id)
 
     @pytest.mark.asyncio
     async def test_deactivate_vendor_not_found(self, vendor_service, mock_repo):
         mock_repo.find_vendor_by_id_all.return_value = None
 
-        with pytest.raises(ResourceNotFound):
+        with pytest.raises(TalkoResourceNotFound):
             await vendor_service.deactivate_vendor("64ab9fbfe7f4f5b4a10ebc88")
 
     @pytest.mark.asyncio

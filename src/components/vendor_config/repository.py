@@ -2,21 +2,21 @@ from typing import Union
 
 from bson import ObjectId
 
-from src.components.vendor.models import VendorModel
+from src.components.vendor.models import TalkoVendorModel
 from src.components.vendor_config.constants import PULL_ALL, PUSH, SET
 from src.components.vendor_config.message import VENDOR_CONFIG_FOR_VENDOR_ID_NOT_FOUND
-from src.components.vendor_config.models import VendorConfigModel
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.vendor_config.models import TalkoVendorConfigModel
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class VendorConfigRepository:
+class TalkoVendorConfigRepository:
     """
     Repository class for handling all database operations related to Vendor Configurations.
     """
 
     def __init__(
-        self, db_manager: DocDatabaseSessionManager, logger: HollerServiceLogger
+        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
     ):
         """
         Initialize the repository with database manager and logger.
@@ -42,7 +42,7 @@ class VendorConfigRepository:
         """
         try:
             async with self.__db_manager.collection(
-                VendorConfigModel.CollectionName.VENDOR_CONFIG
+                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
             ) as collection:
                 result = await collection.insert_one(config_dict)
                 self.__logger.info(
@@ -64,7 +64,7 @@ class VendorConfigRepository:
         """
         try:
             async with self.__db_manager.collection(
-                VendorConfigModel.CollectionName.VENDOR_CONFIG
+                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
             ) as collection:
                 exists = await collection.find_one({"vendor_id": vendor_id}) is not None
                 self.__logger.info(
@@ -92,7 +92,7 @@ class VendorConfigRepository:
         """
         try:
             async with self.__db_manager.collection(
-                VendorConfigModel.CollectionName.VENDOR_CONFIG
+                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
             ) as collection:
                 exists = await collection.find_one({"_id": id}) is not None
                 self.__logger.info(
@@ -118,12 +118,12 @@ class VendorConfigRepository:
         """
         try:
             async with self.__db_manager.collection(
-                VendorConfigModel.CollectionName.VENDOR_CONFIG
+                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
             ) as configs_collection:
                 pipeline = [
                     {
                         self.__lookup: {
-                            "from": VendorModel.CollectionName.VENDOR,
+                            "from": TalkoVendorModel.CollectionName.VENDOR,
                             "localField": "vendor_id",
                             "foreignField": "_id",
                             "as": "vendor",
@@ -160,13 +160,13 @@ class VendorConfigRepository:
         """
         try:
             async with self.__db_manager.collection(
-                VendorConfigModel.CollectionName.VENDOR_CONFIG
+                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
             ) as configs_collection:
                 pipeline = [
                     {self.__match: {"_id": config_id}},
                     {
                         self.__lookup: {
-                            "from": VendorModel.CollectionName.VENDOR,
+                            "from": TalkoVendorModel.CollectionName.VENDOR,
                             "localField": "vendor_id",
                             "foreignField": "_id",
                             "as": "vendor",
@@ -207,13 +207,13 @@ class VendorConfigRepository:
     async def find_configs_by_vendor_id(self, vendor_id: ObjectId) -> list[dict]:
         try:
             async with self.__db_manager.collection(
-                VendorConfigModel.CollectionName.VENDOR_CONFIG
+                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
             ) as configs_collection:
                 pipeline = [
                     {self.__match: {"vendor_id": vendor_id}},
                     {
                         self.__lookup: {
-                            "from": VendorModel.CollectionName.VENDOR,
+                            "from": TalkoVendorModel.CollectionName.VENDOR,
                             "localField": "vendor_id",
                             "foreignField": "_id",
                             "as": "vendor",
@@ -252,13 +252,13 @@ class VendorConfigRepository:
         """
         try:
             async with self.__db_manager.collection(
-                VendorConfigModel.CollectionName.VENDOR_CONFIG
+                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
             ) as configs_collection:
                 pipeline = [
                     # Join with Vendor collection
                     {
                         self.__lookup: {
-                            "from": VendorModel.CollectionName.VENDOR,
+                            "from": TalkoVendorModel.CollectionName.VENDOR,
                             "localField": "vendor_id",  # link via vendor_id
                             "foreignField": "_id",
                             "as": "vendor",
@@ -313,7 +313,7 @@ class VendorConfigRepository:
         """
         try:
             async with self.__db_manager.collection(
-                VendorConfigModel.CollectionName.VENDOR_CONFIG
+                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
             ) as collection:
                 result = await collection.find_one_and_update(
                     {"_id": config_id}, {"$set": update_dict}, return_document=True
@@ -422,7 +422,7 @@ class VendorConfigRepository:
         """
         try:
             async with self.__db_manager.collection(
-                VendorConfigModel.CollectionName.VENDOR_CONFIG
+                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
             ) as collection:
                 result = await collection.find_one_and_update(
                     {"vendor_id": vendor_id}, update_dict, return_document=True

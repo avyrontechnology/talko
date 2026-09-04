@@ -1,8 +1,8 @@
-from ..loggers.holler_service_logger import HollerServiceLogger
+from ..loggers.talko_service_logger import TalkoServiceLogger
 
 
 def validate_required_fields(
-    data: dict, required_fields: list[str], logger: HollerServiceLogger
+    data: dict, required_fields: list[str], logger: TalkoServiceLogger
 ):
     """Validate that all required fields are present in the data."""
     missing_fields = [

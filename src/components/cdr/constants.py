@@ -2,7 +2,7 @@ from datetime import timedelta, timezone
 from enum import Enum
 
 from src.components.analytics.constants import CLICK_TO_CALL
-from src.utils.enums import ConnectionStatus
+from src.utils.enums import TalkoConnectionStatus
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -14,12 +14,12 @@ VALID_AGENT_STATUSES = {"agent_connected", "agent_not_connected"}
 VALID_CALL_STATUSES = VALID_DB_STATUSES | VALID_LEAD_STATUSES | VALID_AGENT_STATUSES
 
 
-class EntityType(str, Enum):
+class TalkoEntityType(str, Enum):
     LEAD = "Lead"
     CONTACT = "Contact"
 
 
-class TalkTimeRange(str, Enum):
+class TalkoTalkTimeRange(str, Enum):
     ZERO_TO_ONE = "0_1"
     ONE_TO_THREE = "1_3"
     THREE_TO_FIVE = "3_5"
@@ -27,10 +27,10 @@ class TalkTimeRange(str, Enum):
 
 
 TALK_TIME_RANGES = {
-    TalkTimeRange.ZERO_TO_ONE: (0, 60),  # 0–1 min
-    TalkTimeRange.ONE_TO_THREE: (61, 180),  # 1–3 min
-    TalkTimeRange.THREE_TO_FIVE: (181, 300),  # 3–5 min
-    TalkTimeRange.GREATER_FIVE: (301, None),  # > 5 min
+    TalkoTalkTimeRange.ZERO_TO_ONE: (0, 60),  # 0–1 min
+    TalkoTalkTimeRange.ONE_TO_THREE: (61, 180),  # 1–3 min
+    TalkoTalkTimeRange.THREE_TO_FIVE: (181, 300),  # 3–5 min
+    TalkoTalkTimeRange.GREATER_FIVE: (301, None),  # > 5 min
 }
 
 AGENT_STATUS_EXPR = {
@@ -39,8 +39,8 @@ AGENT_STATUS_EXPR = {
         "then": {
             "$cond": {
                 "if": {"$gt": [{"$ifNull": ["$total_call_duration", 0]}, 0]},
-                "then": ConnectionStatus.CONNECTED.value,
-                "else": ConnectionStatus.NOT_CONNECTED.value,
+                "then": TalkoConnectionStatus.CONNECTED.value,
+                "else": TalkoConnectionStatus.NOT_CONNECTED.value,
             }
         },
         "else": {
@@ -51,8 +51,8 @@ AGENT_STATUS_EXPR = {
                         {"$gt": [{"$ifNull": ["$talk_time", 0]}, 0]},
                     ]
                 },
-                "then": ConnectionStatus.CONNECTED.value,
-                "else": ConnectionStatus.NOT_CONNECTED.value,
+                "then": TalkoConnectionStatus.CONNECTED.value,
+                "else": TalkoConnectionStatus.NOT_CONNECTED.value,
             }
         },
     }
@@ -64,15 +64,15 @@ LEAD_STATUS_EXPR = {
         "then": {
             "$cond": {
                 "if": {"$gt": [{"$ifNull": ["$talk_time", 0]}, 0]},
-                "then": ConnectionStatus.CONNECTED.value,
-                "else": ConnectionStatus.NOT_CONNECTED.value,
+                "then": TalkoConnectionStatus.CONNECTED.value,
+                "else": TalkoConnectionStatus.NOT_CONNECTED.value,
             }
         },
         "else": {
             "$cond": {
                 "if": {"$gt": [{"$ifNull": ["$total_call_duration", 0]}, 0]},
-                "then": ConnectionStatus.CONNECTED.value,
-                "else": ConnectionStatus.NOT_CONNECTED.value,
+                "then": TalkoConnectionStatus.CONNECTED.value,
+                "else": TalkoConnectionStatus.NOT_CONNECTED.value,
             }
         },
     }

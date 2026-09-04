@@ -8,23 +8,23 @@ from src.components.call_management.constant import (
     TATA_WEBHOOK_FIELD_MAPPINGS,
     WEBHOOK,
 )
-from src.components.call_management.handlers.webhook_base_handler import WebhookHandler
+from src.components.call_management.handlers.webhook_base_handler import TalkoWebhookHandler
 from src.components.call_management.messages import (
     CALL_ID_MUST_BE_PROVIDED,
     CDR_NOT_FOUND,
     FAILED_TO_UPDATE,
     WEBHOOK_PAYLOAD_MISSING,
 )
-from src.components.call_management.repository import CallRepository
+from src.components.call_management.repository import TalkoCallRepository
 from src.components.cdr.entity_fields import derive_entity_fields
-from src.exceptions import BadRequestError, ResourceNotFound
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.datetime_util import DateTimeUtil
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.datetime_util import TalkoDateTimeUtil
 
 
-class TataTeleWebhookHandler(WebhookHandler):
+class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
     """
-    Handles webhook and API-fetched CDR data for Tata Tele, updating CDR records.
+    Handles webhook and API-fetched TalkoCDR data for Tata Tele, updating TalkoCDR records.
     """
 
     def __init__(
@@ -44,11 +44,11 @@ class TataTeleWebhookHandler(WebhookHandler):
             call_redis_helper: Used only to dedupe missed-inbound-call
                 callback scheduling (see _maybe_schedule_missed_call_callback).
                 Optional — callers that never process live webhooks (e.g. the
-                CDR-API polling reconciler) can omit it.
+                TalkoCDR-API polling reconciler) can omit it.
         """
-        self.logger: HollerServiceLogger = logger
-        self.call_repository: CallRepository = call_repository
-        self.datetime_util: DateTimeUtil = DateTimeUtil()
+        self.logger: TalkoServiceLogger = logger
+        self.call_repository: TalkoCallRepository = call_repository
+        self.datetime_util: TalkoDateTimeUtil = TalkoDateTimeUtil()
         self.vendor_type: str = vendor_type
         self.call_redis_helper: Any = call_redis_helper
 
@@ -76,9 +76,9 @@ class TataTeleWebhookHandler(WebhookHandler):
         self, cdr: Dict[str, Any], updates: Dict[str, Any]
     ) -> None:
         """
-        Preserve entity fields from existing CDR when webhook/API payload
+        Preserve entity fields from existing TalkoCDR when webhook/API payload
         does not explicitly provide them. Also backfills entity_type/entity_id/
-        entity_name from a legacy lead_id/lead_name on the existing CDR when
+        entity_name from a legacy lead_id/lead_name on the existing TalkoCDR when
         those were never derived (e.g. CDRs created before entity fields existed).
         """
 
@@ -109,7 +109,7 @@ class TataTeleWebhookHandler(WebhookHandler):
         repeatedly lost on QA (published fine, never even "received" — idle
         worker, no restart), while sweeper-dispatched immediate tasks always
         land. All partner-opt-in / agent-availability / already-connected
-        decisions are still made later by the task itself (CallService.
+        decisions are still made later by the task itself (TalkoCallService.
         initiate_missed_call_callback); duplicate Tata deliveries are
         harmless — every execution converges on the deterministic task id
         plus the already-handled / exec-lock guards and at most one ever
@@ -128,7 +128,7 @@ class TataTeleWebhookHandler(WebhookHandler):
 
     async def process_webhook(self, payload: Dict[str, Any]) -> Dict[str, str]:
         """
-        Process Tata Tele webhook payload and update CDR.
+        Process Tata Tele webhook payload and update TalkoCDR.
 
         Args:
             payload: Webhook data from Tata Tele.
@@ -145,12 +145,12 @@ class TataTeleWebhookHandler(WebhookHandler):
         uuid: Optional[str] = None,
     ) -> Dict[str, str]:
         """
-        Process Tata Tele CDR API payload and update CDR.
+        Process Tata Tele TalkoCDR API payload and update TalkoCDR.
 
         Args:
             payload: API response data.
-            call_id: Call ID for the CDR (optional).
-            uuid: UUID for the CDR (optional).
+            call_id: Call ID for the TalkoCDR (optional).
+            uuid: UUID for the TalkoCDR (optional).
 
         Returns:
             Dict[str, str]: Status response.
@@ -167,7 +167,7 @@ class TataTeleWebhookHandler(WebhookHandler):
         uuid: Optional[str] = None,
     ) -> Dict[str, str]:
         """
-        Common logic to process payload (webhook or API) and update CDR.
+        Common logic to process payload (webhook or API) and update TalkoCDR.
 
         Args:
             payload: Data from webhook or API.
@@ -191,23 +191,23 @@ class TataTeleWebhookHandler(WebhookHandler):
             if source == API:
                 if not call_id and not uuid:
                     self.logger.error("Missing call_id or uuid in API payload")
-                    raise BadRequestError(CALL_ID_MUST_BE_PROVIDED)
+                    raise TalkoBadRequestError(CALL_ID_MUST_BE_PROVIDED)
                 identifier: str = call_id or uuid  # type: ignore
             else:
                 call_id = payload.get("call_id")
                 uuid = payload.get("uuid")
                 if not call_id and not uuid:
                     self.logger.error(WEBHOOK_PAYLOAD_MISSING)
-                    raise BadRequestError(CALL_ID_MUST_BE_PROVIDED)
+                    raise TalkoBadRequestError(CALL_ID_MUST_BE_PROVIDED)
                 identifier = call_id or uuid  # type: ignore
 
-            # Fetch CDR
+            # Fetch TalkoCDR
             cdr: dict = await self.call_repository.get_cdr_by_call_id_or_uuid(
                 str(call_id), uuid
             )
             if not cdr:
-                self.logger.error("No CDR found for {}".format(identifier))
-                raise ResourceNotFound(CDR_NOT_FOUND)
+                self.logger.error("No TalkoCDR found for {}".format(identifier))
+                raise TalkoResourceNotFound(CDR_NOT_FOUND)
 
             self.logger.debug("Webhook process payload cdr data: {}".format(cdr))
 
@@ -226,7 +226,7 @@ class TataTeleWebhookHandler(WebhookHandler):
                 "Process payload field mapping: {}".format(field_mappings)
             )
 
-            # Map payload fields to CDR fields
+            # Map payload fields to TalkoCDR fields
             updates: Dict[str, Any] = {
                 db_field: payload.get(payload_key)
                 for payload_key, db_field in field_mappings.items()
@@ -258,7 +258,7 @@ class TataTeleWebhookHandler(WebhookHandler):
 
             self._preserve_entity_fields(cdr, updates)
 
-            self.logger.debug("Map payload fields to CDR fields: {}".format(updates))
+            self.logger.debug("Map payload fields to TalkoCDR fields: {}".format(updates))
 
             # FIX: use `or []` to safely handle None agent_ids from DB
             agent_ids = cdr.get("agent_ids") or []
@@ -445,20 +445,20 @@ class TataTeleWebhookHandler(WebhookHandler):
 
             updates["updated_at"] = self.datetime_util.get_current_time()
 
-            # Update CDR
+            # Update TalkoCDR
             result: bool = await self.call_repository.update_cdr(cdr["_id"], updates)
             if not result:
-                self.logger.error("Failed to update CDR for {}".format(identifier))
-                raise BadRequestError(FAILED_TO_UPDATE)
+                self.logger.error("Failed to update TalkoCDR for {}".format(identifier))
+                raise TalkoBadRequestError(FAILED_TO_UPDATE)
 
-            self.logger.info("Successfully updated CDR for {}".format(identifier))
+            self.logger.info("Successfully updated TalkoCDR for {}".format(identifier))
 
             # AI-bridge/campaign calls complete via THIS path (Tata's
             # standard call webhook, calling_mode=clicktocall) — not
-            # DialerWebhookHandler, which is a different Tata Tele product
+            # TalkoDialerWebhookHandler, which is a different Tata Tele product
             # we don't use for campaigns. Relay best-effort, source=WEBHOOK
-            # only (never for API-polled CDR fetches, which aren't a live
-            # delivery makun-ai needs to react to); our own CDR write above
+            # only (never for API-polled TalkoCDR fetches, which aren't a live
+            # delivery makun-ai needs to react to); our own TalkoCDR write above
             # already succeeded, so a relay failure must never surface as a
             # failure of this webhook.
             if source == WEBHOOK:
@@ -476,6 +476,6 @@ class TataTeleWebhookHandler(WebhookHandler):
 
         except Exception as e:
             self.logger.error(
-                "Exception occurred while updating CDR: {}".format(str(e))
+                "Exception occurred while updating TalkoCDR: {}".format(str(e))
             )
             raise

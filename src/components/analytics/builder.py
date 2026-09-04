@@ -3,17 +3,17 @@ from typing import Dict, List, Optional
 from dateutil.relativedelta import relativedelta
 
 from src.components.analytics import constants as analytics_constants
-from src.components.analytics.date_range_helper import DateRangeHelper
-from src.components.cdr.models import CDR
-from src.core.doc_db import DocDatabaseSessionManager
-from src.loggers.holler_service_logger import HollerServiceLogger
-from src.utils.enums import UserRoleHierarchy
+from src.components.analytics.date_range_helper import TalkoDateRangeHelper
+from src.components.cdr.models import TalkoCDR
+from src.core.doc_db import TalkoDocDatabaseSessionManager
+from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.enums import TalkoUserRoleHierarchy
 
 
-class QueryBuilder:
+class TalkoQueryBuilder:
     """Helper class to build MongoDB queries for analytics."""
 
-    def __init__(self, logger: HollerServiceLogger):
+    def __init__(self, logger: TalkoServiceLogger):
         self.__logger = logger
 
     def build_query(
@@ -24,7 +24,7 @@ class QueryBuilder:
         agents: Optional[List[int]] = None,
         service_board_id: Optional[List[int]] = None,
         entity_type: Optional[str] = None,
-        user_role: Optional[int] = UserRoleHierarchy.MAINTAINER.value,
+        user_role: Optional[int] = TalkoUserRoleHierarchy.MAINTAINER.value,
     ) -> Dict:
         """Build MongoDB query with partner_id, date range, and optional filters."""
         query = {analytics_constants.PARTNER_ID: partner_id}
@@ -34,7 +34,7 @@ class QueryBuilder:
                 analytics_constants.LTE_CONDITION: end_date_ms,
             }
         if (
-            user_role != UserRoleHierarchy.MAINTAINER.value
+            user_role != TalkoUserRoleHierarchy.MAINTAINER.value
             and agents
             and len(agents) > 0
         ):

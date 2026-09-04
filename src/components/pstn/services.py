@@ -14,14 +14,14 @@ from livekit import rtc
 from redis import asyncio as aioredis
 
 from src.components.cache.redis_client import get_redis_client
-from src.components.call_management.redis_helper import CallRedisHelper
-from src.components.call_management.repository import CallRepository
-from src.components.call_management.tata_tele.call_service import TataTeleCallHandler
-from src.components.did_management.constants import DIDType
-from src.components.did_management.repositories import DidRepository
-from src.components.pstn.dto import CallContext
-from src.components.pstn.providers.base import AbstractPSTNProvider
-from src.core.environment import ENV
+from src.components.call_management.redis_helper import TalkoCallRedisHelper
+from src.components.call_management.repository import TalkoCallRepository
+from src.components.call_management.tata_tele.call_service import TalkoTataTeleCallHandler
+from src.components.did_management.constants import TalkoDIDType
+from src.components.did_management.repositories import TalkoDidRepository
+from src.components.pstn.dto import TalkoCallContext
+from src.components.pstn.providers.base import TalkoAbstractPSTNProvider
+from src.core.environment import TalkoENV
 from src.utils.phone_number_utils import normalize_phone_number
 from src.core.redis_constants import (
     ACK_WAIT_SECONDS,
@@ -34,9 +34,9 @@ from src.core.redis_constants import (
     STREAM_CONTEXT_KEY,
     STREAM_CONTEXT_TTL_SECONDS,
 )
-from src.grpc_client.constants import GrpcServices
-from src.grpc_client.rpc_service_factory import RPCServiceFactory
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.grpc_client.constants import TalkoGrpcServices
+from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 GREETING_PLAYED_KEY = "greeting_played:{call_sid}"
 GREETING_PLAYED_TTL_SECONDS = 60 * 60  # generous upper bound on call duration
@@ -49,7 +49,7 @@ INBOUND_GREETING_DELAY_SECONDS = 2.2  # natural pause before inbound greeting st
 MAKUNAI_SESSION_TIMEOUT_SECONDS = 15.0
 
 
-class AudioBridge:
+class TalkoAudioBridge:
     def __init__(self) -> None:
         self._inbound_state: Optional[Tuple[bytes, int]] = None
         self._outbound_state: Optional[Tuple[bytes, int]] = None
@@ -62,7 +62,7 @@ class AudioBridge:
             )
             return pcm_48k
         except Exception as e:
-            raise RuntimeError("AudioBridge.inbound conversion failed: {}".format(e))
+            raise RuntimeError("TalkoAudioBridge.inbound conversion failed: {}".format(e))
 
     def outbound(self, pcm_48k: bytes) -> bytes:
         try:
@@ -71,7 +71,7 @@ class AudioBridge:
             )
             return audioop.lin2ulaw(pcm_8k, 2)
         except Exception as e:
-            raise RuntimeError("AudioBridge.outbound conversion failed: {}".format(e))
+            raise RuntimeError("TalkoAudioBridge.outbound conversion failed: {}".format(e))
 
     @staticmethod
     def align_chunks(
@@ -84,14 +84,14 @@ class AudioBridge:
         return chunks, buffer
 
 
-class PSTNBridgeService:
+class TalkoPSTNBridgeService:
     def __init__(
         self,
-        did_repository: DidRepository,
-        logger: HollerServiceLogger,
+        did_repository: TalkoDidRepository,
+        logger: TalkoServiceLogger,
         http_client: httpx.AsyncClient,
-        call_redis_helper: CallRedisHelper,
-        call_repository: CallRepository,
+        call_redis_helper: TalkoCallRedisHelper,
+        call_repository: TalkoCallRepository,
     ) -> None:
         self.__did_repository = did_repository
         self.__logger = logger
@@ -100,7 +100,7 @@ class PSTNBridgeService:
         self.__call_repository = call_repository
         self.__redis: Optional[aioredis.Redis] = None
         self.__logger.info(
-            "[PSTNBridgeService][INIT] call_redis_helper_id={}".format(
+            "[TalkoPSTNBridgeService][INIT] call_redis_helper_id={}".format(
                 id(call_redis_helper)
             )
         )
@@ -109,7 +109,7 @@ class PSTNBridgeService:
         # Returns the singleton pool — no new connection per call
         if self.__redis is None:
             self.__redis = await get_redis_client()
-            self.__logger.info("[PSTNBridgeService] Redis pool acquired")
+            self.__logger.info("[TalkoPSTNBridgeService] Redis pool acquired")
         return self.__redis
 
     async def _get_cached_did(self, did_number: str) -> Optional[Dict[str, Any]]:
@@ -217,12 +217,12 @@ class PSTNBridgeService:
                 partner_id
             )
         )
-        grpc_client = RPCServiceFactory.get_service(GrpcServices.AUTH)
+        grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
         api_key: str = await grpc_client.get_partner_api_key(partner_id)
         await self._set_cached_api_key(partner_id, api_key)
         return api_key
 
-    async def _resolve_did(self, ctx: CallContext) -> CallContext:
+    async def _resolve_did(self, ctx: TalkoCallContext) -> TalkoCallContext:
         self.__logger.info("[PSTN][DID] Resolving did_number={}".format(ctx.did_number))
         did_record = await self._get_cached_did(ctx.did_number)
 
@@ -262,7 +262,7 @@ class PSTNBridgeService:
                     "No active DID record found for {}".format(ctx.did_number)
                 )
 
-        did_type: str = did_record.get("did_type", DIDType.NORMAL.value)
+        did_type: str = did_record.get("did_type", TalkoDIDType.NORMAL.value)
         partner_id: int = did_record["partner_id"]
         vendor_config_id: str = str(did_record.get("vendor_config_id", ""))
         agent_id: Optional[int] = did_record.get("agent_id")
@@ -274,7 +274,7 @@ class PSTNBridgeService:
             )
         )
 
-        if did_type == DIDType.AI_AGENT.value:
+        if did_type == TalkoDIDType.AI_AGENT.value:
             if not agent_bot_id:
                 raise ValueError(
                     "DID {} is ai_agent but agent_bot_id is missing".format(
@@ -300,13 +300,13 @@ class PSTNBridgeService:
         return ctx
 
     async def _attach_pending_context(
-        self, ctx: CallContext, event: Dict[str, Any]
-    ) -> CallContext:
+        self, ctx: TalkoCallContext, event: Dict[str, Any]
+    ) -> TalkoCallContext:
         """
         Attach pre-stored call context to ctx.
 
         Changes vs original:
-        1. Uses CallRedisHelper.fetch_and_delete_context() which pipelines
+        1. Uses TalkoCallRedisHelper.fetch_and_delete_context() which pipelines
            GET context + DELETE both keys into 2 round trips instead of 4
            sequential calls (get_store_key → get_context → delete_context
            → delete_index = 4 round trips).
@@ -397,7 +397,7 @@ class PSTNBridgeService:
             )
             return ctx
 
-    async def _create_session(self, ctx: CallContext) -> CallContext:
+    async def _create_session(self, ctx: TalkoCallContext) -> TalkoCallContext:
         self.__logger.info(
             "[PSTN][SESSION] Creating session call_sid={} partner_id={} agent_id={}".format(
                 ctx.call_sid, ctx.partner_id, ctx.makunai_agent_id
@@ -427,11 +427,11 @@ class PSTNBridgeService:
             }
             self.__logger.info(
                 "[PSTN][SESSION] Sending to MAKUNAI_SESSION_URL={} payload={}".format(
-                    ENV.MAKUNAI_SESSION_URL, json.dumps(payload, default=str)
+                    TalkoENV.MAKUNAI_SESSION_URL, json.dumps(payload, default=str)
                 )
             )
             resp = await self.__http_client.post(
-                ENV.MAKUNAI_SESSION_URL,
+                TalkoENV.MAKUNAI_SESSION_URL,
                 headers=headers,
                 json=payload,
                 timeout=MAKUNAI_SESSION_TIMEOUT_SECONDS,
@@ -460,19 +460,19 @@ class PSTNBridgeService:
             raise
 
     async def _backfill_real_vendor_call_id(
-        self, ctx: CallContext, room: rtc.Room
+        self, ctx: TalkoCallContext, room: rtc.Room
     ) -> None:
         """
         Best-effort background task: resolve Tata's real vendor call_id (not
         ctx.call_sid) via the live_calls poll and republish it over the
         LiveKit data channel, so makun-ai's context_data["call_id"] ends up
-        holding a value that TataTeleCallHandler.hangup_call() can actually
+        holding a value that TalkoTataTeleCallHandler.hangup_call() can actually
         use — not just the WS callSid that the unconditional Step 6 publish
         sends.
 
         AI-bridge's click_to_call_support never returns call_id synchronously
-        (see TataTeleCallHandler.find_live_call_id docstring), and the
-        pre-warm path's own bounded 1.5s poll (CallService._pre_create_session)
+        (see TalkoTataTeleCallHandler.find_live_call_id docstring), and the
+        pre-warm path's own bounded 1.5s poll (TalkoCallService._pre_create_session)
         can still miss. This is a second, decoupled attempt that runs off the
         critical path — it must never delay track publish/greeting playback,
         so it is always fired via asyncio.create_task, never awaited inline.
@@ -524,7 +524,7 @@ class PSTNBridgeService:
                 )
             )
 
-            handler = TataTeleCallHandler(
+            handler = TalkoTataTeleCallHandler(
                 vendor_config, self.__logger, vendor_config.get("vendor_type")
             )
 
@@ -559,21 +559,21 @@ class PSTNBridgeService:
                 # past ringing, or Tata's poll window missed it) — ctx.call_sid
                 # is still a genuine Tata call identifier (parsed off the WS
                 # start event, already published unconditionally in Step 6),
-                # so use it as the CDR fallback rather than leaving the CDR's
+                # so use it as the TalkoCDR fallback rather than leaving the TalkoCDR's
                 # call_id empty forever just because this specific poll missed.
                 self.__logger.info(
                     "[PSTN][CALL_ID] No live_calls match — falling back to "
-                    "ctx.call_sid={} for CDR update".format(ctx.call_sid)
+                    "ctx.call_sid={} for TalkoCDR update".format(ctx.call_sid)
                 )
 
-            # Fix up Holler's own CDR row (inserted at initiate_call time
+            # Fix up Talko's own TalkoCDR row (inserted at initiate_call time
             # with call_id="" for AI-bridge calls, since Tata's click-to-call
             # API never returns it synchronously) in BOTH cases above — a
             # resolved live_calls id is preferred, ctx.call_sid otherwise.
             # Without this, Tata's later dialer webhook can never match this
-            # row via get_cdr_by_call_id_or_uuid (empty call_id, and Holler's
+            # row via get_cdr_by_call_id_or_uuid (empty call_id, and Talko's
             # own self-generated call_uuid doesn't match Tata's), so it
-            # creates an orphan duplicate CDR instead of enriching this one.
+            # creates an orphan duplicate TalkoCDR instead of enriching this one.
             final_call_id = resolved_call_id or ctx.call_sid
             cdr_id = (ctx.context_data or {}).get("cdr_id")
             if cdr_id and final_call_id:
@@ -587,13 +587,13 @@ class PSTNBridgeService:
                         cdr_id, {"call_id": final_call_id}
                     )
                     self.__logger.info(
-                        "[PSTN][CALL_ID] ✅ Updated CDR cdr_id={} with call_id={}".format(
+                        "[PSTN][CALL_ID] ✅ Updated TalkoCDR cdr_id={} with call_id={}".format(
                             cdr_id, final_call_id
                         )
                     )
                 except Exception as exc:
                     self.__logger.warning(
-                        "[PSTN][CALL_ID] Failed to update CDR cdr_id={} with "
+                        "[PSTN][CALL_ID] Failed to update TalkoCDR cdr_id={} with "
                         "call_id={}: {}".format(cdr_id, final_call_id, exc)
                     )
         except Exception as e:
@@ -629,10 +629,10 @@ class PSTNBridgeService:
     async def _play_cached_greeting(
         self,
         ws,
-        provider: AbstractPSTNProvider,
+        provider: TalkoAbstractPSTNProvider,
         stream_sid: str,
         greeting_audio_b64: str,
-        bridge: AudioBridge,
+        bridge: TalkoAudioBridge,
         pending_marks: Dict[str, asyncio.Event],
         mark_sent_at: Dict[str, float],
         delay_seconds: float = 0.0,
@@ -642,7 +642,7 @@ class PSTNBridgeService:
         bypassing the LiveKit agent entirely for the first utterance.
 
         greeting_audio_b64 is raw PCM16 mono 48000Hz, base64-encoded — exactly
-        what AudioBridge.outbound() expects, so this reuses the SAME
+        what TalkoAudioBridge.outbound() expects, so this reuses the SAME
         conversion + chunking + send path _outbound_audio() already uses for
         live agent speech, just with a different audio source. Uses a
         "greeting_" label prefix (vs "chunk_") so its marks can't collide
@@ -666,7 +666,7 @@ class PSTNBridgeService:
 
             pcm_48k = base64.b64decode(greeting_audio_b64)
             mulaw_8k = bridge.outbound(pcm_48k)
-            chunks, _ = AudioBridge.align_chunks(mulaw_8k)
+            chunks, _ = TalkoAudioBridge.align_chunks(mulaw_8k)
 
             self.__logger.info(
                 "[PSTN][GREETING] Playing cached greeting stream_sid={} chunks={}".format(
@@ -741,9 +741,9 @@ class PSTNBridgeService:
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def handle_call(self, ws, provider: AbstractPSTNProvider, raw_events) -> None:
+    async def handle_call(self, ws, provider: TalkoAbstractPSTNProvider, raw_events) -> None:
         self.__logger.info("[PSTN][CALL] ===== HANDLE CALL STARTED =====")
-        ctx: Optional[CallContext] = None
+        ctx: Optional[TalkoCallContext] = None
         room: Optional[rtc.Room] = None
         audio_source: Optional[rtc.AudioSource] = None
         pending_marks: Dict[str, asyncio.Event] = {}
@@ -751,7 +751,7 @@ class PSTNBridgeService:
         media_frame_count: int = 0
         outbound_task: Optional[asyncio.Task] = None
         greeting_task: Optional[asyncio.Task] = None
-        bridge = AudioBridge()
+        bridge = TalkoAudioBridge()
 
         try:
             async for raw in raw_events:
@@ -808,7 +808,7 @@ class PSTNBridgeService:
 
                         # ── Step 3: Room selection ────────────────────────────
                         #
-                        # For outbound AI-bridge calls, CallService._pre_create_session
+                        # For outbound AI-bridge calls, TalkoCallService._pre_create_session
                         # pre-created a makun-ai session during the ringing window and
                         # stored it in Redis under outbound_room:<to_number>.
                         #
@@ -862,10 +862,10 @@ class PSTNBridgeService:
                             ctx.caller_token = outbound_room["caller_token"]
                             ctx.livekit_url = outbound_room["livekit_url"]
                             ctx.pre_warmed = True
-                            # carries cdr_id — see CallService._pre_create_session
+                            # carries cdr_id — see TalkoCallService._pre_create_session
                             # Step 4 (call_management/services.py) — needed by
                             # _backfill_real_vendor_call_id below to update the
-                            # original CDR row once the real call_id resolves.
+                            # original TalkoCDR row once the real call_id resolves.
                             ctx.context_data = outbound_room.get("context_data") or {}
                             ctx.greeting_audio = outbound_room.get(
                                 "greeting_audio"
@@ -1299,7 +1299,7 @@ class PSTNBridgeService:
                 try:
                     frame = audio_event.frame
                     buffer += bridge.outbound(bytes(frame.data))
-                    chunks, buffer = AudioBridge.align_chunks(
+                    chunks, buffer = TalkoAudioBridge.align_chunks(
                         buffer, chunk_size=CHUNK_SIZE
                     )
 

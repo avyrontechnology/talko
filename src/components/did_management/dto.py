@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel
 
 
-class Contract:
+class TalkoContract:
     class DidDefaultAttendanceCreate(BaseModel):
         service_board_id: int
         did_number: str
@@ -38,7 +38,7 @@ class Contract:
 
     class DIDSeriesResponse(BaseModel):
         series: str
-        dids: List["Contract.DIDDetail"]
+        dids: List["TalkoContract.DIDDetail"]
         count: int
 
     class ServiceBoardDIDMapping(BaseModel):
@@ -46,7 +46,7 @@ class Contract:
         did_numbers: List[str]
 
     class AssignDIDToPartner(BaseModel):
-        dids_for_service_board: Optional[List["Contract.ServiceBoardDIDMapping"]] = None
+        dids_for_service_board: Optional[List["TalkoContract.ServiceBoardDIDMapping"]] = None
         dids_for_agent_mapping: Optional[List[Dict[str, str]]] = None
         dids_for_round_robin: Optional[List[str]] = None
 
@@ -60,8 +60,8 @@ class Contract:
         agent_id: Optional[int] = None
 
     class AdminDIDActionResponse(BaseModel):
-        summary: "Contract.AdminDIDActionSummary"
-        results: List["Contract.AdminDIDActionResult"]
+        summary: "TalkoContract.AdminDIDActionSummary"
+        results: List["TalkoContract.AdminDIDActionResult"]
 
     class DIDListItem(BaseModel):
         did_number: str
@@ -81,7 +81,7 @@ class Contract:
         total: int
         page: int
         limit: int
-        dids: List["Contract.DIDListItem"]
+        dids: List["TalkoContract.DIDListItem"]
 
     class ErrorDetail(BaseModel):
         code: str
@@ -91,7 +91,7 @@ class Contract:
         did_number: str
         success: bool
         status: str  # "updated" | "skipped"
-        error: Optional["Contract.ErrorDetail"] = None
+        error: Optional["TalkoContract.ErrorDetail"] = None
 
     class AdminDIDActionSummary(BaseModel):
         total: int
@@ -105,7 +105,7 @@ class Contract:
     class StatusMetadataResponse(BaseModel):
         status: str = "success"
         message: str = "DID status workflow"
-        data: List["Contract.StatusTransition"]
+        data: List["TalkoContract.StatusTransition"]
         # optional extra info
         metadata: Dict = {}
 

@@ -2,11 +2,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.components.call_management.handlers.base_handler import VendorCallHandler
+from src.components.call_management.handlers.base_handler import TalkoVendorCallHandler
 
 
 # Dummy concrete class for testing abstract base class
-class DummyVendorCallHandler(VendorCallHandler):
+class TalkoDummyVendorCallHandler(TalkoVendorCallHandler):
     async def make_call(self, to_number, from_number, call_url, agent_number):
         return {
             "status": "success",
@@ -31,14 +31,14 @@ class TestVendorCallHandler:
     @pytest.mark.asyncio
     async def test_initialization_sets_attributes_correctly(self):
         """
-        Test that VendorCallHandler initializes config, logger, and vendor_type correctly.
+        Test that TalkoVendorCallHandler initializes config, logger, and vendor_type correctly.
         """
         mock_logger = MagicMock()
         config = {
             "generic_url_handler": {"call_api": {"endpoint": "https://test.com/call"}}
         }
 
-        handler = DummyVendorCallHandler(config, mock_logger, "DUMMY_VENDOR")
+        handler = TalkoDummyVendorCallHandler(config, mock_logger, "DUMMY_VENDOR")
 
         assert handler.config == {"endpoint": "https://test.com/call"}
         assert handler.logger == mock_logger
@@ -47,10 +47,10 @@ class TestVendorCallHandler:
     @pytest.mark.asyncio
     async def test_make_call_returns_expected_result(self):
         """
-        Test that DummyVendorCallHandler.make_call returns expected dict.
+        Test that TalkoDummyVendorCallHandler.make_call returns expected dict.
         """
         mock_logger = MagicMock()
-        handler = DummyVendorCallHandler(
+        handler = TalkoDummyVendorCallHandler(
             {"generic_url_handler": {"call_api": {}}}, mock_logger, "DUMMY_VENDOR"
         )
 
@@ -71,7 +71,7 @@ class TestVendorCallHandler:
 
     def test_instantiating_abstract_class_raises_type_error(self):
         """
-        Test that directly instantiating VendorCallHandler raises TypeError.
+        Test that directly instantiating TalkoVendorCallHandler raises TypeError.
         """
         with pytest.raises(TypeError):
-            VendorCallHandler({}, MagicMock(), "DUMMY_VENDOR")
+            TalkoVendorCallHandler({}, MagicMock(), "DUMMY_VENDOR")

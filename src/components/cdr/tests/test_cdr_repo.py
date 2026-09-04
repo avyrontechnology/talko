@@ -2,11 +2,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.components.cdr.repository import CDRRepository
-from src.loggers.holler_service_logger import HollerServiceLogger
+from src.components.cdr.repository import TalkoCDRRepository
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
-class FakeCursor:
+class TalkoFakeCursor:
     """Fake async cursor for mocking MongoDB cursor methods"""
 
     def __init__(self, data=None, raise_exc=None):
@@ -48,8 +48,8 @@ class TestCDRRepository:
     @pytest.fixture
     def setup(self):
         mock_db_manager = MagicMock()
-        mock_logger = MagicMock(spec=HollerServiceLogger)
-        repo = CDRRepository(mock_db_manager, mock_logger)
+        mock_logger = MagicMock(spec=TalkoServiceLogger)
+        repo = TalkoCDRRepository(mock_db_manager, mock_logger)
         return repo, mock_db_manager, mock_logger
 
     async def test_insert_cdr_success(self, setup):
@@ -81,7 +81,7 @@ class TestCDRRepository:
     async def test_find_all_cdrs_success(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.find.return_value = FakeCursor(
+        mock_collection.find.return_value = TalkoFakeCursor(
             [{"call_id": "1"}, {"call_id": "2"}]
         )
         mock_cm = AsyncMock()
@@ -108,7 +108,7 @@ class TestCDRRepository:
     async def test_get_cdrs_by_criteria_success(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.find.return_value = FakeCursor(
+        mock_collection.find.return_value = TalkoFakeCursor(
             [{"call_id": "1"}, {"call_id": "2"}]
         )
         mock_cm = AsyncMock()
@@ -121,7 +121,7 @@ class TestCDRRepository:
     async def test_get_cdrs_by_criteria_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.find.return_value = FakeCursor(
+        mock_collection.find.return_value = TalkoFakeCursor(
             raise_exc=Exception("DB failure")
         )
         mock_cm = AsyncMock()
@@ -138,7 +138,7 @@ class TestCDRRepository:
         # find_all_call_logs_on_the_basis_of_user_id runs a single $facet
         # aggregation returning both the page ("data") and the total ("count")
         # in one document.
-        mock_collection.aggregate.return_value = FakeCursor(
+        mock_collection.aggregate.return_value = TalkoFakeCursor(
             [
                 {
                     "data": [{"call_id": "1"}, {"call_id": "2"}],
@@ -159,7 +159,7 @@ class TestCDRRepository:
     async def test_find_agent_call_logs_exception_branch(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.aggregate.return_value = FakeCursor(
+        mock_collection.aggregate.return_value = TalkoFakeCursor(
             raise_exc=Exception("Aggregate failed")
         )
         mock_cm = AsyncMock()
@@ -176,8 +176,8 @@ class TestCDRRepositoryCustomFields:
     @pytest.fixture
     def setup(self):
         mock_db_manager = MagicMock()
-        mock_logger = MagicMock(spec=HollerServiceLogger)
-        repo = CDRRepository(mock_db_manager, mock_logger)
+        mock_logger = MagicMock(spec=TalkoServiceLogger)
+        repo = TalkoCDRRepository(mock_db_manager, mock_logger)
         return repo, mock_db_manager, mock_logger
 
     async def test_find_cdr_by_call_id_success(self, setup):

@@ -6,14 +6,14 @@ from typing import Any, Dict, Optional
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from src.core.environment import ENV
+from src.core.environment import TalkoENV
 
 
-class RSAKeyHandler:
+class TalkoRSAKeyHandler:
     @staticmethod
     def load_private_key() -> rsa.RSAPrivateKey:
         """Load base64-encoded private key from environment string."""
-        private_key_b64: Optional[str] = ENV.RSA_PRIVATE_KEY
+        private_key_b64: Optional[str] = TalkoENV.RSA_PRIVATE_KEY
         if not private_key_b64 or private_key_b64.strip() == "":
             raise ValueError("RSA_PRIVATE_KEY not found or empty in environment")
 
@@ -29,7 +29,7 @@ class RSAKeyHandler:
     @staticmethod
     def load_public_key() -> rsa.RSAPublicKey:
         """Load base64-encoded public key from environment string."""
-        public_key_b64: Optional[str] = ENV.RSA_PUBLIC_KEY
+        public_key_b64: Optional[str] = TalkoENV.RSA_PUBLIC_KEY
         if not public_key_b64 or public_key_b64.strip() == "":
             raise ValueError("RSA_PUBLIC_KEY not found or empty in environment")
 
@@ -90,12 +90,12 @@ class RSAKeyHandler:
         Supports both base64 and hex encoded input, prioritizing hex for 512-character strings.
         """
         if not private_key:
-            private_key = RSAKeyHandler.load_private_key()
+            private_key = TalkoRSAKeyHandler.load_private_key()
 
         try:
             expected_length = 256
 
-            if len(ciphertext_str) == 512 and RSAKeyHandler._is_valid_hex(ciphertext_str):
+            if len(ciphertext_str) == 512 and TalkoRSAKeyHandler._is_valid_hex(ciphertext_str):
                 try:
                     ciphertext = binascii.unhexlify(ciphertext_str)
                     if len(ciphertext) != expected_length:

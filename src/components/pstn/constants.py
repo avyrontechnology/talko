@@ -1,11 +1,11 @@
 from enum import Enum
 
 
-class PSTNProvider(str, Enum):
+class TalkoPSTNProvider(str, Enum):
     TATA_TELE = "tata_tele"
     EXOTEL = "exotel"
 
 
-class CallDirection(str, Enum):
+class TalkoCallDirection(str, Enum):
     INBOUND = "inbound"
     OUTBOUND = "outbound"
