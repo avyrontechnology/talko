@@ -1,0 +1,8 @@
+DUPLICATE_ASSET_INSERTION = "Asset with same name already exists"
+SOMETHING_WENT_WRONG = "Something went wrong"
+NOT_FOUND = "Not Found"
+INVALID_REQUESTED_DATA = "Please check the requested data and try again."
+INVALID_ASSET_TYPE = "Invalid asset provided"
+FAILED_TO_UPDATE_RECORDING_STATUS = "Failed to update is_recording_saved"
+MISSING_FILE_PATH = "FilePath is Empty"
+SOMETHING_WENT_WRONG = "Something went wrong"

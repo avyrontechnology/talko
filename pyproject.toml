@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "fastapi-template"
+version = "0.1.0"
+description = ""
+authors = ["Aditya Tripathi <aditya.tripathi@affinityeducation.in>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.8"
+dependency-injector = "^4.45.0"
+sqlalchemy = "^2.0.38"
+starlette-context = "^0.3.6"
+uvicorn = "^0.34.0"
+celery = "^5.4.0"
+pydantic-settings = "^2.7.1"
+redis = "^5.2.1"
+asyncpg = "^0.30.0"
+grpcio-tools = "^1.73.0"
+motor = "^3.7.1"
+httpx = "^0.28.1"
+cryptography = "^45.0.6"
+aiohttp = "^3.12.15"
+pytz = "^2025.2"
+boto3 = "^1.35.84"
+python-multipart = "^0.0.20"
+email-validator = "^2.3.0"
+psutil = "^7.2.2"
+livekit = "^1.1.7"
+livekit-api = "^1.1.0"
+
+
+[tool.poetry.group.dev.dependencies]
+coverage = "^7.9.2"
+pytest = "^8.4.1"
+pytest-asyncio = "^1.0.0"
+asgi-lifespan = "^2.1.0"
+websockets = "^16.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

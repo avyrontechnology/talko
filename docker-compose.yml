@@ -1,0 +1,70 @@
+version: '3'
+
+services:
+  holler:
+    container_name: holler-service
+    build: .
+    restart: on-failure
+    ports:
+      - "8003:8003"
+    volumes:
+      - .:/holler-service
+    env_file:
+      - .env
+    depends_on:
+      - holler-mongodb
+      - redis
+    networks:
+      - makunai_console
+    environment:
+      - PYTHONPATH=/holler-service
+
+  holler-mongodb:
+    container_name: holler-mongodb
+    image: mongo:latest
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+    ports:
+      - "27018:27017"
+    env_file:
+      - .env
+    volumes:
+      - mongodbdata:/var/lib/mongodb/data
+    networks:
+      - makunai_console
+  redis:
+    container_name: holler-redis
+    image: redis
+    ports:
+      - 6381:6379
+    volumes:
+      - redisdata:/data
+    networks:
+        - makunai_console
+
+  celery-worker:
+    build: .
+    container_name: holler-worker
+    command: poetry run celery -A src.holler_celery.celery_app.celery worker --loglevel=info --concurrency=6 -Q default_queue,call_operation_queue,call_assets_queue,did_management_queue,call_management_queue,missed_callback_queue
+    volumes:
+      - .:/holler-service
+    networks:
+      - makunai_console
+
+  celery-beat:
+    build: .
+    container_name: holler-beat
+    command: poetry run celery -A src.holler_celery.celery_app.celery beat --loglevel=info
+    volumes:
+      - .:/holler-service
+    networks:
+      - makunai_console
+
+volumes:
+  mongodbdata:
+  redisdata:
+
+networks:
+  makunai_console:
+    external: true

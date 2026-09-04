@@ -1,0 +1,7 @@
+VENDOR_CONFIG_CREATED_SUCCESSFULLY = "Vendor config created successfully."
+VENDOR_CONFIG_UPDATED_SUCCESSFULLY = "Vendor config updated successfully."
+INVALID_VENDOR_CONFIG_ID = "Invalid vendor config id."
+NO_FIELDS_PROVIDED_FOR_UPDATE = "No fields provided for update."
+VENDOR_CONFIG_FOR_VENDOR_ID_NOT_FOUND = "Vendor config for vendor_id {} not found"
+NOT_FOUND = "Not Found"
+SOMETHING_WENT_WRONG = "Something went wrong"

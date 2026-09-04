@@ -1,0 +1,5 @@
+INVALID_EMAIL = "Invalid {} email: {}"
+EMPTY_EMAIL_LIST = "{} email list cannot be empty"
+SUBJECT_EMPTY = "Subject must be a non-empty string"
+BODY_EMPTY = "Body cannot be empty"
+API_CALL_FAILED = "Email API call failed: {}"

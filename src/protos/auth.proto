@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+package auth;
+
+// The authentication service definition.
+service AuthService {
+    // RPC to validate a token and return user information.
+    rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse);
+
+    // RPC to get the list of child users for a given user.
+    rpc GetUserChildHierarchy (GetUserChildHierarchyRequest) returns (GetUserChildHierarchyResponse);
+
+    // RPC to get the list of child users for a given user along with their directory information.
+    rpc GetUserChildDetails (GetUserChildDetailsRequest) returns (GetUserChildDetailsResponse);
+
+    //add GRPC method to get CurrentUserDetails.
+    rpc GetUserDetails (GetUserDetailsRequest) returns (GetUserDetailsResponse);
+
+
+    // RPC to get list of permission for given user.
+    rpc GetUserPermissions (GetUserPermissionsRequest) returns (GetUserPermissionsResponse);
+
+    //RPC to get User role
+    rpc GetUserRole (GetUserRoleRequest) returns (GetUserRoleResponse);
+
+    // RPC to get service board user details
+    rpc GetServiceBoardUsersDetails(GetUsersDetailsRequest) returns (GetServiceBoardUserDetailsResponse);
+
+    //RPC to get Partner API KEY
+    rpc GetPartnerApiKey (GetPartnerApiKeyRequest) returns (GetPartnerApiKeyResponse);
+}
+
+// Context message containing metadata for the request.
+message MContext {
+    string correlation_id = 1; // A unique ID to correlate requests.
+}
+
+// Body message containing the main request information.
+message MBody {
+    string token = 1; // The JWT token to validate.
+}
+
+// The request message for token validation.
+message ValidateTokenRequest {
+    MContext mcontext = 1; 
+    MBody mbody = 2;       
+}
+
+// The response message for token validation.
+message ValidateTokenResponse {
+    string message = 1;              
+    string correlation_id = 2;     
+    bool is_active = 3;                
+    int64 user_id = 4;            
+    string session_id = 6;           
+    int64 expires_in = 7;            
+    int64 partner_id = 8;
+}
+
+// UserDetail message representing a user's directory information.
+message UserDetail {
+    int64 user_id = 1;        // User's ID.
+    string email = 2;         // Email of the child user.
+    bool is_active = 3;       // Indicates whether the user is active (true) or inactive (false).
+    bool is_suspended = 4;    // Indicates whether the user is suspended or not.
+    string name = 5;          // Full name of the user.
+    string role = 6;
+    int64 role_hierarchy = 7;
+}
+
+// The request message for retrieving the child user list.
+message GetUserChildDetailsRequest {
+    MContext mcontext = 1; // Metadata context.
+    int64 user_id = 2;     // The current user's ID.
+}
+
+// The response message for the child user list.
+message GetUserChildDetailsResponse {
+    string message = 1;              // Response message.
+    repeated UserDetail user_detail = 2; // Directory information of child users.
+}
+
+// The request message for retrieving child user hierarchies.
+message GetUserChildHierarchyRequest {
+    MContext mcontext = 1; // Metadata context.
+    repeated int64 user_ids = 2; // List of user IDs.
+}
+
+// The response message for child user hierarchies.
+message GetUserChildHierarchyResponse {
+    string message = 1; // Response message.
+    repeated ChildHierarchy child_hierarchy = 2; // List of child hierarchy details.
+}
+
+// Message for a single user’s child hierarchy.
+message ChildHierarchy {
+    int64 user_id = 1; // The input user ID.
+    repeated int64 child_ids = 2; // List of child user IDs.
+}
+
+
+message UserProfile {
+    int64 user_id = 1;        // User's ID.
+    string name = 2;      // name of the child user.
+    string email = 3;         // Email of the child user.
+    int64 partner_id = 4;       // partner_id
+    int64 role_hierarchy_level=5; //role hierarchy level
+    
+}
+
+//The request for retrieving current user details
+message GetUserDetailsRequest{
+    MContext mcontext = 1; // Metadata context.
+    int64 user_id=2;// The current user's ID.
+}
+
+message GetUserDetailsResponse{
+    string message=1;
+    UserProfile user_profile = 2; //user profile information.
+
+}
+
+
+message GetUserPermissionsRequest{
+    int64 user_id = 1;  //user Id 
+}
+
+message GetUserPermissionsResponse{
+    string message = 1;
+    repeated string permissions = 2;  //List of user permission
+}
+
+message GetUserRoleRequest{
+    int64 user_id = 1; //user_id
+}
+
+message GetUserRoleResponse{
+    string message = 1;
+    string role = 2;
+    int64 hierarchy = 3;
+}
+
+// The response message for the child user list.
+message GetServiceBoardUserDetailsResponse {
+    string message = 1;              // Response message.
+    repeated UserDetail user_detail = 2; // Directory information of child users.
+}
+
+// The request message for retrieving user list ids.
+message GetUsersDetailsRequest {
+    MContext mcontext = 1; // Metadata context.
+    repeated int64 user_ids = 2;     // List of user's ID.
+}
+
+message GetPartnerApiKeyRequest{
+    int64 partner_id = 1;
+}
+
+message GetPartnerApiKeyResponse{
+    string api_key = 1;
+}
