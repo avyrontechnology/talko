@@ -16,6 +16,10 @@ class TalkoENV:
     DO_SPACE_NAME = os.getenv("DO_SPACE_NAME", "")
     DO_SECRET_ACCESS_KEY = os.getenv("DO_SECRET_ACCESS_KEY", "")
     DO_ACCESS_KEY_ID = os.getenv("DO_ACCESS_KEY_ID", "")
+    CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+    CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "")
+    CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")
+    CLOUDINARY_FOLDER = os.getenv("CLOUDINARY_FOLDER", "talko")
     ENVIRONMENT = os.getenv("TalkoENV", "")
     STORAGE_SERVICE_PROVIDER = os.getenv("STORAGE_SERVICE_PROVIDER", "")
     CA = os.getenv("CA", "None")
@@ -48,6 +52,29 @@ class TalkoENV:
 
     MAKUNAI_SESSION_URL = os.getenv("MAKUNAI_SESSION_URL", "https://int-makun-ai-service.makunaiglobal.ai/ai/v1/voice/sessions")
     MAKUNAI_SESSION_API_KEY = os.getenv("MAKUNAI_SESSION_API_KEY", "cc18990d45720d7d036a2a107127e4f24b7ed966f626e62621bdbebd4cc643a5")
+
+    # ── voiceai (external AI voice-agent engine) trunk integration ──────
+    # When a call carries context_data.voiceai_agent_id (outbound calls placed
+    # via voiceai's talko_api_server) or its DID is mapped below (inbound),
+    # TalkoPSTNBridgeService relays Tata media to voiceai's WS instead of the
+    # makun-ai LiveKit path — see src/components/pstn/voiceai_relay.py.
+    # voiceai WS auth: Talko mints a single-use ticket per call via
+    # POST {VOICEAI_API_BASE_URL}/ws-ticket using VOICEAI_API_KEY (a voiceai
+    # Bearer API key with calls:write scope), then opens
+    # {VOICEAI_WS_BASE_URL}/chat/v1/{agent_id}?token={ticket}.
+    VOICEAI_API_BASE_URL = os.getenv("VOICEAI_API_BASE_URL", "")
+    VOICEAI_WS_BASE_URL = os.getenv("VOICEAI_WS_BASE_URL", "")
+    VOICEAI_API_KEY = os.getenv("VOICEAI_API_KEY", "")
+    VOICEAI_WS_TICKET_TIMEOUT_SECONDS = float(
+        os.getenv("VOICEAI_WS_TICKET_TIMEOUT_SECONDS", "10")
+    )
+    VOICEAI_WS_CONNECT_TIMEOUT_SECONDS = float(
+        os.getenv("VOICEAI_WS_CONNECT_TIMEOUT_SECONDS", "15")
+    )
+    # Optional inbound routing: JSON map of Talko DID -> voiceai agent_id,
+    # e.g. '{"918045678901": "agent_abc123"}'. DIDs listed here bypass the
+    # makun-ai path even without per-call context_data.
+    VOICEAI_INBOUND_AGENT_MAP = os.getenv("VOICEAI_INBOUND_AGENT_MAP", "")
 
     # Relays Tata Tele's dialer webhook (already-persisted TalkoCDR) onward to
     # makun-ai's campaign webhook — see TalkoDialerWebhookHandler._relay_to_makunai.

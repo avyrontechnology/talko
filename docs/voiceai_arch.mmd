@@ -1,0 +1,53 @@
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#1f2650',
+  'primaryTextColor': '#ffffff',
+  'primaryBorderColor': '#1f2650',
+  'secondaryColor': '#f74737',
+  'secondaryTextColor': '#ffffff',
+  'secondaryBorderColor': '#d63a2b',
+  'tertiaryColor': '#eff3ff',
+  'tertiaryTextColor': '#1f2650',
+  'tertiaryBorderColor': '#1f2650',
+  'lineColor': '#36464d',
+  'fontSize': '15px'
+}}}%%
+flowchart TB
+    V([voiceai campaign])
+    C([Customer phone])
+
+    subgraph VAI["voiceai"]
+        direction TB
+        T["talko_api_server :8004<br/>/talko/call · /talko/hangup"]
+        E["voiceai-app :5001<br/>ASR · LLM · TTS<br/>WS /chat/v1/agent"]
+        RD[(redis<br/>agents + tickets)]
+    end
+
+    subgraph Talko["talko-service :8003"]
+        direction TB
+        A["Call API<br/>POST /call ai_bridge"]
+        B["PSTN Bridge<br/>/pstn/tata/stream"]
+        R["VoiceAI Relay<br/>ticket + media pump"]
+        M[(Mongo CDR)]
+    end
+
+    subgraph Tata["Tata Tele Smartflo"]
+        direction TB
+        D[C2C dial]
+        S[Media WS · mulaw 8k]
+    end
+
+    V --> T
+    T -->|"POST /call + API-KEY<br/>ai_bridge, voiceai_agent_id"| A
+    A -->|"dial"| D
+    D -->|"PSTN call"| C
+    C -->|"answer: media stream"| S
+    S -->|"media WS"| B
+    B -->|"voiceai route"| R
+    R <-->|"ticket + Twilio-shaped<br/>media WS"| E
+    R -->|"CDR write"| M
+    E --- RD
+
+    classDef initiator fill:#f5b73d,stroke:#1f2650,color:#1f2650,stroke-width:2px;
+    classDef trunk fill:#f74737,stroke:#d63a2b,color:#ffffff,stroke-width:2px;
+    class V,C initiator;
+    class T,R trunk;

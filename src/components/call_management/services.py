@@ -41,6 +41,7 @@ from src.components.did_management.services import TalkoDidManagementService
 from src.components.inbound_call_events.publisher import TalkoInboundCallEventPublisher
 from src.components.integrations.console.maglo_client import TalkoMagloClient
 from src.components.partner_config.repository import TalkoPartnerConfigRepository
+from src.components.pstn.voiceai_relay import VOICEAI_AGENT_ID_KEY
 from src.components.vendor_config.repository import TalkoVendorConfigRepository
 from src.core.environment import TalkoENV
 from src.core.redis import TalkoRedisCache
@@ -809,6 +810,24 @@ class TalkoCallService:
         """
         t0 = time.perf_counter()
         try:
+            # ── voiceai route: no makun-ai pre-session ────────────────────
+            # Calls carrying context_data.voiceai_agent_id are served by the
+            # voiceai engine (relayed in pstn/services.py Step 4b), so skip
+            # the DID resolve + makun-ai session POST entirely and store the
+            # pending context directly — the PSTN side picks it up via the
+            # normal on-demand _attach_pending_context path.
+            if (context_data or {}).get(VOICEAI_AGENT_ID_KEY):
+                self.__logger.info(
+                    "[PreSession] voiceai-routed call to_number={} agent={} — "
+                    "skipping makun-ai pre-session, storing pending context".format(
+                        to_number, context_data.get(VOICEAI_AGENT_ID_KEY)
+                    )
+                )
+                await self._store_fallback_context(
+                    fallback_store_key, fallback_payload, to_number
+                )
+                return
+
             # ── Step 1: Resolve agent_id from DID ────────────────────────────
             # Exact same logic as TalkoPSTNBridgeService._resolve_did()
             try:

@@ -14,6 +14,7 @@ class TalkoStorageProvidersEnum(Enum):
     AWS = 1
     AZURE = 2
     DIGITAL_OCEAN = 3
+    CLOUDINARY = 4
 
 
 URL_EXPIRATION_TIME = 24 * 60 * 60  # Expiration time in seconds

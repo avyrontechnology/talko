@@ -21,6 +21,7 @@ from src.components.did_management.constants import TalkoDIDType
 from src.components.did_management.repositories import TalkoDidRepository
 from src.components.pstn.dto import TalkoCallContext
 from src.components.pstn.providers.base import TalkoAbstractPSTNProvider
+from src.components.pstn.voiceai_relay import VOICEAI_AGENT_ID_KEY, TalkoVoiceaiRelay
 from src.core.environment import TalkoENV
 from src.utils.phone_number_utils import normalize_phone_number
 from src.core.redis_constants import (
@@ -299,6 +300,32 @@ class TalkoPSTNBridgeService:
         )
         return ctx
 
+    @staticmethod
+    def _voiceai_configured() -> bool:
+        """True when the voiceai trunk env (WS + ticket API) is provisioned."""
+        return bool(TalkoENV.VOICEAI_WS_BASE_URL and TalkoENV.VOICEAI_API_KEY)
+
+    def _resolve_voiceai_agent_id(self, ctx: TalkoCallContext) -> Optional[str]:
+        """Resolve the voiceai agent for this call, if it is voiceai-routed.
+
+        Outbound: ``context_data.voiceai_agent_id`` (set by voiceai's
+        talko_api_server via POST /call context_data).
+        Inbound: ``VOICEAI_INBOUND_AGENT_MAP`` DID -> agent_id mapping.
+        Returns None for makun-ai / human calls (normal path unchanged).
+        """
+        agent_id = (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY)
+        if agent_id:
+            return str(agent_id)
+        try:
+            mapping = json.loads(TalkoENV.VOICEAI_INBOUND_AGENT_MAP or "{}")
+        except (json.JSONDecodeError, TypeError) as e:
+            self.__logger.warning(
+                "[PSTN][VOICEAI] Ignoring invalid VOICEAI_INBOUND_AGENT_MAP: {}".format(e)
+            )
+            return None
+        agent_id = mapping.get(ctx.did_number)
+        return str(agent_id) if agent_id else None
+
     async def _attach_pending_context(
         self, ctx: TalkoCallContext, event: Dict[str, Any]
     ) -> TalkoCallContext:
@@ -403,6 +430,16 @@ class TalkoPSTNBridgeService:
                 ctx.call_sid, ctx.partner_id, ctx.makunai_agent_id
             )
         )
+        if (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY):
+            # voiceai-routed call — no makun-ai session; handle_call() runs
+            # the voiceai relay instead (see Step 4b below).
+            self.__logger.info(
+                "[PSTN][SESSION] voiceai-routed call sid={} agent={} — "
+                "skipping makun-ai session".format(
+                    ctx.call_sid, ctx.context_data.get(VOICEAI_AGENT_ID_KEY)
+                )
+            )
+            return ctx
         try:
             api_key: str = await self._resolve_partner_api_key(ctx.partner_id)
             headers = {"API-Key": api_key, "Content-Type": "application/json"}
@@ -963,6 +1000,44 @@ class TalkoPSTNBridgeService:
                                 )
                             )
                         # ── End room selection ────────────────────────────────
+
+                        # ── Step 4b: voiceai route ────────────────────────────
+                        #
+                        # Calls carrying context_data.voiceai_agent_id (outbound
+                        # calls placed via voiceai's talko_api_server) or whose
+                        # DID is mapped in VOICEAI_INBOUND_AGENT_MAP bypass the
+                        # makun-ai LiveKit path entirely: relay Tata media to
+                        # the voiceai agent socket instead, then break out to
+                        # the normal cleanup below (room is None there).
+                        # ─────────────────────────────────────────────────────
+                        voiceai_agent_id = self._resolve_voiceai_agent_id(ctx)
+                        if voiceai_agent_id and self._voiceai_configured():
+                            self.__logger.info(
+                                "[PSTN][CALL] Step 4b: voiceai relay sid={} agent={}".format(
+                                    ctx.call_sid, voiceai_agent_id
+                                )
+                            )
+                            try:
+                                relay = TalkoVoiceaiRelay(
+                                    ws_base_url=TalkoENV.VOICEAI_WS_BASE_URL,
+                                    api_base_url=TalkoENV.VOICEAI_API_BASE_URL,
+                                    api_key=TalkoENV.VOICEAI_API_KEY,
+                                    logger=self.__logger,
+                                    ticket_timeout_seconds=TalkoENV.VOICEAI_WS_TICKET_TIMEOUT_SECONDS,
+                                    connect_timeout_seconds=TalkoENV.VOICEAI_WS_CONNECT_TIMEOUT_SECONDS,
+                                )
+                                await relay.run(
+                                    ws, provider, ctx, event,
+                                    raw_events, voiceai_agent_id,
+                                )
+                            except Exception as e:
+                                self.__logger.error(
+                                    "[PSTN][CALL] ❌ voiceai relay FAILED sid={} "
+                                    "error={} traceback={}".format(
+                                        ctx.call_sid, e, traceback.format_exc()
+                                    )
+                                )
+                            break
 
                         # ── Step 5: LiveKit connect ───────────────────────────
                         self.__logger.info(

@@ -1,0 +1,64 @@
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#eff3ff',
+  'primaryTextColor': '#1f2650',
+  'primaryBorderColor': '#1f2650',
+  'actorBkg': '#1f2650',
+  'actorTextColor': '#ffffff',
+  'actorBorderColor': '#1f2650',
+  'signalColor': '#36464d',
+  'signalTextColor': '#1f2650',
+  'labelBoxBkgColor': '#f74737',
+  'labelBoxBorderColor': '#d63a2b',
+  'labelTextColor': '#ffffff',
+  'loopTextColor': '#1f2650',
+  'activationBorderColor': '#f74737',
+  'activationBkgColor': '#f7473722',
+  'sequenceNumberColor': '#ffffff',
+  'fontSize': '15px'
+}}}%%
+sequenceDiagram
+    autonumber
+    box rgb(245,183,61,0.18) Initiator
+        participant V as voiceai campaign
+    end
+    box rgb(247,71,55,0.10) voiceai
+        participant T as talko_api_server :8004
+        participant E as voiceai engine :5001
+    end
+    box rgb(31,38,80,0.08) talko-service :8003
+        participant K as talko-service
+    end
+    box rgb(54,70,77,0.10) Telecom
+        participant TT as Tata Tele
+        participant C as Customer
+    end
+
+    V->>T: POST /talko/call {agent_id, to_number}
+    activate T
+    T->>K: POST /call {ai_bridge, did, ctx.voiceai_agent_id}
+    deactivate T
+    activate K
+    K->>K: CDR insert + pending_context
+    K->>TT: C2C dial (customer_number, caller_id)
+    deactivate K
+    TT->>C: PSTN call
+    C->>TT: Answer
+    TT->>K: WS start {callSid, streamSid}
+    activate K
+    K->>K: DID resolve + pending ctx<br/>voiceai route → skip makun-ai
+    K->>E: POST /ws-ticket (Bearer key)
+    E-->>K: ticket (single-use, 60s)
+    K->>E: WS /chat/v1/agent?token= + forward start
+    E->>E: agent session warm
+    loop media relay (~50 frames/sec)
+        TT->>K: media {payload, chunk}
+        K->>E: media {payload, +timestamp}
+        E->>K: media {agent audio}
+        K->>TT: media + mark
+        TT->>K: mark ack
+        K->>E: mark ack (voiceai names only)
+    end
+    TT->>K: stop
+    K->>E: forward stop + close
+    K->>K: CDR update + recording link
+    deactivate K

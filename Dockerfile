@@ -24,5 +24,6 @@ COPY . ./
 # CMD poetry run uvicorn --host=0.0.0.0 --port=8003 src.main:app --reload &\
 #     poetry run celery -A src.maglo_celery.celery_app.celery worker --loglevel=info --concurrency=4
 # CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8003"]
-CMD poetry run uvicorn --host=0.0.0.0 --port=8003 src.main:app --reload
+# PORT env lets hosts like Hugging Face Spaces (7860) dictate the port.
+CMD ["sh", "-c", "poetry run uvicorn --host=0.0.0.0 --port=${PORT:-8003} src.main:app"]
 

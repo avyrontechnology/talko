@@ -1,6 +1,6 @@
 from src.components.digital_assets.constants import TalkoStorageProvidersEnum
 from src.components.digital_assets.storage.base import TalkoBaseStorageManager
-from src.components.digital_assets.storage.managers import digital_ocean_manager
+from src.components.digital_assets.storage.managers import cloudinary_manager, digital_ocean_manager
 
 
 class TalkoFactoryStorageManager:
@@ -24,6 +24,8 @@ class TalkoFactoryStorageManager:
         """
         if provider == TalkoStorageProvidersEnum.DIGITAL_OCEAN.name:
             storage_manager_class = digital_ocean_manager.TalkoDOStorageManager()
+        elif provider == TalkoStorageProvidersEnum.CLOUDINARY.name:
+            storage_manager_class = cloudinary_manager.TalkoCloudinaryStorageManager()
         # elif provider == TalkoStorageProvidersEnum.AWS.name:
         #     storage_manager_class = AWSStorageManager()
         # elif provider == TalkoStorageProvidersEnum.AZURE.name:

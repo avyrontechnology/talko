@@ -1,0 +1,59 @@
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#eff3ff',
+  'primaryTextColor': '#1f2650',
+  'primaryBorderColor': '#1f2650',
+  'actorBkg': '#1f2650',
+  'actorTextColor': '#ffffff',
+  'actorBorderColor': '#1f2650',
+  'signalColor': '#36464d',
+  'signalTextColor': '#1f2650',
+  'labelBoxBkgColor': '#f74737',
+  'labelBoxBorderColor': '#d63a2b',
+  'labelTextColor': '#ffffff',
+  'loopTextColor': '#1f2650',
+  'activationBorderColor': '#f74737',
+  'activationBkgColor': '#f7473722',
+  'sequenceNumberColor': '#ffffff',
+  'fontSize': '15px'
+}}}%%
+sequenceDiagram
+    autonumber
+    box rgb(245,183,61,0.18) Initiator
+        participant C as Customer
+    end
+    box rgb(54,70,77,0.10) Telecom
+        participant TT as Tata Tele
+    end
+    box rgb(31,38,80,0.08) talko-service :8003
+        participant K as talko-service
+    end
+    box rgb(247,71,55,0.10) voiceai
+        participant E as voiceai engine :5001
+    end
+
+    C->>TT: Dial AI DID
+    TT->>K: WS start {direction: inbound}
+    activate K
+    K->>K: DID resolve (ai_agent)<br/>INBOUND_AGENT_MAP → agent_id
+    K->>E: POST /ws-ticket (Bearer key)
+    E-->>K: ticket
+    K->>E: WS /chat/v1/agent?token= + forward start
+    loop conversation
+        C->>TT: speech
+        TT->>K: media
+        K->>E: media (+timestamp)
+        E->>K: media (agent reply)
+        K->>TT: media + mark
+        E->>K: clear (barge-in)
+        K->>TT: clear (flush buffer)
+    end
+    alt customer hangs up
+        TT->>K: stop
+        K->>E: forward stop + close
+    else agent hangs up
+        E->>K: WS close
+        K->>TT: close leg (v1: media only)
+    end
+    Note over K: v1 limitation: agent hangup does<br/>not call Tata hangup API yet
+    K->>K: CDR update
+    deactivate K

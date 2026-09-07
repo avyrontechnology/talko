@@ -1,6 +1,8 @@
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware import Middleware
 
+import os
+
 # from .auth import JWTMiddleware
 from src.middlewares.context import TalkoContextMiddleware
 
@@ -28,6 +30,11 @@ origins = [
     "http://talko-service.console-prod:8003",
     "https://agentglo.makunaiglobal.ai",
 ]
+
+# Extra browser origins (comma-separated), e.g. a Vercel preview URL for the
+# Talko UI: CORS_EXTRA_ORIGINS=https://talko-ui.vercel.app
+_extra_origins = os.getenv("CORS_EXTRA_ORIGINS", "")
+origins += [o.strip() for o in _extra_origins.split(",") if o.strip()]
 
 allow_methods = ["*"]
 allow_headers = ["*"]
