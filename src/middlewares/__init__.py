@@ -53,6 +53,11 @@ allow_hosts = [
     "agentglo.makunaiglobal.ai",
 ]
 
+# Extra allowed Host headers (comma-separated), e.g. a Render domain:
+# ALLOWED_HOSTS_EXTRA=talko-service.onrender.com
+_extra_hosts = os.getenv("ALLOWED_HOSTS_EXTRA", "")
+allow_hosts += [h.strip() for h in _extra_hosts.split(",") if h.strip()]
+
 allowed_middlewares = [
     Middleware(TalkoContextMiddleware),
     Middleware(

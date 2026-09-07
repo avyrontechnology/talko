@@ -51,3 +51,5 @@ services:
         value: talko
       - key: CORS_EXTRA_ORIGINS
         sync: false
+      - key: ALLOWED_HOSTS_EXTRA
+        value: talko-service.onrender.com
