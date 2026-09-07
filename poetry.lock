@@ -597,6 +597,25 @@ prompt-toolkit = ">=3.0.36"
 testing = ["pytest (>=7.2.1)", "pytest-cov (>=4.0.0)", "tox (>=4.4.3)"]
 
 [[package]]
+name = "cloudinary"
+version = "1.46.2"
+description = "Upload, transform, optimize, and manage images and videos with Cloudinary from Python or Django."
+optional = false
+python-versions = "*"
+files = [
+    {file = "cloudinary-1.46.2-py3-none-any.whl", hash = "sha256:c552d819cd76cb7cd3c15a8a5ea23557ed6ad0ded661ad4b3f3b46ff353fc391"},
+    {file = "cloudinary-1.46.2.tar.gz", hash = "sha256:491ebf4f66ded86a7cff31151e85056520e5a184caf42c7de71b3025da358b95"},
+]
+
+[package.dependencies]
+certifi = "*"
+six = "*"
+urllib3 = ">=1.26.5"
+
+[package.extras]
+dev = ["pytest", "pytest (==4.6)", "tox"]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -2829,4 +2848,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "4d2f380a0040602d8e2fa2a9ff49fc8074e7834a3904fd65a5279e30dd085a4f"
+content-hash = "2603ee69cae63d63aa26dc914c1ce3f7d59d5e9cbe6c92e0ff7b878c592532dd"
