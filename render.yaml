@@ -1,0 +1,53 @@
+# Render Blueprint — Talko service (free tier for testing).
+# Deploy: dashboard.render.com → New → Blueprint → point at this repo.
+# Fill the empty env vars in the Render dashboard (Secrets), then deploy.
+# NOTE: free services sleep after ~15 min idle (30-50s cold start) and give
+# 512 MB RAM — fine for API/dashboard testing, not for live Tata media.
+services:
+  - type: web
+    name: talko-service
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /talko-service/v1/health
+    envVars:
+      - key: SERVICE_NAME
+        value: talko-service
+      - key: LOGGING_CONFIG_PATH
+        value: src/config/log.py
+      - key: MONGO_USER
+        sync: false
+      - key: MONGO_PASSWORD
+        sync: false
+      - key: MONGO_HOST
+        sync: false
+      - key: MONGO_DB
+        sync: false
+      - key: CACHE_PROTOCOL
+        value: rediss
+      - key: CACHE_USERNAME
+        value: default
+      - key: CACHE_PASSWORD
+        sync: false
+      - key: CACHE_HOST
+        sync: false
+      - key: CACHE_PORT
+        value: 6379
+      - key: CACHE_DB
+        value: 0
+      - key: CONSOLE_GRPC_HOST
+        sync: false
+      - key: CONSOLE_GRPC_PORT
+        value: 50051
+      - key: STORAGE_SERVICE_PROVIDER
+        value: CLOUDINARY
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        value: talko
+      - key: CORS_EXTRA_ORIGINS
+        sync: false
