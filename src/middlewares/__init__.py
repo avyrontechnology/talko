@@ -51,6 +51,7 @@ allow_hosts = [
     "talko-service.console-prod:8003",
     "maglo-service.console-prod:8000",
     "agentglo.makunaiglobal.ai",
+    "talko-service.onrender.com",
 ]
 
 # Extra allowed Host headers (comma-separated), e.g. a Render domain:
