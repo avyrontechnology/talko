@@ -277,12 +277,23 @@ class TalkoPSTNBridgeService:
 
         if did_type == TalkoDIDType.AI_AGENT.value:
             if not agent_bot_id:
-                raise ValueError(
-                    "DID {} is ai_agent but agent_bot_id is missing".format(
+                # voiceai-routed inbound DIDs are bound via
+                # VOICEAI_INBOUND_AGENT_MAP (DID -> voiceai agent id), not via
+                # agent_bot_id. Let them through — Step 4b resolves the agent
+                # from the map. Anything else is still a hard error.
+                if self._resolve_voiceai_agent_id_for_did(ctx.did_number) is None:
+                    raise ValueError(
+                        "DID {} is ai_agent but agent_bot_id is missing".format(
+                            ctx.did_number
+                        )
+                    )
+                self.__logger.info(
+                    "[PSTN][DID] voiceai-mapped DID {} — agent resolved in Step 4b".format(
                         ctx.did_number
                     )
                 )
-            ctx.makunai_agent_id = agent_bot_id
+            else:
+                ctx.makunai_agent_id = agent_bot_id
         else:
             if not agent_id:
                 raise ValueError(
@@ -316,6 +327,13 @@ class TalkoPSTNBridgeService:
         agent_id = (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY)
         if agent_id:
             return str(agent_id)
+        return self._resolve_voiceai_agent_id_for_did(ctx.did_number)
+
+    def _resolve_voiceai_agent_id_for_did(self, did_number: str) -> Optional[str]:
+        """Inbound lookup only: DID -> voiceai agent id.
+
+        Tolerant of leading '+' (Tata sends +9179…, maps may store 9179…).
+        """
         try:
             mapping = json.loads(TalkoENV.VOICEAI_INBOUND_AGENT_MAP or "{}")
         except (json.JSONDecodeError, TypeError) as e:
@@ -323,8 +341,13 @@ class TalkoPSTNBridgeService:
                 "[PSTN][VOICEAI] Ignoring invalid VOICEAI_INBOUND_AGENT_MAP: {}".format(e)
             )
             return None
-        agent_id = mapping.get(ctx.did_number)
-        return str(agent_id) if agent_id else None
+        if not isinstance(mapping, dict):
+            return None
+        for candidate in (did_number, (did_number or "").lstrip("+")):
+            agent_id = mapping.get(candidate)
+            if agent_id:
+                return str(agent_id)
+        return None
 
     async def _attach_pending_context(
         self, ctx: TalkoCallContext, event: Dict[str, Any]
