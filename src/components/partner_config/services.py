@@ -154,6 +154,8 @@ class TalkoPartnerConfigService:
             for config in configs:
                 config["id"] = str(config["_id"])
                 config["vendor_id"] = str(config["vendor_id"])
+                if config.get("ai_vendor_config_id") is not None:
+                    config["ai_vendor_config_id"] = str(config["ai_vendor_config_id"])
                 del config["_id"]
                 config_responses.append(TalkoContract.PartnerDataConfigResponse(**config))
             self.logger.info("Get all partner config data ended successfully.")
@@ -179,6 +181,8 @@ class TalkoPartnerConfigService:
 
             config["id"] = str(config["_id"])
             config["vendor_id"] = str(config["vendor_id"])
+            if config.get("ai_vendor_config_id") is not None:
+                config["ai_vendor_config_id"] = str(config["ai_vendor_config_id"])
             del config["_id"]
             self.logger.info(
                 "Get partner config by ID ended successfully for ID: {}".format(id)
