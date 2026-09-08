@@ -59,7 +59,7 @@ class TalkoENV:
     # TalkoPSTNBridgeService relays Tata media to voiceai's WS instead of the
     # makun-ai LiveKit path — see src/components/pstn/voiceai_relay.py.
     # voiceai WS auth: Talko mints a single-use ticket per call via
-    # POST {VOICEAI_API_BASE_URL}/ws-ticket using VOICEAI_API_KEY (a voiceai
+    # POST {VOICEAI_API_BASE_URL}/auth/ws-ticket using VOICEAI_API_KEY (a voiceai
     # Bearer API key with calls:write scope), then opens
     # {VOICEAI_WS_BASE_URL}/chat/v1/{agent_id}?token={ticket}.
     VOICEAI_API_BASE_URL = os.getenv("VOICEAI_API_BASE_URL", "")

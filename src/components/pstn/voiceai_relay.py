@@ -8,7 +8,7 @@ ways (see ``voiceai_events`` for the Tata<->Twilio-shape translation).
 Lifeline:
 
 1. Mint a single-use voiceai WS ticket
-   (``POST {VOICEAI_API_BASE_URL}/ws-ticket``, Bearer ``VOICEAI_API_KEY``).
+   (``POST {VOICEAI_API_BASE_URL}/auth/ws-ticket``, Bearer ``VOICEAI_API_KEY``).
 2. Open ``{VOICEAI_WS_BASE_URL}/chat/v1/{agent_id}?token={ticket}`` and
    forward Tata's ``start`` event first — voiceai requires ``start``
    (``callSid``/``streamSid``) before any ``media``.
@@ -73,7 +73,7 @@ class TalkoVoiceaiRelay:
         return "{}/chat/v1/{}?token={}".format(self.__ws_base_url, agent_id, ticket)
 
     async def __mint_ticket(self) -> str:
-        url = "{}/ws-ticket".format(self.__api_base_url)
+        url = "{}/auth/ws-ticket".format(self.__api_base_url)
         async with httpx.AsyncClient(timeout=self.__ticket_timeout) as client:
             resp = await client.post(
                 url, headers={"Authorization": "Bearer {}".format(self.__api_key)}
