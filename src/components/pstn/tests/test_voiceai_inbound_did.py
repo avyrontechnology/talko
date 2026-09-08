@@ -92,3 +92,25 @@ class TestResolveDidVoiceaiMapped:
         )
         assert service._resolve_voiceai_agent_id_for_did("+917965263087") == "agent_9"
         assert service._resolve_voiceai_agent_id_for_did("910000000000") is None
+
+    @pytest.mark.asyncio
+    async def test_create_session_skipped_for_mapped_did(self, monkeypatch):
+        monkeypatch.setattr(
+            TalkoENV, "VOICEAI_INBOUND_AGENT_MAP",
+            '{"+917965263087": "agent_1"}', raising=False,
+        )
+        service, _ = make_service()
+        ctx = make_ctx(context_data=None)
+        out = await service._create_session(ctx)
+        assert out is ctx
+        assert out.room_name is None  # no makun-ai room touched
+
+    @pytest.mark.asyncio
+    async def test_create_session_runs_makunai_when_unmapped(self, monkeypatch):
+        monkeypatch.setattr(TalkoENV, "VOICEAI_INBOUND_AGENT_MAP", "", raising=False)
+        service, _ = make_service()
+        # Without mapping it proceeds to the makun-ai path, which fails here
+        # on the (mocked) API-key resolve — proving no skip happened.
+        service._resolve_partner_api_key = AsyncMock(side_effect=RuntimeError("grpc down"))
+        with pytest.raises(RuntimeError, match="grpc down"):
+            await service._create_session(make_ctx(context_data=None))

@@ -463,6 +463,17 @@ class TalkoPSTNBridgeService:
                 )
             )
             return ctx
+        if self._resolve_voiceai_agent_id_for_did(ctx.did_number) is not None:
+            # Inbound voiceai call: no pending context exists, so the marker
+            # above can't fire — skip on the DID map instead. Without this,
+            # _create_session would attempt the makun-ai path (incl. a gRPC
+            # API-key fetch that is unreachable from some networks) and kill
+            # the call before Step 4b ever runs.
+            self.__logger.info(
+                "[PSTN][SESSION] voiceai-mapped DID sid={} — "
+                "skipping makun-ai session".format(ctx.call_sid)
+            )
+            return ctx
         try:
             api_key: str = await self._resolve_partner_api_key(ctx.partner_id)
             headers = {"API-Key": api_key, "Content-Type": "application/json"}
