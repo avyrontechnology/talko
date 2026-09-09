@@ -12,7 +12,9 @@ from src.components.common.responses import (
     TalkoUnauthorizedResponse,
 )
 from src.components.partner_auth.services import TalkoPartnerApiKeyService
+from src.components.user_auth.passwords import verify_talko_token
 from src.core.container import TalkoContainer
+from src.core.environment import TalkoENV
 from src.grpc_client.constants import TalkoGrpcServices
 from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
 from src.loggers.talko_service_logger import TalkoServiceLogger
@@ -74,6 +76,8 @@ class TalkoAuthMiddleware(BaseHTTPMiddleware):
             "/talko-service/v1/pstn/tata/stream",
             "/talko-service/v1/ws/inbound-calls/",
             "/talko-service/v1/dids/list-ai-agent-dids",
+            "/talko-service/v1/auth/signup",
+            "/talko-service/v1/auth/login",
         )
 
         # Check if the current request path is in the excluded paths
@@ -117,6 +121,26 @@ class TalkoAuthMiddleware(BaseHTTPMiddleware):
                     detail=TalkoErrorPrompt.UNAUTHORIZED_HEADER
                 )
             token = token_parts[1]
+
+            # Talko-native JWTs (user_auth login) verify locally — no gRPC hop.
+            # Console JWTs fall through to the gRPC flow below unchanged.
+            talko_claims = verify_talko_token(TalkoENV.TALKO_JWT_SECRET, token)
+            if talko_claims:
+                request.state.user = {
+                    "user_id": talko_claims.get("sub"),
+                    "email": talko_claims.get("email"),
+                    "user_role": talko_claims.get("role"),
+                    "partner_id": talko_claims.get("partner_id"),
+                    "is_superadmin": bool(talko_claims.get("is_superadmin")),
+                    "is_talko_auth": True,
+                }
+                request.state.hierarchy = []
+                logger.info(
+                    "Talko JWT auth completed user_id={} superadmin={}".format(
+                        talko_claims.get("sub"), talko_claims.get("is_superadmin")
+                    )
+                )
+                return await call_next(request)
 
             payload = await resolve_user_payload(token, redis_pool, logger)
             if not payload:

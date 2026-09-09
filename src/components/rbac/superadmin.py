@@ -27,14 +27,19 @@ class TalkoSuperadminDenied(PermissionError):
 
 
 async def is_superadmin(request: Request, grpc_client, logger) -> bool:
-    """True when the caller is a JWT user with ADMIN hierarchy level.
+    """True when the caller is a superadmin.
 
-    API-key callers are partner-scoped by construction and never qualify.
-    Any lookup failure denies (fail closed).
+    Talko-native JWTs carry a middleware-verified ``is_superadmin`` claim
+    (trusted directly — the signature was already checked). Console JWTs
+    resolve through the existing ADMIN-hierarchy gRPC lookup. API-key
+    callers are partner-scoped by construction and never qualify. Any
+    lookup failure denies (fail closed).
     """
     user = getattr(request.state, "user", None) or {}
     if user.get("is_api_key_auth"):
         return False
+    if user.get("is_superadmin") is True:
+        return True
     user_id = user.get(TalkoCurrentUserMap.USER_ID)
     if not user_id:
         return False
@@ -63,17 +68,19 @@ async def resolve_effective_partner_id(
     """
     user = getattr(request.state, "user", None) or {}
     own_partner_id = user.get(TalkoCurrentUserMap.PARTNER_ID)
+    if scope_override is not None and (
+        own_partner_id is None or int(scope_override) != int(own_partner_id)
+    ):
+        if await is_superadmin(request, grpc_client, logger):
+            logger.info(
+                "Superadmin user_id={} acting on partner_id={} (own={})".format(
+                    user.get(TalkoCurrentUserMap.USER_ID), scope_override, own_partner_id
+                )
+            )
+            return int(scope_override)
+        raise TalkoSuperadminDenied(
+            "Cross-partner scope requires superadmin (ADMIN) role"
+        )
     if own_partner_id is None:
         raise ValueError("No partner scope on request")
-    if scope_override is None or int(scope_override) == int(own_partner_id):
-        return int(own_partner_id)
-    if await is_superadmin(request, grpc_client, logger):
-        logger.info(
-            "Superadmin user_id={} acting on partner_id={} (own={})".format(
-                user.get(TalkoCurrentUserMap.USER_ID), scope_override, own_partner_id
-            )
-        )
-        return int(scope_override)
-    raise TalkoSuperadminDenied(
-        "Cross-partner scope requires superadmin (ADMIN) role"
-    )
+    return int(own_partner_id)

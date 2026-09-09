@@ -97,6 +97,11 @@ class TalkoENV:
     # this to be provisioned as a real secret in deployed environments.
     WEBHOOK_SECRET_MASTER_KEY = os.getenv("WEBHOOK_SECRET_MASTER_KEY", "")
 
+    # Talko-native user auth (user_auth component). No default: login refuses
+    # to mint tokens until this is provisioned as a real secret.
+    TALKO_JWT_SECRET = os.getenv("TALKO_JWT_SECRET", "")
+    TALKO_JWT_TTL_HOURS = int(os.getenv("TALKO_JWT_TTL_HOURS", "72"))
+
     @classmethod
     def validate_env_vars(cls):
         """

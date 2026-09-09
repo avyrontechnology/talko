@@ -43,6 +43,8 @@ from src.components.partner_auth.rate_limiter import TalkoPartnerApiKeyRateLimit
 from src.components.partner_auth.repository import TalkoPartnerApiKeyRepository
 from src.components.partner_auth.services import TalkoPartnerApiKeyService
 from src.components.partner_auth.validation import TalkoPartnerApiKeyValidator
+from src.components.user_auth.repository import TalkoUserRepository
+from src.components.user_auth.services import TalkoUserAuthService
 from src.components.partner_config.repository import TalkoPartnerConfigRepository
 from src.components.partner_config.services import TalkoPartnerConfigService
 from src.components.partner_config.validation import TalkoPartnerConfigValidator
@@ -99,6 +101,7 @@ class TalkoContainer(containers.DeclarativeContainer):
                 "src.components.inbound_call_events.controllers",
                 "src.components.partner_auth.controllers",
                 "src.components.partner_webhook.controllers",
+                "src.components.user_auth.controllers",
             ]
         )
 
@@ -168,6 +171,12 @@ class TalkoContainer(containers.DeclarativeContainer):
     )
     partner_api_key_repo = providers.Factory(
         TalkoPartnerApiKeyRepository, db_manager=db, logger=logger
+    )
+    talko_user_repo = providers.Factory(
+        TalkoUserRepository, db_manager=db, logger=logger
+    )
+    user_auth_service = providers.Factory(
+        TalkoUserAuthService, repository=talko_user_repo, logger=logger
     )
     partner_webhook_repo = providers.Factory(
         TalkoPartnerWebhookRepository, db_manager=db, logger=logger

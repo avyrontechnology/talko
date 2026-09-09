@@ -96,7 +96,21 @@ class TestResolveEffectivePartnerId:
             await resolve_effective_partner_id(req, make_grpc(hierarchy=1), make_logger(), 9)
 
     @pytest.mark.asyncio
+    async def test_talko_jwt_flag_trusted_without_grpc(self):
+        req = make_request({"user_id": "abc", "is_superadmin": True, "is_talko_auth": True})
+        grpc_client = make_grpc(hierarchy=8)
+        assert await is_superadmin(req, grpc_client, make_logger()) is True
+        grpc_client.get_user_roles.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_missing_scope_raises(self):
         req = make_request({"user_id": 7})
         with pytest.raises(ValueError):
             await resolve_effective_partner_id(req, make_grpc(), make_logger())
+
+    @pytest.mark.asyncio
+    async def test_scopeless_superadmin_with_override(self):
+        req = make_request({"user_id": "abc", "is_superadmin": True})
+        assert (
+            await resolve_effective_partner_id(req, make_grpc(), make_logger(), 9) == 9
+        )
