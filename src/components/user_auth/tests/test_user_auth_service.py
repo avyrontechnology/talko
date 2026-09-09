@@ -58,28 +58,42 @@ def signup_payload(**overrides):
         "email": "aarav@example.com",
         "phone": "+919889560593",
         "password": "Str0ng!Pass",
-        "partner_id": 2,
     }
     data.update(overrides)
     return TalkoContract.Signup(**data)
+
+
+def provision_payload(**overrides):
+    data = {
+        "name": "Aarav Sharma",
+        "email": "aarav@example.com",
+        "phone": "+919889560593",
+        "password": "Str0ng!Pass",
+        "role": "viewer",
+        "partner_id": 2,
+    }
+    data.update(overrides)
+    return TalkoContract.AdminCreateUser(**data)
 
 
 class TestSignup:
     @pytest.mark.asyncio
     async def test_first_user_becomes_superadmin(self):
         service = make_service()
-        user = await service.signup(signup_payload(partner_id=None))
+        user = await service.signup(signup_payload())
         assert user["role"] == "superadmin"
         assert user["partner_id"] is None
+        assert user["is_active"] is True
         assert "password_hash" not in user
 
     @pytest.mark.asyncio
-    async def test_later_signup_defaults_to_scoped_viewer(self):
+    async def test_later_signup_is_pending_inactive(self):
         service = make_service()
-        await service.signup(signup_payload(email="first@example.com", partner_id=None))
+        await service.signup(signup_payload(email="first@example.com"))
         user = await service.signup(signup_payload())
         assert user["role"] == "viewer"
-        assert user["partner_id"] == 2
+        assert user["partner_id"] is None
+        assert user["is_active"] is False
 
     @pytest.mark.asyncio
     async def test_duplicate_email_rejected(self):
@@ -90,19 +104,41 @@ class TestSignup:
         with pytest.raises(TalkoUserExistsError):
             await service.signup(signup_payload())
 
+
+class TestProvisioning:
     @pytest.mark.asyncio
-    async def test_later_signup_requires_partner(self):
+    async def test_provision_scoped_viewer(self):
         service = make_service()
-        await service.signup(signup_payload(email="first@example.com", partner_id=None))
+        await service.signup(signup_payload(email="root@example.com"))
+        user = await service.create_user(provision_payload())
+        assert user["role"] == "viewer"
+        assert user["partner_id"] == 2
+        assert user["is_active"] is True
+
+    @pytest.mark.asyncio
+    async def test_provision_duplicate_rejected(self):
+        from src.components.user_auth.services import TalkoUserExistsError
+
+        service = make_service()
+        await service.signup(signup_payload(email="root@example.com"))
+        await service.create_user(provision_payload())
+        with pytest.raises(TalkoUserExistsError):
+            await service.create_user(provision_payload())
+
+    @pytest.mark.asyncio
+    async def test_provision_non_admin_needs_partner(self):
+        service = make_service()
+        await service.signup(signup_payload(email="root@example.com"))
         with pytest.raises(ValueError):
-            await service.signup(signup_payload(partner_id=None))
+            await service.create_user(provision_payload(partner_id=None))
 
 
 class TestLogin:
     @pytest.mark.asyncio
     async def test_login_mints_token(self):
         service = make_service()
-        await service.signup(signup_payload())
+        await service.signup(signup_payload(email="root@example.com"))
+        await service.create_user(provision_payload())
         out = await service.login(
             TalkoContract.Login(credential="AARAV@EXAMPLE.COM", password="Str0ng!Pass")
         )
@@ -110,9 +146,20 @@ class TestLogin:
         assert out["token_type"] == "bearer"
 
     @pytest.mark.asyncio
+    async def test_pending_signup_cannot_login(self):
+        service = make_service()
+        await service.signup(signup_payload(email="root@example.com"))
+        await service.signup(signup_payload())
+        with pytest.raises(TalkoInactiveUserError):
+            await service.login(
+                TalkoContract.Login(credential="aarav@example.com", password="Str0ng!Pass")
+            )
+
+    @pytest.mark.asyncio
     async def test_wrong_password_rejected_without_hint(self):
         service = make_service()
-        await service.signup(signup_payload())
+        await service.signup(signup_payload(email="root@example.com"))
+        await service.create_user(provision_payload())
         with pytest.raises(TalkoInvalidCredentialsError):
             await service.login(
                 TalkoContract.Login(credential="aarav@example.com", password="Wr0ng!Pass")
@@ -125,7 +172,8 @@ class TestLogin:
     @pytest.mark.asyncio
     async def test_inactive_user_cannot_login(self):
         service = make_service()
-        user = await service.signup(signup_payload())
+        await service.signup(signup_payload(email="root@example.com"))
+        user = await service.create_user(provision_payload())
         await service.update_user(user["id"], TalkoContract.UpdateUser(is_active=False))
         with pytest.raises(TalkoInactiveUserError):
             await service.login(
@@ -137,8 +185,8 @@ class TestUserManagement:
     @pytest.mark.asyncio
     async def test_promote_and_scope(self):
         service = make_service()
-        await service.signup(signup_payload(email="root@example.com", partner_id=None))
-        user = await service.signup(signup_payload())
+        await service.signup(signup_payload(email="root@example.com"))
+        user = await service.create_user(provision_payload())
         updated = await service.update_user(
             user["id"],
             TalkoContract.UpdateUser(role="superadmin", partner_id=None),
@@ -149,13 +197,30 @@ class TestUserManagement:
     @pytest.mark.asyncio
     async def test_non_admin_must_keep_scope(self):
         service = make_service()
-        await service.signup(signup_payload(email="root@example.com", partner_id=None))
-        user = await service.signup(signup_payload())
+        await service.signup(signup_payload(email="root@example.com"))
+        user = await service.create_user(provision_payload())
         with pytest.raises(ValueError):
             await service.update_user(
                 user["id"],
                 TalkoContract.UpdateUser(role="viewer", partner_id=None),
             )
+
+    @pytest.mark.asyncio
+    async def test_activate_pending_signup_with_scope(self):
+        service = make_service()
+        await service.signup(signup_payload(email="root@example.com"))
+        pending = await service.signup(signup_payload())
+        assert pending["is_active"] is False
+        updated = await service.update_user(
+            pending["id"],
+            TalkoContract.UpdateUser(role="viewer", partner_id=9, is_active=True),
+        )
+        assert updated["is_active"] is True
+        assert updated["partner_id"] == 9
+        out = await service.login(
+            TalkoContract.Login(credential="aarav@example.com", password="Str0ng!Pass")
+        )
+        assert out["token"]
 
     @pytest.mark.asyncio
     async def test_unknown_user_returns_none(self):
@@ -175,8 +240,8 @@ class TestUserManagement:
         from src.core.environment import TalkoENV
 
         service = make_service()
-        await service.signup(signup_payload(email="root@example.com", partner_id=None))
-        await service.signup(signup_payload())
+        await service.signup(signup_payload(email="root@example.com"))
+        await service.create_user(provision_payload())
         stored = service._TalkoUserAuthService__repository.docs["user-2"]
         assert stored["password_hash"] != "Str0ng!Pass"
         assert verify_password("Str0ng!Pass", stored["password_hash"]) is True

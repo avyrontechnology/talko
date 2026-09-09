@@ -46,9 +46,9 @@ class TalkoUserAuthService:
     async def signup(self, payload: TalkoContract.Signup) -> dict:
         """Create a user. The first user ever becomes superadmin (bootstrap).
 
-        Later signups default to viewer scoped to their partner_id. Non-first
-        signups without a partner_id are rejected — only a cross-partner
-        superadmin may exist without one.
+        Later public signups become INACTIVE viewers with no scope — a
+        superadmin activates them with a role + partner (Users table).
+        Nothing is asked beyond identity + password at signup.
         """
         existing = await self.__repository.find_by_email(payload.email)
         if existing:
@@ -56,14 +56,48 @@ class TalkoUserAuthService:
         total = await self.__repository.count_users()
         if total == 0:
             role = TalkoUserRole.SUPERADMIN
-            partner_id = payload.partner_id  # may stay None: cross-partner
+            partner_id = None
+            is_active = True
         else:
             role = TalkoUserRole.VIEWER
+            partner_id = None
+            is_active = False
+        doc = TalkoUserModel(
+            email=payload.email,
+            name=payload.name.strip(),
+            phone=(payload.phone or "").strip() or None,
+            password_hash=hash_password(payload.password),
+            role=role,
+            partner_id=partner_id,
+            is_active=is_active,
+        ).model_dump()
+        user_id = await self.__repository.insert_user(doc)
+        doc["_id"] = user_id
+        self.__logger.info(
+            "Talko user signed up email={} role={} active={}".format(
+                payload.email, role, is_active
+            )
+        )
+        return _public_user(doc)
+
+    async def create_user(self, payload: TalkoContract.AdminCreateUser) -> dict:
+        """Superadmin-provisioned account with explicit role/scope.
+
+        First user ever still bootstraps to superadmin; otherwise the given
+        role/scope apply (non-superadmin roles require a partner_id).
+        """
+        existing = await self.__repository.find_by_email(payload.email)
+        if existing:
+            raise TalkoUserExistsError("Email already registered")
+        total = await self.__repository.count_users()
+        if total == 0:
+            role = TalkoUserRole.SUPERADMIN
             partner_id = payload.partner_id
-            if partner_id is None:
-                raise ValueError(
-                    "partner_id is required (only the first superadmin may omit it)"
-                )
+        else:
+            role = payload.role
+            partner_id = payload.partner_id
+            if role != TalkoUserRole.SUPERADMIN and partner_id is None:
+                raise ValueError("Non-superadmin users require a partner_id")
         doc = TalkoUserModel(
             email=payload.email,
             name=payload.name.strip(),
@@ -76,7 +110,7 @@ class TalkoUserAuthService:
         user_id = await self.__repository.insert_user(doc)
         doc["_id"] = user_id
         self.__logger.info(
-            "Talko user signed up email={} role={} partner_id={}".format(
+            "Talko user provisioned email={} role={} partner_id={}".format(
                 payload.email, role, partner_id
             )
         )
