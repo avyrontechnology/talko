@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from src.components.common.constants import TalkoCurrentUserMap
 from src.components.common.responses import (
     TalkoBadRequestResponse,
+    TalkoForbiddenPermissionResponse,
     TalkoInternalServerErrorResponse,
     TalkoResourceCreatedResponse,
     TalkoResourceNotFoundResponse,
@@ -13,8 +14,14 @@ from src.components.partner_auth.dto import TalkoContract
 from src.components.partner_auth.message import SOMETHING_WENT_WRONG
 from src.components.rbac.permission_dependency import TalkoPermissionDependency
 from src.components.rbac.permission_injector import permission_check
+from src.components.rbac.superadmin import (
+    TalkoSuperadminDenied,
+    resolve_effective_partner_id,
+)
 from src.core.container import TalkoContainer
 from src.exceptions import TalkoResourceNotFound
+from src.grpc_client.constants import TalkoGrpcServices
+from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
 from src.loggers.talko_service_logger import TalkoServiceLogger
 
 from .services import TalkoPartnerApiKeyService
@@ -50,6 +57,15 @@ class TalkoPartnerApiKeyController:
                     user_id, data.partner_id
                 )
             )
+            # Keys are issued into the body partner: superadmins may onboard
+            # any partner, everyone else only their own scope.
+            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            try:
+                await resolve_effective_partner_id(
+                    request, grpc_client, talko_service_logger, data.partner_id
+                )
+            except TalkoSuperadminDenied as denied:
+                return TalkoForbiddenPermissionResponse(detail=str(denied))
             created = await partner_api_key_service.create_api_key(data, user_id)
             return TalkoResourceCreatedResponse(data=created)
         except Exception as e:

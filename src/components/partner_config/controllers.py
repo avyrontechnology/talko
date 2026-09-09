@@ -4,6 +4,7 @@ from fastapi import APIRouter, Body, Depends, Request, status
 from src.components.common.constants import TalkoCurrentUserMap
 from src.components.common.responses import (
     TalkoBadRequestResponse,
+    TalkoForbiddenPermissionResponse,
     TalkoInternalServerErrorResponse,
     TalkoResourceCreatedResponse,
     TalkoResourceNotFoundResponse,
@@ -18,8 +19,14 @@ from src.components.partner_config.message import (
 )
 from src.components.rbac.permission_dependency import TalkoPermissionDependency
 from src.components.rbac.permission_injector import permission_check
+from src.components.rbac.superadmin import (
+    TalkoSuperadminDenied,
+    resolve_effective_partner_id,
+)
 from src.core.container import TalkoContainer
 from src.exceptions import TalkoBadRequestError, TalkoConflictError, TalkoResourceNotFound
+from src.grpc_client.constants import TalkoGrpcServices
+from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
 from src.loggers.talko_service_logger import TalkoServiceLogger
 
 from .services import TalkoPartnerConfigService
@@ -67,6 +74,15 @@ class TalkoPartnerConfigController:
                     user_id, partner_id
                 )
             )
+            # Body carries the target partner: superadmins may onboard any
+            # partner, everyone else only their own scope.
+            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            try:
+                await resolve_effective_partner_id(
+                    request, grpc_client, talko_service_logger, config_data.partner_id
+                )
+            except TalkoSuperadminDenied as denied:
+                return TalkoForbiddenPermissionResponse(detail=str(denied))
             created_config: TalkoContract.PartnerConfigResponse = (
                 await partner_config_service.create_partner_config(config_data)
             )
