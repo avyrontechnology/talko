@@ -276,7 +276,7 @@ class TestRealtimePacing:
             [json.dumps({"event": "media", "streamSid": "MZ123", "media": {"payload": agent_audio}})],
         )
         tata = FakeTataWs()
-        relay = make_relay(vws, max_pending_marks=2, ack_wait_seconds=5)
+        relay = make_relay(vws, max_pending_marks=2, ack_wait_seconds=5, mark_every_n_frames=1)
         start = {"event": "start", "start": {}}
 
         async def tata_acks_paced():
@@ -325,7 +325,7 @@ class TestRealtimePacing:
             deliver_delay=0.05,
         )
         tata = FakeTataWs()
-        relay = make_relay(vws, max_pending_marks=1, ack_wait_seconds=10)
+        relay = make_relay(vws, max_pending_marks=1, ack_wait_seconds=10, mark_every_n_frames=1)
         start = {"event": "start", "start": {}}
 
         async def tata_idles_then_stops():
@@ -377,3 +377,28 @@ class TestRealtimePacing:
         assert [m["media"]["chunk"] for m in _tata_medias(tata)] == [1, 2, 3, 4, 5, 6]
         # first frame immediate + 5 paced intervals of 20 ms (slop allowed)
         assert elapsed >= 0.09, "frames burst out without realtime pacing ({:.3f}s)".format(elapsed)
+
+    @pytest.mark.asyncio
+    async def test_marks_sent_sparsely_by_default(self):
+        """60-frame blob with defaults: only frames 1 and 51 carry marks —
+        Tata's mark path (a few marks/s) must not be flooded."""
+        agent_audio = base64.b64encode(b"\xef" * 9600).decode()  # 60 frames
+        vws = FakeVoiceaiSocket(
+            [json.dumps({"event": "media", "streamSid": "MZ123", "media": {"payload": agent_audio}})],
+            remote_close_when_empty=True,
+        )
+        tata = FakeTataWs()
+        relay = make_relay(vws)
+        start = {"event": "start", "start": {}}
+
+        async def tata_idles_then_stops():
+            while not tata.closed:
+                await asyncio.sleep(0.01)
+            yield json.dumps({"event": "stop", "streamSid": "MZ123"})
+
+        await asyncio.wait_for(
+            relay.run(tata, TalkoTataTeleProvider(), make_ctx(), start, tata_idles_then_stops(), "agent_1"),
+            timeout=10,
+        )
+        assert [m["media"]["chunk"] for m in _tata_medias(tata)] == list(range(1, 61))
+        assert _own_mark_names(tata) == ["voiceai-chunk-1", "voiceai-chunk-51"]

@@ -41,9 +41,8 @@ from src.components.pstn.voiceai_events import forward_to_voiceai, parse_from_vo
 
 VOICEAI_AGENT_ID_KEY = "voiceai_agent_id"
 SEND_TIMEOUT_SECONDS = 5.0
-# Prefix for the relay's own per-chunk marks (see __pump_voiceai_to_tata).
-# Acks carrying this prefix are consumed immediately WITHOUT the grace wait:
-# waiting 200ms on every one of Tata's ~50 acks/sec would stall inbound audio.
+# Prefix for the relay's own sparse marks (see RELAY_MARK_EVERY_N_FRAMES).
+# Acks carrying this prefix are consumed immediately WITHOUT the grace wait.
 OWN_MARK_PREFIX = "voiceai-chunk-"
 # Tata's audio contract (see TalkoAbstractPSTNProvider): exactly 160 bytes of
 # μ-law 8kHz per media event (20 ms). voiceai emits larger per-message blobs
@@ -56,17 +55,21 @@ _MULAW_SILENCE = b"\xff"
 # services.py uses MAX_PENDING_MARKS=8 because its audio already arrives at
 # realtime rate so the window never binds).
 #
-# The engine emits replies up to ~4x realtime while Tata acks each mark
-# ~0.7 s after receipt. An 8-frame ack window then caps throughput at
-# ~12 frames/s against the 50/s Tata plays — chronic playout starvation
-# (caller hears silence although every mark gets acked). So:
-# - send at most 1 frame per 20 ms (realtime rate cap), and
-# - keep up to ~1 s of audio in flight (50 frames) so a 0.7 s ack latency
-#   never throttles the rate; the window is pure backpressure for a truly
+# Tata acks engine marks in ~0.7 s at low rates, but processes inbound marks
+# at only a few per second: 50 marks/s (one per 20 ms frame) backs its ack
+# queue up ~16 s deep, and any ack-sized window then throttles audio down to
+# Tata's mark-processing rate (~5 frames/s — caller hears silence although
+# every mark is eventually acked). So the relay:
+# - sends at most 1 frame per 20 ms (realtime rate cap — the pacer, not the
+#   acks, sets the rate),
+# - marks only every MARK_EVERY_N_FRAMES-th frame (liveness signal without
+#   flooding Tata's mark path), and
+# - keeps up to ~1 s of audio in flight as pure backpressure for a truly
 #   stalled Tata leg.
 RELAY_MAX_PENDING_MARKS = 50
 RELAY_FRAME_INTERVAL_SECONDS = 0.02
 RELAY_ACK_WAIT_SECONDS = 2.0
+RELAY_MARK_EVERY_N_FRAMES = 50
 
 
 def _split_frames(payload: bytes):
@@ -113,6 +116,7 @@ class TalkoVoiceaiRelay:
         max_pending_marks: int = RELAY_MAX_PENDING_MARKS,
         ack_wait_seconds: float = RELAY_ACK_WAIT_SECONDS,
         frame_interval_seconds: float = RELAY_FRAME_INTERVAL_SECONDS,
+        mark_every_n_frames: int = RELAY_MARK_EVERY_N_FRAMES,
     ) -> None:
         self.__ws_base_url = ws_base_url.rstrip("/")
         self.__api_base_url = api_base_url.rstrip("/")
@@ -128,6 +132,7 @@ class TalkoVoiceaiRelay:
         self.__max_pending_marks = max(1, max_pending_marks)
         self.__ack_wait_seconds = ack_wait_seconds
         self.__frame_interval = frame_interval_seconds
+        self.__mark_every_n = max(1, mark_every_n_frames)
         self.__next_send_ts = 0.0
 
     # ── setup helpers ────────────────────────────────────────────────
@@ -388,8 +393,16 @@ class TalkoVoiceaiRelay:
                 while outbox and len(pending_marks) < self.__max_pending_marks:
                     chunk_no, frame = outbox.popleft()
                     await self.__pace_frame()
-                    label = "{}-{}".format(OWN_MARK_PREFIX.rstrip("-"), chunk_no)
-                    pending_marks[label] = asyncio.Event()
+                    # Mark sparsely: Tata's mark path handles only a few
+                    # marks/s, so a mark per frame would flood it (see
+                    # RELAY_* constants). Frame 1 is always marked.
+                    if (chunk_no - 1) % self.__mark_every_n == 0:
+                        label: Optional[str] = "{}-{}".format(
+                            OWN_MARK_PREFIX.rstrip("-"), chunk_no
+                        )
+                        pending_marks[label] = asyncio.Event()
+                    else:
+                        label = None
                     try:
                         await provider.send_audio(
                             tata_ws,
@@ -400,7 +413,8 @@ class TalkoVoiceaiRelay:
                         )
                         stats["fwd_frames"] += 1
                     except Exception:
-                        pending_marks.pop(label, None)
+                        if label is not None:
+                            pending_marks.pop(label, None)
                         raise
                 if finished and not outbox:
                     break
@@ -408,10 +422,15 @@ class TalkoVoiceaiRelay:
                     await asyncio.wait_for(
                         wake.wait(), timeout=self.__ack_wait_seconds
                     )
+                    timed_out = False
                 except asyncio.TimeoutError:
-                    pass
+                    timed_out = True
                 wake.clear()
-                if outbox and len(pending_marks) >= self.__max_pending_marks:
+                if (
+                    timed_out
+                    and outbox
+                    and len(pending_marks) >= self.__max_pending_marks
+                ):
                     # Acks for wiped/lost frames never arrive — drop the
                     # oldest slot so one lost ack can't stall the call
                     # (same tradeoff as the LiveKit path in services.py).

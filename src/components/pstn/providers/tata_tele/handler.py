@@ -1,4 +1,5 @@
 import base64
+from typing import Optional
 
 from src.components.pstn.constants import TalkoCallDirection, TalkoPSTNProvider
 from src.components.pstn.dto import TalkoCallContext
@@ -50,26 +51,29 @@ class TalkoTataTeleProvider(TalkoAbstractPSTNProvider):
         self,
         ws,
         audio_bytes: bytes,
-        label: str,
+        label: Optional[str] = None,
         stream_sid: str = "",
         chunk: int = 1,
     ) -> None:
         """
-        Send one μ-law audio chunk followed by a mark event to Tata.
+        Send one μ-law audio chunk to Tata, with a mark event iff labelled.
 
         The media event carries the audio payload. The mark event requests
         a playback acknowledgement, which Tata echoes back once the audio
-        has finished playing — used for barge-in / turn-taking.
+        has finished playing — used for barge-in / turn-taking. Tata
+        processes inbound marks at only a few per second, so high-rate
+        streams must pass label=None (media only) and mark sparsely.
 
         Args:
             ws:          WebSocket connection to Tata.
             audio_bytes: 160 bytes of μ-law 8kHz audio (20 ms per chunk).
-            label:       Unique mark label for this chunk (e.g. "chunk_000001").
+            label:       Unique mark label, or None to skip the mark event.
             stream_sid:  streamSid from the start event. Required by Tata.
             chunk:       Monotonically increasing chunk counter. Required by Tata.
         """
         await ws.send_text(TalkoTataTeleEvents.build_media(audio_bytes, stream_sid, chunk))
-        await ws.send_text(TalkoTataTeleEvents.build_mark(label, stream_sid))
+        if label is not None:
+            await ws.send_text(TalkoTataTeleEvents.build_mark(label, stream_sid))
 
     async def send_clear(self, ws, stream_sid: str = "") -> None:
         """

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from src.components.pstn.dto import TalkoCallContext
 
@@ -41,20 +42,24 @@ class TalkoAbstractPSTNProvider(ABC):
         self,
         ws,
         audio_bytes: bytes,
-        label: str,
+        label: Optional[str] = None,
         stream_sid: str = "",
         chunk: int = 1,
     ) -> None:
         """
         Send one μ-law audio chunk to the caller via the provider's protocol.
 
-        Implementations should send the audio payload and a mark event
-        (if supported by the provider) so playback acknowledgements can be tracked.
+        Implementations send the audio payload and, when ``label`` is given,
+        a mark event (if supported by the provider) so playback
+        acknowledgements can be tracked. ``label=None`` sends media only —
+        use it for high-rate streams where per-chunk marks would flood the
+        provider's ack path.
 
         Args:
             ws:          WebSocket connection to the provider.
             audio_bytes: 160 bytes of μ-law 8kHz audio (20 ms per chunk).
-            label:       Unique mark label for this chunk (e.g. "chunk_000001").
+            label:       Unique mark label for this chunk (e.g. "chunk_000001"),
+                         or None to skip the mark event.
             stream_sid:  Stream identifier from the start event.
                          Required by Tata Tele — omitting causes silent discard.
             chunk:       Monotonically increasing chunk counter (1-based).
