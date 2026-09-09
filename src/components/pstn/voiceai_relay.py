@@ -342,6 +342,15 @@ class TalkoVoiceaiRelay:
                         stats["rms_max"] = max(stats["rms_max"], rms)
                         if stats["rms_min"] is None or rms < stats["rms_min"]:
                             stats["rms_min"] = rms
+                        # TEMP DEBUG: per-message energy+size. The aggregate
+                        # avg hides bimodal distributions (loud greeting +
+                        # silent replies). ~26 msgs/call: cheap to log all.
+                        # Speech reads in the hundreds-thousands; ~0 = silence.
+                        self.__logger.info(
+                            "[VOICEAI][RELAY] voiceai audio sid={} msg={} bytes={} rms={}".format(
+                                ctx.call_sid, stats["voiceai_msgs"], len(payload), rms
+                            )
+                        )
                         for frame in _split_frames(payload):
                             chunk += 1
                             outbox.append((chunk, frame))
