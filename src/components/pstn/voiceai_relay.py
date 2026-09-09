@@ -241,6 +241,11 @@ class TalkoVoiceaiRelay:
                         if label in voiceai_marks:
                             # Ack for a mark voiceai itself requested —
                             # forward so its playout tracking completes.
+                            # Discard: the mark may be acked twice (an early
+                            # grace-wait hit plus Tata's real ack once the
+                            # ordered mark is actually forwarded) and the
+                            # engine must see each mark only once.
+                            voiceai_marks.discard(label)
                             await self.__send_voiceai(vws, raw, sid)
                         # else: unknown mark, consume locally.
                         continue
@@ -278,12 +283,19 @@ class TalkoVoiceaiRelay:
 
     # ── pumps ────────────────────────────────────────────────────────
     #
-    # Reader and sender run as separate tasks sharing an outbox queue.
-    # Split deliberately: the sender blocks on Tata's ack window (realtime
-    # pacing), but voiceai control messages — especially barge-in ``clear``
-    # — must be honoured immediately even when the window is full. A single
-    # task would stall behind a full window and process the clear seconds
-    # late, after Tata already buffered (and then wipes) the reply.
+    # Reader and sender run as separate tasks sharing ONE ordered outbox.
+    # Split deliberately: the sender blocks on pacing / Tata's ack window,
+    # but voiceai control messages must be honoured promptly even when it
+    # is blocked. A single task would stall behind a full window and
+    # process controls seconds late.
+    #
+    # Ordering guarantee: voiceai's pre/post marks travel IN ORDER with
+    # their audio (queued, not forwarded instantly). Tata sees each mark
+    # adjacent to the audio it brackets — exactly like a Twilio-native
+    # endpoint — instead of a pre-mark seconds ahead of its (paced) audio.
+    #
+    # Outbox item shapes: ("media", chunk_no, frame_bytes),
+    # ("vmark", mark_name), ("clear",).
 
     async def __pump_voiceai_to_tata(
         self,
@@ -301,7 +313,7 @@ class TalkoVoiceaiRelay:
         Returns TEMP DEBUG audio-flow stats (see ``stats`` below), logged by
         the caller in the Ended summary.
         """
-        outbox: Deque[Tuple[int, bytes]] = collections.deque()
+        outbox: Deque[Tuple[Any, ...]] = collections.deque()
         finished = False  # reader drained the voiceai socket (nonlocal below)
         send_failed = False
         # TEMP DEBUG (silent-reply investigation): audio flow counters + RMS
@@ -342,47 +354,50 @@ class TalkoVoiceaiRelay:
                         stats["rms_max"] = max(stats["rms_max"], rms)
                         if stats["rms_min"] is None or rms < stats["rms_min"]:
                             stats["rms_min"] = rms
-                        # TEMP DEBUG: per-message energy+size. The aggregate
-                        # avg hides bimodal distributions (loud greeting +
-                        # silent replies). ~26 msgs/call: cheap to log all.
-                        # Speech reads in the hundreds-thousands; ~0 = silence.
+                        # TEMP DEBUG: per-message energy+size+head-bytes. The
+                        # aggregate avg hides bimodal distributions (loud
+                        # greeting + silent replies). ~26 msgs/call: cheap to
+                        # log all. Speech RMS reads in the hundreds-thousands;
+                        # ~0 = silence. Head bytes distinguish μ-law speech
+                        # from mis-encoded audio (PCM-as-μ-law shows runs of
+                        # 0x00/0xFF every other byte).
                         self.__logger.info(
-                            "[VOICEAI][RELAY] voiceai audio sid={} msg={} bytes={} rms={}".format(
-                                ctx.call_sid, stats["voiceai_msgs"], len(payload), rms
+                            "[VOICEAI][RELAY] voiceai audio sid={} msg={} bytes={} rms={} head={}".format(
+                                ctx.call_sid,
+                                stats["voiceai_msgs"],
+                                len(payload),
+                                rms,
+                                payload[:16].hex(),
                             )
                         )
                         for frame in _split_frames(payload):
                             chunk += 1
-                            outbox.append((chunk, frame))
+                            outbox.append(("media", chunk, frame))
                         wake.set()
                     elif kind == "mark":
+                        # Registered now (so early acks grace-wait
+                        # successfully) but forwarded in order by the sender —
+                        # Tata sees each mark adjacent to the audio it
+                        # brackets, like a Twilio-native endpoint.
                         voiceai_marks.add(payload)
-                        await self.__send_tata(
-                            tata_ws,
-                            json.dumps(
-                                {
-                                    "event": "mark",
-                                    "streamSid": ctx.stream_sid,
-                                    "mark": {"name": payload},
-                                }
-                            ),
-                            ctx.call_sid,
-                        )
+                        outbox.append(("vmark", payload))
+                        wake.set()
                     elif kind == "clear":
-                        # Barge-in: Tata wipes its playout buffer, so drop
-                        # anything queued-but-unsent (stale reply tail) and
-                        # release pacing slots whose acks will never arrive.
+                        # Barge-in: release pacing slots at once (their acks
+                        # will never arrive) and drop queued-but-unsent items
+                        # — the stale reply tail. The drop happens HERE, at
+                        # arrival, so only pre-clear items go; anything the
+                        # engine sends after stays queued behind the clear
+                        # marker the sender forwards next, in order.
                         dropped = len(outbox)
                         outbox.clear()
                         stats["dropped_on_clear"] += dropped
                         for ev in pending_marks.values():
                             ev.set()
                         pending_marks.clear()
-                        await provider.send_clear(
-                            tata_ws, stream_sid=ctx.stream_sid
-                        )
+                        outbox.append(("clear",))
                         self.__logger.info(
-                            "[VOICEAI][RELAY] clear forwarded sid={} dropped_queued={}".format(
+                            "[VOICEAI][RELAY] clear queued sid={} dropped_queued={}".format(
                                 ctx.call_sid, dropped
                             )
                         )
@@ -393,38 +408,71 @@ class TalkoVoiceaiRelay:
             return chunk
 
         async def sender() -> None:
-            """Outbox -> Tata at realtime rate, ack window as backpressure."""
+            """Outbox -> Tata at realtime rate, ack window as backpressure.
+
+            Items flow in arrival order: media frames (paced), voiceai marks
+            (forwarded where they sit — adjacent to their audio), clears
+            (forwarded, buffer already dropped at arrival). Only media is
+            gated on the ack window; control items always flow so a full
+            window can never trap a clear behind unsent audio.
+            """
             nonlocal send_failed
             while True:
                 wake.clear()
                 # No await between clear() and these checks, so no wake-up
                 # can interleave and get lost.
-                while outbox and len(pending_marks) < self.__max_pending_marks:
-                    chunk_no, frame = outbox.popleft()
-                    await self.__pace_frame()
-                    # Mark sparsely: Tata's mark path handles only a few
-                    # marks/s, so a mark per frame would flood it (see
-                    # RELAY_* constants). Frame 1 is always marked.
-                    if (chunk_no - 1) % self.__mark_every_n == 0:
-                        label: Optional[str] = "{}-{}".format(
-                            OWN_MARK_PREFIX.rstrip("-"), chunk_no
-                        )
-                        pending_marks[label] = asyncio.Event()
-                    else:
-                        label = None
-                    try:
-                        await provider.send_audio(
+                while outbox:
+                    kind = outbox[0][0]
+                    if kind == "media" and len(pending_marks) >= self.__max_pending_marks:
+                        break  # backpressure gates audio only, never control
+                    item = outbox.popleft()
+                    if item[0] == "media":
+                        _, chunk_no, frame = item
+                        await self.__pace_frame()
+                        # Mark sparsely: Tata's mark path handles only a few
+                        # marks/s, so a mark per frame would flood it (see
+                        # RELAY_* constants). Frame 1 is always marked.
+                        if (chunk_no - 1) % self.__mark_every_n == 0:
+                            label: Optional[str] = "{}-{}".format(
+                                OWN_MARK_PREFIX.rstrip("-"), chunk_no
+                            )
+                            pending_marks[label] = asyncio.Event()
+                        else:
+                            label = None
+                        try:
+                            await provider.send_audio(
+                                tata_ws,
+                                frame,
+                                label=label,
+                                stream_sid=ctx.stream_sid,
+                                chunk=chunk_no,
+                            )
+                            stats["fwd_frames"] += 1
+                        except Exception:
+                            if label is not None:
+                                pending_marks.pop(label, None)
+                            raise
+                    elif item[0] == "vmark":
+                        await self.__send_tata(
                             tata_ws,
-                            frame,
-                            label=label,
-                            stream_sid=ctx.stream_sid,
-                            chunk=chunk_no,
+                            json.dumps(
+                                {
+                                    "event": "mark",
+                                    "streamSid": ctx.stream_sid,
+                                    "mark": {"name": item[1]},
+                                }
+                            ),
+                            ctx.call_sid,
                         )
-                        stats["fwd_frames"] += 1
-                    except Exception:
-                        if label is not None:
-                            pending_marks.pop(label, None)
-                        raise
+                    elif item[0] == "clear":
+                        await provider.send_clear(
+                            tata_ws, stream_sid=ctx.stream_sid
+                        )
+                        self.__logger.info(
+                            "[VOICEAI][RELAY] clear forwarded sid={}".format(
+                                ctx.call_sid
+                            )
+                        )
                 if finished and not outbox:
                     break
                 try:
