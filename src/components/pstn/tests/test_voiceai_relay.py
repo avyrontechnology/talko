@@ -340,3 +340,40 @@ class TestRealtimePacing:
         # frame 1 sent, stale frame 2 dropped by the clear, fresh frame 3 sent
         assert [m["media"]["chunk"] for m in _tata_medias(tata)] == [1, 3]
         assert any(m["event"] == "clear" for m in tata.sent)
+
+    @pytest.mark.asyncio
+    async def test_send_rate_capped_at_realtime_despite_fast_acks(self):
+        """Even with instant acks and a huge window, frames must leave at
+        ~50/s realtime — the pacer (not Tata's ack speed) sets the rate, so
+        Tata's playout gets a steady stream instead of bursts."""
+        import time
+
+        agent_audio = base64.b64encode(b"\xee" * 960).decode()  # 6 frames
+        vws = FakeVoiceaiSocket(
+            [json.dumps({"event": "media", "streamSid": "MZ123", "media": {"payload": agent_audio}})],
+        )
+        tata = FakeTataWs()
+        relay = make_relay(vws, max_pending_marks=50, ack_wait_seconds=5)
+        start = {"event": "start", "start": {}}
+
+        async def tata_acks_instantly():
+            acked = set()
+            for _ in range(1000):
+                for name in _own_mark_names(tata):
+                    if name not in acked:
+                        acked.add(name)
+                        yield _ack(name)
+                if len(_tata_medias(tata)) >= 6:
+                    break
+                await asyncio.sleep(0.005)
+            yield json.dumps({"event": "stop", "streamSid": "MZ123"})
+
+        t0 = time.monotonic()
+        await asyncio.wait_for(
+            relay.run(tata, TalkoTataTeleProvider(), make_ctx(), start, tata_acks_instantly(), "agent_1"),
+            timeout=15,
+        )
+        elapsed = time.monotonic() - t0
+        assert [m["media"]["chunk"] for m in _tata_medias(tata)] == [1, 2, 3, 4, 5, 6]
+        # first frame immediate + 5 paced intervals of 20 ms (slop allowed)
+        assert elapsed >= 0.09, "frames burst out without realtime pacing ({:.3f}s)".format(elapsed)

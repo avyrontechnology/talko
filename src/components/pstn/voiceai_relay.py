@@ -28,6 +28,7 @@ v1 limitations (documented, not silent):
 import asyncio
 import collections
 import json
+import time
 from typing import Any, Awaitable, Callable, Deque, Dict, Optional, Set, Tuple
 
 import aiohttp
@@ -36,7 +37,6 @@ import httpx
 from src.components.pstn.dto import TalkoCallContext
 from src.components.pstn.providers.base import TalkoAbstractPSTNProvider
 from src.components.pstn.voiceai_events import forward_to_voiceai, parse_from_voiceai
-from src.core.redis_constants import ACK_WAIT_SECONDS, MAX_PENDING_MARKS
 
 VOICEAI_AGENT_ID_KEY = "voiceai_agent_id"
 SEND_TIMEOUT_SECONDS = 5.0
@@ -49,8 +49,28 @@ OWN_MARK_PREFIX = "voiceai-chunk-"
 # (hundreds of ms of audio); forwarding those 1:1 breaks Tata's playout
 # (buffer bloat, growing ack lag, garbled/silent audio), so split them here.
 # Short final frames are padded with μ-law silence (0xFF).
+# Tata's audio contract (see TalkoAbstractPSTNProvider): exactly 160 bytes of
+# μ-law 8kHz per media event (20 ms). voiceai emits larger per-message blobs
+# (hundreds of ms of audio); forwarding those 1:1 breaks Tata's playout
+# (buffer bloat, growing ack lag, garbled/silent audio), so split them here.
+# Short final frames are padded with μ-law silence (0xFF).
 TATA_FRAME_BYTES = 160
 _MULAW_SILENCE = b"\xff"
+# Outbound pacing toward Tata (relay-specific; the LiveKit path in
+# services.py uses MAX_PENDING_MARKS=8 because its audio already arrives at
+# realtime rate so the window never binds).
+#
+# The engine emits replies up to ~4x realtime while Tata acks each mark
+# ~0.7 s after receipt. An 8-frame ack window then caps throughput at
+# ~12 frames/s against the 50/s Tata plays — chronic playout starvation
+# (caller hears silence although every mark gets acked). So:
+# - send at most 1 frame per 20 ms (realtime rate cap), and
+# - keep up to ~1 s of audio in flight (50 frames) so a 0.7 s ack latency
+#   never throttles the rate; the window is pure backpressure for a truly
+#   stalled Tata leg.
+RELAY_MAX_PENDING_MARKS = 50
+RELAY_FRAME_INTERVAL_SECONDS = 0.02
+RELAY_ACK_WAIT_SECONDS = 2.0
 
 
 def _split_frames(payload: bytes):
@@ -79,8 +99,9 @@ class TalkoVoiceaiRelay:
         connect_timeout_seconds: float = 15.0,
         ticket_provider: Optional[Callable[[], Awaitable[str]]] = None,
         ws_connector: Optional[Callable[[str], Awaitable[Any]]] = None,
-        max_pending_marks: int = MAX_PENDING_MARKS,
-        ack_wait_seconds: float = ACK_WAIT_SECONDS,
+        max_pending_marks: int = RELAY_MAX_PENDING_MARKS,
+        ack_wait_seconds: float = RELAY_ACK_WAIT_SECONDS,
+        frame_interval_seconds: float = RELAY_FRAME_INTERVAL_SECONDS,
     ) -> None:
         self.__ws_base_url = ws_base_url.rstrip("/")
         self.__api_base_url = api_base_url.rstrip("/")
@@ -90,11 +111,13 @@ class TalkoVoiceaiRelay:
         self.__connect_timeout = connect_timeout_seconds
         self.__ticket_provider = ticket_provider or self.__mint_ticket
         self.__ws_connector = ws_connector or self.__connect_socket
-        # Realtime pacing window (mirrors the LiveKit path in services.py):
-        # at most this many 20ms frames in flight toward Tata; the pump
-        # waits for the oldest ack before sending more.
+        # Realtime pacing (see RELAY_* constants above): the frame interval
+        # caps the send rate at 50/s; the ack window only backpressures a
+        # genuinely stalled Tata leg and must NOT be the rate limiter.
         self.__max_pending_marks = max(1, max_pending_marks)
         self.__ack_wait_seconds = ack_wait_seconds
+        self.__frame_interval = frame_interval_seconds
+        self.__next_send_ts = 0.0
 
     # ── setup helpers ────────────────────────────────────────────────
 
@@ -307,7 +330,7 @@ class TalkoVoiceaiRelay:
             return chunk
 
         async def sender() -> None:
-            """Outbox -> Tata, paced by Tata's ack window (realtime rate)."""
+            """Outbox -> Tata at realtime rate, ack window as backpressure."""
             nonlocal send_failed
             while True:
                 wake.clear()
@@ -315,6 +338,7 @@ class TalkoVoiceaiRelay:
                 # can interleave and get lost.
                 while outbox and len(pending_marks) < self.__max_pending_marks:
                     chunk_no, frame = outbox.popleft()
+                    await self.__pace_frame()
                     label = "{}-{}".format(OWN_MARK_PREFIX.rstrip("-"), chunk_no)
                     pending_marks[label] = asyncio.Event()
                     try:
@@ -376,6 +400,21 @@ class TalkoVoiceaiRelay:
                 await tata_ws.close()
             except Exception:
                 pass
+
+    async def __pace_frame(self) -> None:
+        """Cap outbound audio at realtime rate (1 frame per 20 ms).
+
+        The engine emits bursts; Tata plays 50 frames/s. Without this cap
+        the ack window alone sets the rate (window/latency ≈ 12/s observed),
+        starving Tata's playout. Re-anchored every frame so wake-ups and
+        ack waits can't accumulate drift.
+        """
+        now = time.monotonic()
+        delay = self.__next_send_ts - now
+        if delay > 0:
+            await asyncio.sleep(delay)
+            now = time.monotonic()
+        self.__next_send_ts = now + self.__frame_interval
 
     async def __wait_for_mark(self, voiceai_marks: Set[str], label: str) -> None:
         """Brief grace period for the pump to register voiceai's mark."""
