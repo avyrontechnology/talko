@@ -26,6 +26,7 @@ v1 limitations (documented, not silent):
 """
 
 import asyncio
+import audioop
 import collections
 import json
 import time
@@ -44,11 +45,6 @@ SEND_TIMEOUT_SECONDS = 5.0
 # Acks carrying this prefix are consumed immediately WITHOUT the grace wait:
 # waiting 200ms on every one of Tata's ~50 acks/sec would stall inbound audio.
 OWN_MARK_PREFIX = "voiceai-chunk-"
-# Tata's audio contract (see TalkoAbstractPSTNProvider): exactly 160 bytes of
-# μ-law 8kHz per media event (20 ms). voiceai emits larger per-message blobs
-# (hundreds of ms of audio); forwarding those 1:1 breaks Tata's playout
-# (buffer bloat, growing ack lag, garbled/silent audio), so split them here.
-# Short final frames are padded with μ-law silence (0xFF).
 # Tata's audio contract (see TalkoAbstractPSTNProvider): exactly 160 bytes of
 # μ-law 8kHz per media event (20 ms). voiceai emits larger per-message blobs
 # (hundreds of ms of audio); forwarding those 1:1 breaks Tata's playout
@@ -84,6 +80,21 @@ def _split_frames(payload: bytes):
         if len(frame) < TATA_FRAME_BYTES:
             frame += _MULAW_SILENCE * (TATA_FRAME_BYTES - len(frame))
         yield frame
+
+
+def _mulaw_rms(payload: bytes) -> int:
+    """RMS energy of μ-law bytes on the 16-bit scale (0 = digital silence).
+
+    TEMP DEBUG for the silent-reply investigation: speech typically measures
+    in the hundreds–thousands; a stream of ~0s means the engine is sending
+    silence, not that Tata is dropping audio.
+    """
+    if not payload:
+        return 0
+    try:
+        return audioop.rms(audioop.ulaw2lin(payload, 2), 2)
+    except Exception:
+        return -1
 
 
 class TalkoVoiceaiRelay:
@@ -176,6 +187,7 @@ class TalkoVoiceaiRelay:
         # Set when the Tata leg ended on its own (stop event) so the pump
         # doesn't redundantly close an already-dead Tata socket.
         tata_ended = False
+        pump_stats: Dict[str, Any] = {}
         try:
             await self.__send_voiceai(vws, json.dumps(start_event), sid)
             pump = asyncio.create_task(
@@ -237,13 +249,27 @@ class TalkoVoiceaiRelay:
                     await vws.close()
                 except Exception:
                     pass
-                await pump
+                try:
+                    pump_stats = await pump
+                except Exception:
+                    pump_stats = {}
         finally:
             try:
                 await vws.close()
             except Exception:
                 pass
-            self.__logger.info("[VOICEAI][RELAY] Ended sid={}".format(sid))
+            # TEMP DEBUG (silent-reply investigation): per-call audio flow —
+            # voiceai_msgs/bytes + rms_* describe what the engine sent
+            # (rms ~0 ⇒ engine sent silence); fwd_frames what Tata got.
+            msgs = (pump_stats or {}).get("voiceai_msgs", 0)
+            avg_rms = (
+                (pump_stats or {}).get("rms_sum", 0) / msgs if msgs else 0
+            )
+            self.__logger.info(
+                "[VOICEAI][RELAY] Ended sid={} stats={} avg_rms={:.0f}".format(
+                    sid, pump_stats, avg_rms
+                )
+            )
 
     # ── pumps ────────────────────────────────────────────────────────
     #
@@ -264,11 +290,26 @@ class TalkoVoiceaiRelay:
         pending_marks: Dict[str, asyncio.Event],
         wake: asyncio.Event,
         tata_ended: Callable[[], bool],
-    ) -> None:
-        """Forward agent audio / marks / clears to Tata. Ends on WS close."""
+    ) -> Dict[str, Any]:
+        """Forward agent audio / marks / clears to Tata. Ends on WS close.
+
+        Returns TEMP DEBUG audio-flow stats (see ``stats`` below), logged by
+        the caller in the Ended summary.
+        """
         outbox: Deque[Tuple[int, bytes]] = collections.deque()
         finished = False  # reader drained the voiceai socket (nonlocal below)
         send_failed = False
+        # TEMP DEBUG (silent-reply investigation): audio flow counters + RMS
+        # energy of what voiceai actually sent. Logged in the Ended summary.
+        stats = {
+            "voiceai_msgs": 0,
+            "voiceai_bytes": 0,
+            "rms_min": None,
+            "rms_max": 0,
+            "rms_sum": 0,
+            "fwd_frames": 0,
+            "dropped_on_clear": 0,
+        }
 
         async def reader() -> int:
             """voiceai socket -> outbox. Returns next chunk number to use."""
@@ -289,6 +330,13 @@ class TalkoVoiceaiRelay:
                         break
                     kind, payload = parse_from_voiceai(data)
                     if kind == "media":
+                        rms = _mulaw_rms(payload)
+                        stats["voiceai_msgs"] += 1
+                        stats["voiceai_bytes"] += len(payload)
+                        stats["rms_sum"] += rms
+                        stats["rms_max"] = max(stats["rms_max"], rms)
+                        if stats["rms_min"] is None or rms < stats["rms_min"]:
+                            stats["rms_min"] = rms
                         for frame in _split_frames(payload):
                             chunk += 1
                             outbox.append((chunk, frame))
@@ -312,6 +360,7 @@ class TalkoVoiceaiRelay:
                         # release pacing slots whose acks will never arrive.
                         dropped = len(outbox)
                         outbox.clear()
+                        stats["dropped_on_clear"] += dropped
                         for ev in pending_marks.values():
                             ev.set()
                         pending_marks.clear()
@@ -349,6 +398,7 @@ class TalkoVoiceaiRelay:
                             stream_sid=ctx.stream_sid,
                             chunk=chunk_no,
                         )
+                        stats["fwd_frames"] += 1
                     except Exception:
                         pending_marks.pop(label, None)
                         raise
@@ -400,6 +450,7 @@ class TalkoVoiceaiRelay:
                 await tata_ws.close()
             except Exception:
                 pass
+        return stats
 
     async def __pace_frame(self) -> None:
         """Cap outbound audio at realtime rate (1 frame per 20 ms).
