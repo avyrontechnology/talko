@@ -294,8 +294,8 @@ class TalkoVoiceaiRelay:
     # adjacent to the audio it brackets — exactly like a Twilio-native
     # endpoint — instead of a pre-mark seconds ahead of its (paced) audio.
     #
-    # Outbox item shapes: ("media", chunk_no, frame_bytes),
-    # ("vmark", mark_name), ("clear",).
+    # Outbox item shapes: ("media", chunk_no, frame_bytes), ("clear",).
+    # (Voiceai turn marks are acked locally, never queued — see reader.)
 
     async def __pump_voiceai_to_tata(
         self,
@@ -375,13 +375,28 @@ class TalkoVoiceaiRelay:
                             outbox.append(("media", chunk, frame))
                         wake.set()
                     elif kind == "mark":
-                        # Registered now (so early acks grace-wait
-                        # successfully) but forwarded in order by the sender —
-                        # Tata sees each mark adjacent to the audio it
-                        # brackets, like a Twilio-native endpoint.
-                        voiceai_marks.add(payload)
-                        outbox.append(("vmark", payload))
-                        wake.set()
+                        # TEMP DEBUG (silent-reply diagnosis): do NOT forward
+                        # voiceai's turn-boundary marks to Tata — ack them
+                        # locally instead. Tata's docs frame marks as
+                        # end-of-input signaling; if its gateway gates
+                        # playout on turn marks, the greeting's post-mark
+                        # would arm "turn over" and mute all replies while
+                        # acks keep flowing — exactly our symptom. Holler
+                        # sends no turn marks (chunk marks only) and plays
+                        # fine, so Tata here sees holler-shaped traffic.
+                        # Engine tracking stays green via the instant local
+                        # ack (delay≈0, which the engine already tolerates).
+                        await self.__send_voiceai(
+                            vws,
+                            json.dumps(
+                                {
+                                    "event": "mark",
+                                    "streamSid": ctx.stream_sid,
+                                    "mark": {"name": payload},
+                                }
+                            ),
+                            ctx.call_sid,
+                        )
                     elif kind == "clear":
                         # Barge-in: release pacing slots at once (their acks
                         # will never arrive) and drop queued-but-unsent items
@@ -452,18 +467,6 @@ class TalkoVoiceaiRelay:
                             if label is not None:
                                 pending_marks.pop(label, None)
                             raise
-                    elif item[0] == "vmark":
-                        await self.__send_tata(
-                            tata_ws,
-                            json.dumps(
-                                {
-                                    "event": "mark",
-                                    "streamSid": ctx.stream_sid,
-                                    "mark": {"name": item[1]},
-                                }
-                            ),
-                            ctx.call_sid,
-                        )
                     elif item[0] == "clear":
                         await provider.send_clear(
                             tata_ws, stream_sid=ctx.stream_sid

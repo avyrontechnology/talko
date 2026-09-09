@@ -110,11 +110,13 @@ def make_relay(vws, ticket="tick", **kwargs):
 class TestVoiceaiRelayOutbound:
     @pytest.mark.asyncio
     async def test_full_call_flow(self):
-        """Tata start+media+mark-ack+stop; voiceai media+mark.
+        """Tata start+media+stop; voiceai media+mark.
 
-        Asserts translation both ways incl. timestamp injection, mark-name
-        preservation, and stop forwarding. (Barge-in clear semantics live in
-        TestRealtimePacing: a clear actively drops queued-but-unsent audio.)
+        Asserts translation both ways incl. timestamp injection and stop
+        forwarding. Voiceai turn marks are acked LOCALLY (never forwarded
+        to Tata — Tata sees holler-shaped media+sparse-mark traffic only),
+        so a Tata-side ack of the voiceai mark name must NOT route back.
+        (Barge-in clear semantics live in TestRealtimePacing.)
         """
         agent_audio = base64.b64encode(b"\xaa" * 160).decode()
         vws = FakeVoiceaiSocket(
@@ -141,7 +143,6 @@ class TestVoiceaiRelayOutbound:
         frames = [
             tata_media(1),
             tata_media(2),
-            json.dumps({"event": "mark", "streamSid": "MZ123", "mark": {"name": "m-uuid-1"}}),
             json.dumps({"event": "stop", "streamSid": "MZ123", "stop": {"reason": "hangup"}}),
         ]
         await relay.run(tata, TalkoTataTeleProvider(), make_ctx(), start, fake_raw_events(frames), "agent_1")
@@ -152,9 +153,9 @@ class TestVoiceaiRelayOutbound:
         assert first["start"]["callSid"] == "CA123"
         medias = [m for m in vws.sent if m["event"] == "media"]
         assert [m["media"]["timestamp"] for m in medias] == [20, 40]
-        # voiceai's own mark ack routed back to it
+        # voiceai's own mark acked locally with the same name
         assert {"event": "mark", "streamSid": "MZ123", "mark": {"name": "m-uuid-1"}} in vws.sent
-        assert vws.sent[-1]["event"] == "stop"
+        assert any(m["event"] == "stop" for m in vws.sent)
         assert vws.closed
 
         # ── voiceai -> Tata ──
@@ -164,7 +165,10 @@ class TestVoiceaiRelayOutbound:
         assert tata_medias[0]["media"]["chunk"] == 1
         assert base64.b64decode(tata_medias[0]["media"]["payload"]) == b"\xaa" * 160
         tata_marks = [m["mark"]["name"] for m in tata.sent if m["event"] == "mark"]
-        assert "m-uuid-1" in tata_marks  # voiceai mark name preserved verbatim
+        # voiceai turn marks never reach Tata (local-ack only); only the
+        # relay's own sparse pacing mark for frame 1 goes out
+        assert "m-uuid-1" not in tata_marks
+        assert tata_marks == ["voiceai-chunk-1"]
         assert not tata.closed  # Tata ended the call itself via stop
 
     @pytest.mark.asyncio
