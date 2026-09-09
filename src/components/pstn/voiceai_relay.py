@@ -26,8 +26,9 @@ v1 limitations (documented, not silent):
 """
 
 import asyncio
+import collections
 import json
-from typing import Any, Awaitable, Callable, Dict, Optional, Set
+from typing import Any, Awaitable, Callable, Deque, Dict, Optional, Set, Tuple
 
 import aiohttp
 import httpx
@@ -35,6 +36,7 @@ import httpx
 from src.components.pstn.dto import TalkoCallContext
 from src.components.pstn.providers.base import TalkoAbstractPSTNProvider
 from src.components.pstn.voiceai_events import forward_to_voiceai, parse_from_voiceai
+from src.core.redis_constants import ACK_WAIT_SECONDS, MAX_PENDING_MARKS
 
 VOICEAI_AGENT_ID_KEY = "voiceai_agent_id"
 SEND_TIMEOUT_SECONDS = 5.0
@@ -77,6 +79,8 @@ class TalkoVoiceaiRelay:
         connect_timeout_seconds: float = 15.0,
         ticket_provider: Optional[Callable[[], Awaitable[str]]] = None,
         ws_connector: Optional[Callable[[str], Awaitable[Any]]] = None,
+        max_pending_marks: int = MAX_PENDING_MARKS,
+        ack_wait_seconds: float = ACK_WAIT_SECONDS,
     ) -> None:
         self.__ws_base_url = ws_base_url.rstrip("/")
         self.__api_base_url = api_base_url.rstrip("/")
@@ -86,6 +90,11 @@ class TalkoVoiceaiRelay:
         self.__connect_timeout = connect_timeout_seconds
         self.__ticket_provider = ticket_provider or self.__mint_ticket
         self.__ws_connector = ws_connector or self.__connect_socket
+        # Realtime pacing window (mirrors the LiveKit path in services.py):
+        # at most this many 20ms frames in flight toward Tata; the pump
+        # waits for the oldest ack before sending more.
+        self.__max_pending_marks = max(1, max_pending_marks)
+        self.__ack_wait_seconds = ack_wait_seconds
 
     # ── setup helpers ────────────────────────────────────────────────
 
@@ -134,6 +143,13 @@ class TalkoVoiceaiRelay:
         # pump, read by the inbound loop to route acks back to voiceai.
         # Set add/contains are GIL-atomic; ack routing is best-effort.
         voiceai_marks: Set[str] = set()
+        # In-flight per-frame marks of our own (label -> ack event), in send
+        # order. Bounds how far ahead of Tata's playout the pump may run —
+        # without this the engine's bursts pile up in Tata's buffer and the
+        # caller hears nothing (or everything minutes late).
+        pending_marks: Dict[str, asyncio.Event] = {}
+        # Wakes the pump's sender the moment an ack frees a pacing slot.
+        pacing_wake = asyncio.Event()
         # Set when the Tata leg ended on its own (stop event) so the pump
         # doesn't redundantly close an already-dead Tata socket.
         tata_ended = False
@@ -141,7 +157,14 @@ class TalkoVoiceaiRelay:
             await self.__send_voiceai(vws, json.dumps(start_event), sid)
             pump = asyncio.create_task(
                 self.__pump_voiceai_to_tata(
-                    vws, tata_ws, provider, ctx, voiceai_marks, lambda: tata_ended
+                    vws,
+                    tata_ws,
+                    provider,
+                    ctx,
+                    voiceai_marks,
+                    pending_marks,
+                    pacing_wake,
+                    lambda: tata_ended,
                 ),
                 name="voiceai_out_{}".format(sid),
             )
@@ -163,8 +186,13 @@ class TalkoVoiceaiRelay:
                     if provider.is_mark_ack(event):
                         label = provider.get_mark_label(event)
                         if label.startswith(OWN_MARK_PREFIX):
-                            # Ack for our own per-chunk mark — consume
-                            # immediately; never grace-wait these (50/sec).
+                            # Ack for our own per-chunk mark — release the
+                            # pacing slot and wake the sender; never
+                            # grace-wait these (50/sec).
+                            ev = pending_marks.pop(label, None)
+                            if ev is not None:
+                                ev.set()
+                            pacing_wake.set()
                             continue
                         if label not in voiceai_marks:
                             # The pump may not have registered voiceai's mark
@@ -195,6 +223,13 @@ class TalkoVoiceaiRelay:
             self.__logger.info("[VOICEAI][RELAY] Ended sid={}".format(sid))
 
     # ── pumps ────────────────────────────────────────────────────────
+    #
+    # Reader and sender run as separate tasks sharing an outbox queue.
+    # Split deliberately: the sender blocks on Tata's ack window (realtime
+    # pacing), but voiceai control messages — especially barge-in ``clear``
+    # — must be honoured immediately even when the window is full. A single
+    # task would stall behind a full window and process the clear seconds
+    # late, after Tata already buffered (and then wipes) the reply.
 
     async def __pump_voiceai_to_tata(
         self,
@@ -203,64 +238,144 @@ class TalkoVoiceaiRelay:
         provider: TalkoAbstractPSTNProvider,
         ctx: TalkoCallContext,
         voiceai_marks: Set[str],
+        pending_marks: Dict[str, asyncio.Event],
+        wake: asyncio.Event,
         tata_ended: Callable[[], bool],
     ) -> None:
         """Forward agent audio / marks / clears to Tata. Ends on WS close."""
-        chunk = 0
-        stream_sid = ctx.stream_sid
-        sid = ctx.call_sid
-        while True:
+        outbox: Deque[Tuple[int, bytes]] = collections.deque()
+        finished = False  # reader drained the voiceai socket (nonlocal below)
+        send_failed = False
+
+        async def reader() -> int:
+            """voiceai socket -> outbox. Returns next chunk number to use."""
+            nonlocal finished
+            chunk = 0
             try:
-                data = await vws.receive_str()
-            except Exception as e:
-                self.__logger.warning(
-                    "[VOICEAI][RELAY] voiceai recv failed sid={}: {}".format(sid, e)
-                )
-                break
-            if data is None:
-                if not tata_ended():
-                    # voiceai closed first (agent hangup) — end the Tata leg.
-                    self.__logger.info(
-                        "[VOICEAI][RELAY] voiceai socket closed sid={} — "
-                        "closing Tata leg".format(sid)
-                    )
+                while True:
                     try:
-                        await tata_ws.close()
-                    except Exception:
-                        pass
-                break
-            kind, payload = parse_from_voiceai(data)
-            try:
-                if kind == "media":
-                    for frame in _split_frames(payload):
-                        chunk += 1
+                        data = await vws.receive_str()
+                    except Exception as e:
+                        self.__logger.warning(
+                            "[VOICEAI][RELAY] voiceai recv failed sid={}: {}".format(
+                                ctx.call_sid, e
+                            )
+                        )
+                        break
+                    if data is None:
+                        break
+                    kind, payload = parse_from_voiceai(data)
+                    if kind == "media":
+                        for frame in _split_frames(payload):
+                            chunk += 1
+                            outbox.append((chunk, frame))
+                        wake.set()
+                    elif kind == "mark":
+                        voiceai_marks.add(payload)
+                        await self.__send_tata(
+                            tata_ws,
+                            json.dumps(
+                                {
+                                    "event": "mark",
+                                    "streamSid": ctx.stream_sid,
+                                    "mark": {"name": payload},
+                                }
+                            ),
+                            ctx.call_sid,
+                        )
+                    elif kind == "clear":
+                        # Barge-in: Tata wipes its playout buffer, so drop
+                        # anything queued-but-unsent (stale reply tail) and
+                        # release pacing slots whose acks will never arrive.
+                        dropped = len(outbox)
+                        outbox.clear()
+                        for ev in pending_marks.values():
+                            ev.set()
+                        pending_marks.clear()
+                        await provider.send_clear(
+                            tata_ws, stream_sid=ctx.stream_sid
+                        )
+                        self.__logger.info(
+                            "[VOICEAI][RELAY] clear forwarded sid={} dropped_queued={}".format(
+                                ctx.call_sid, dropped
+                            )
+                        )
+                        wake.set()
+            finally:
+                finished = True
+                wake.set()
+            return chunk
+
+        async def sender() -> None:
+            """Outbox -> Tata, paced by Tata's ack window (realtime rate)."""
+            nonlocal send_failed
+            while True:
+                wake.clear()
+                # No await between clear() and these checks, so no wake-up
+                # can interleave and get lost.
+                while outbox and len(pending_marks) < self.__max_pending_marks:
+                    chunk_no, frame = outbox.popleft()
+                    label = "{}-{}".format(OWN_MARK_PREFIX.rstrip("-"), chunk_no)
+                    pending_marks[label] = asyncio.Event()
+                    try:
                         await provider.send_audio(
                             tata_ws,
                             frame,
-                            label="{}-{}".format(OWN_MARK_PREFIX.rstrip("-"), chunk),
-                            stream_sid=stream_sid,
-                            chunk=chunk,
+                            label=label,
+                            stream_sid=ctx.stream_sid,
+                            chunk=chunk_no,
                         )
-                elif kind == "mark":
-                    voiceai_marks.add(payload)
-                    await self.__send_tata(
-                        tata_ws,
-                        json.dumps(
-                            {
-                                "event": "mark",
-                                "streamSid": stream_sid,
-                                "mark": {"name": payload},
-                            }
-                        ),
-                        sid,
+                    except Exception:
+                        pending_marks.pop(label, None)
+                        raise
+                if finished and not outbox:
+                    break
+                try:
+                    await asyncio.wait_for(
+                        wake.wait(), timeout=self.__ack_wait_seconds
                     )
-                elif kind == "clear":
-                    await provider.send_clear(tata_ws, stream_sid=stream_sid)
-            except Exception as e:
-                self.__logger.warning(
-                    "[VOICEAI][RELAY] Tata send failed sid={}: {}".format(sid, e)
-                )
-                break
+                except asyncio.TimeoutError:
+                    pass
+                wake.clear()
+                if outbox and len(pending_marks) >= self.__max_pending_marks:
+                    # Acks for wiped/lost frames never arrive — drop the
+                    # oldest slot so one lost ack can't stall the call
+                    # (same tradeoff as the LiveKit path in services.py).
+                    oldest_label = next(iter(pending_marks))
+                    if pending_marks.pop(oldest_label, None) is not None:
+                        self.__logger.warning(
+                            "[VOICEAI][RELAY] Ack timeout label={} pending={} sid={}".format(
+                                oldest_label, len(pending_marks), ctx.call_sid
+                            )
+                        )
+
+        reader_task = asyncio.create_task(reader(), name="voiceai_in_{}".format(ctx.call_sid))
+        try:
+            await sender()
+        except Exception as e:
+            send_failed = True
+            self.__logger.warning(
+                "[VOICEAI][RELAY] Tata send failed sid={}: {}".format(ctx.call_sid, e)
+            )
+        finally:
+            if not reader_task.done():
+                reader_task.cancel()
+                try:
+                    await reader_task
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    pass
+        if not tata_ended() and not send_failed:
+            # voiceai closed first (agent hangup) — end the Tata leg.
+            self.__logger.info(
+                "[VOICEAI][RELAY] voiceai socket closed sid={} — "
+                "closing Tata leg".format(ctx.call_sid)
+            )
+            try:
+                await tata_ws.close()
+            except Exception:
+                pass
 
     async def __wait_for_mark(self, voiceai_marks: Set[str], label: str) -> None:
         """Brief grace period for the pump to register voiceai's mark."""

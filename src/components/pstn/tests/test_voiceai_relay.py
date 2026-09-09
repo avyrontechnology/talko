@@ -47,9 +47,10 @@ class FakeVoiceaiSocket:
     simulates the agent hanging up (remote close -> receive returns None).
     """
 
-    def __init__(self, inbound_frames, remote_close_when_empty=False):
+    def __init__(self, inbound_frames, remote_close_when_empty=False, deliver_delay=0.0):
         self.inbound = list(inbound_frames)
         self.remote_close_when_empty = remote_close_when_empty
+        self.deliver_delay = deliver_delay
         self.sent = []
         self.closed = False
         self.__unblocked = asyncio.Event()
@@ -58,6 +59,8 @@ class FakeVoiceaiSocket:
         self.sent.append(json.loads(data))
 
     async def receive_str(self):
+        if self.deliver_delay:
+            await asyncio.sleep(self.deliver_delay)
         if self.inbound:
             return self.inbound.pop(0)
         if self.remote_close_when_empty:
@@ -85,7 +88,7 @@ async def fake_raw_events(frames):
         yield f
 
 
-def make_relay(vws, ticket="tick"):
+def make_relay(vws, ticket="tick", **kwargs):
     async def ticket_provider():
         return ticket
 
@@ -100,24 +103,25 @@ def make_relay(vws, ticket="tick"):
         logger=MagicMock(),
         ticket_provider=ticket_provider,
         ws_connector=ws_connector,
+        **kwargs,
     )
 
 
 class TestVoiceaiRelayOutbound:
     @pytest.mark.asyncio
     async def test_full_call_flow(self):
-        """Tata start+media+mark-ack+stop; voiceai media+mark+clear.
+        """Tata start+media+mark-ack+stop; voiceai media+mark.
 
         Asserts translation both ways incl. timestamp injection, mark-name
-        preservation, and stop forwarding.
+        preservation, and stop forwarding. (Barge-in clear semantics live in
+        TestRealtimePacing: a clear actively drops queued-but-unsent audio.)
         """
         agent_audio = base64.b64encode(b"\xaa" * 160).decode()
         vws = FakeVoiceaiSocket(
             [
                 json.dumps({"event": "media", "streamSid": "MZ123", "media": {"payload": agent_audio}}),
                 json.dumps({"event": "mark", "streamSid": "MZ123", "mark": {"name": "m-uuid-1"}}),
-                json.dumps({"event": "clear", "streamSid": "MZ123"}),
-                # then socket closes (agent done) — but Tata stop ends first
+                # then socket parks (agent idle) — Tata stop ends the call
             ]
         )
         tata = FakeTataWs()
@@ -161,7 +165,6 @@ class TestVoiceaiRelayOutbound:
         assert base64.b64decode(tata_medias[0]["media"]["payload"]) == b"\xaa" * 160
         tata_marks = [m["mark"]["name"] for m in tata.sent if m["event"] == "mark"]
         assert "m-uuid-1" in tata_marks  # voiceai mark name preserved verbatim
-        assert any(m["event"] == "clear" for m in tata.sent)  # barge-in clear
         assert not tata.closed  # Tata ended the call itself via stop
 
     @pytest.mark.asyncio
@@ -245,3 +248,95 @@ class TestFrameSplitting:
         assert payloads[0] == b"\xaa" * 160
         assert payloads[1] == b"\xaa" * 160
         assert payloads[2] == b"\xaa" * 80 + b"\xff" * 80
+
+
+def _tata_medias(tata):
+    return [m for m in tata.sent if m["event"] == "media"]
+
+
+def _own_mark_names(tata):
+    return [
+        m["mark"]["name"]
+        for m in tata.sent
+        if m["event"] == "mark" and m["mark"]["name"].startswith("voiceai-chunk-")
+    ]
+
+
+def _ack(name):
+    return json.dumps({"event": "mark", "streamSid": "MZ123", "mark": {"name": name}})
+
+
+class TestRealtimePacing:
+    @pytest.mark.asyncio
+    async def test_pump_stalls_when_window_full_until_ack(self):
+        """6-frame blob with window=2: the pump must stop after 2 frames and
+        resume only as Tata acks — realtime pacing instead of bursts."""
+        agent_audio = base64.b64encode(b"\xbb" * 960).decode()
+        vws = FakeVoiceaiSocket(
+            [json.dumps({"event": "media", "streamSid": "MZ123", "media": {"payload": agent_audio}})],
+        )
+        tata = FakeTataWs()
+        relay = make_relay(vws, max_pending_marks=2, ack_wait_seconds=5)
+        start = {"event": "start", "start": {}}
+
+        async def tata_acks_paced():
+            acked = set()
+            # phase 1: window fills — prove the pump stalls with no acks
+            for _ in range(200):
+                if len(_tata_medias(tata)) >= 2:
+                    break
+                await asyncio.sleep(0.01)
+            assert len(_tata_medias(tata)) == 2
+            await asyncio.sleep(0.2)
+            assert len(_tata_medias(tata)) == 2, "pump must not burst past the ack window"
+            # phase 2: ack everything as it arrives until all 6 cross
+            for _ in range(1000):
+                for name in _own_mark_names(tata):
+                    if name not in acked:
+                        acked.add(name)
+                        yield _ack(name)
+                if len(_tata_medias(tata)) >= 6:
+                    break
+                await asyncio.sleep(0.01)
+            yield json.dumps({"event": "stop", "streamSid": "MZ123"})
+
+        await asyncio.wait_for(
+            relay.run(tata, TalkoTataTeleProvider(), make_ctx(), start, tata_acks_paced(), "agent_1"),
+            timeout=15,
+        )
+        assert [m["media"]["chunk"] for m in _tata_medias(tata)] == [1, 2, 3, 4, 5, 6]
+
+    @pytest.mark.asyncio
+    async def test_clear_releases_window_and_drops_stale_queue(self):
+        """Barge-in clear with a full window and zero acks: the reader must
+        release the pump promptly (delivery is delayed so the sender is
+        genuinely blocked when the clear lands), drop queued-but-unsent
+        stale audio, and let fresh audio after the clear through — all
+        without waiting out the 10 s ack timeout."""
+        blob2 = base64.b64encode(b"\xcc" * 320).decode()  # frames 1-2
+        blob1 = base64.b64encode(b"\xdd" * 160).decode()  # frame 3 (fresh)
+        vws = FakeVoiceaiSocket(
+            [
+                json.dumps({"event": "media", "streamSid": "MZ123", "media": {"payload": blob2}}),
+                json.dumps({"event": "clear", "streamSid": "MZ123"}),
+                json.dumps({"event": "media", "streamSid": "MZ123", "media": {"payload": blob1}}),
+            ],
+            remote_close_when_empty=True,
+            deliver_delay=0.05,
+        )
+        tata = FakeTataWs()
+        relay = make_relay(vws, max_pending_marks=1, ack_wait_seconds=10)
+        start = {"event": "start", "start": {}}
+
+        async def tata_idles_then_stops():
+            while not tata.closed:
+                await asyncio.sleep(0.01)
+            yield json.dumps({"event": "stop", "streamSid": "MZ123"})
+
+        await asyncio.wait_for(
+            relay.run(tata, TalkoTataTeleProvider(), make_ctx(), start, tata_idles_then_stops(), "agent_1"),
+            timeout=5,  # needs 10 s+ if the clear didn't release frame 1's slot
+        )
+        # frame 1 sent, stale frame 2 dropped by the clear, fresh frame 3 sent
+        assert [m["media"]["chunk"] for m in _tata_medias(tata)] == [1, 3]
+        assert any(m["event"] == "clear" for m in tata.sent)
