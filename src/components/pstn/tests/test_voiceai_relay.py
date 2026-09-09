@@ -211,3 +211,37 @@ class TestVoiceaiRelayOutbound:
             api_key="k", logger=MagicMock(),
         )
         assert relay.ws_url("a1", "t") == "wss://v.local/chat/v1/a1?token=t"
+
+
+class TestFrameSplitting:
+    @pytest.mark.asyncio
+    async def test_large_voiceai_blob_splits_into_160b_tata_frames(self):
+        """voiceai emits multi-hundred-ms audio blobs per message; Tata's
+        contract is exactly 160 B per media event. A 400 B blob must cross
+        as 3 frames (160 + 160 + 80 padded with μ-law silence), chunks 1-3."""
+        agent_audio = base64.b64encode(b"\xaa" * 400).decode()
+        vws = FakeVoiceaiSocket(
+            [json.dumps({"event": "media", "streamSid": "MZ123", "media": {"payload": agent_audio}})],
+            remote_close_when_empty=True,
+        )
+        tata = FakeTataWs()
+        relay = make_relay(vws)
+        start = {"event": "start", "start": {}}
+
+        async def tata_idles_then_stops():
+            while not tata.closed:
+                await asyncio.sleep(0.01)
+            yield json.dumps({"event": "stop", "streamSid": "MZ123"})
+
+        await asyncio.wait_for(
+            relay.run(tata, TalkoTataTeleProvider(), make_ctx(), start, tata_idles_then_stops(), "agent_1"),
+            timeout=10,
+        )
+        tata_medias = [m for m in tata.sent if m["event"] == "media"]
+        assert len(tata_medias) == 3
+        assert [m["media"]["chunk"] for m in tata_medias] == [1, 2, 3]
+        payloads = [base64.b64decode(m["media"]["payload"]) for m in tata_medias]
+        assert all(len(p) == 160 for p in payloads)
+        assert payloads[0] == b"\xaa" * 160
+        assert payloads[1] == b"\xaa" * 160
+        assert payloads[2] == b"\xaa" * 80 + b"\xff" * 80

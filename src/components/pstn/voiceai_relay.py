@@ -42,6 +42,26 @@ SEND_TIMEOUT_SECONDS = 5.0
 # Acks carrying this prefix are consumed immediately WITHOUT the grace wait:
 # waiting 200ms on every one of Tata's ~50 acks/sec would stall inbound audio.
 OWN_MARK_PREFIX = "voiceai-chunk-"
+# Tata's audio contract (see TalkoAbstractPSTNProvider): exactly 160 bytes of
+# μ-law 8kHz per media event (20 ms). voiceai emits larger per-message blobs
+# (hundreds of ms of audio); forwarding those 1:1 breaks Tata's playout
+# (buffer bloat, growing ack lag, garbled/silent audio), so split them here.
+# Short final frames are padded with μ-law silence (0xFF).
+TATA_FRAME_BYTES = 160
+_MULAW_SILENCE = b"\xff"
+
+
+def _split_frames(payload: bytes):
+    """Split one voiceai audio blob into Tata-sized 160B frames.
+
+    Yields ``bytes`` objects of exactly ``TATA_FRAME_BYTES``; a short final
+    frame is padded with μ-law silence (0xFF). Empty payloads yield nothing.
+    """
+    for offset in range(0, len(payload), TATA_FRAME_BYTES):
+        frame = payload[offset : offset + TATA_FRAME_BYTES]
+        if len(frame) < TATA_FRAME_BYTES:
+            frame += _MULAW_SILENCE * (TATA_FRAME_BYTES - len(frame))
+        yield frame
 
 
 class TalkoVoiceaiRelay:
@@ -212,14 +232,15 @@ class TalkoVoiceaiRelay:
             kind, payload = parse_from_voiceai(data)
             try:
                 if kind == "media":
-                    chunk += 1
-                    await provider.send_audio(
-                        tata_ws,
-                        payload,
-                        label="voiceai-chunk-{}".format(chunk),
-                        stream_sid=stream_sid,
-                        chunk=chunk,
-                    )
+                    for frame in _split_frames(payload):
+                        chunk += 1
+                        await provider.send_audio(
+                            tata_ws,
+                            frame,
+                            label="{}-{}".format(OWN_MARK_PREFIX.rstrip("-"), chunk),
+                            stream_sid=stream_sid,
+                            chunk=chunk,
+                        )
                 elif kind == "mark":
                     voiceai_marks.add(payload)
                     await self.__send_tata(
