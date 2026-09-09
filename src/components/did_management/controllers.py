@@ -1,11 +1,12 @@
 from typing import Any, Dict, List, Optional
 
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 
 from src.components.common.constants import TalkoCurrentUserMap
 from src.components.common.responses import (
     TalkoBadRequestResponse,
+    TalkoForbiddenPermissionResponse,
     TalkoInternalServerErrorResponse,
     TalkoSuccessResponse,
 )
@@ -18,8 +19,15 @@ from src.components.did_management.messages import (
 from src.components.did_management.services import TalkoDidManagementService
 from src.components.rbac.permission_dependency import TalkoPermissionDependency
 from src.components.rbac.permission_injector import permission_check
+from src.components.rbac.superadmin import (
+    SUPERADMIN_SCOPE_HEADER,
+    TalkoSuperadminDenied,
+    resolve_effective_partner_id,
+)
 from src.core.container import TalkoContainer
 from src.exceptions import TalkoResourceNotFound
+from src.grpc_client.constants import TalkoGrpcServices
+from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
 from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
@@ -80,12 +88,19 @@ class TalkoDIDController:
         request: Request,
         did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+        partner_scope: Optional[int] = Header(default=None, alias=SUPERADMIN_SCOPE_HEADER),
     ) -> List[TalkoContract.DIDSeriesResponse]:
         try:
             talko_service_logger.info("Fetching DIDs available to be assigned")
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            try:
+                partner_id = await resolve_effective_partner_id(
+                    request, grpc_client, talko_service_logger, partner_scope
+                )
+            except TalkoSuperadminDenied as denied:
+                return TalkoForbiddenPermissionResponse(detail=str(denied))
             talko_service_logger.info(
                 "User: {}, Partner: {}".format(user_id, partner_id)
             )
@@ -123,12 +138,19 @@ class TalkoDIDController:
         assign_did_data: TalkoContract.AssignDIDToPartner,
         did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+        partner_scope: Optional[int] = Header(default=None, alias=SUPERADMIN_SCOPE_HEADER),
     ) -> dict:
         try:
             talko_service_logger.info("DIDs received to be assigned: ")
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            try:
+                partner_id = await resolve_effective_partner_id(
+                    request, grpc_client, talko_service_logger, partner_scope
+                )
+            except TalkoSuperadminDenied as denied:
+                return TalkoForbiddenPermissionResponse(detail=str(denied))
             talko_service_logger.info(
                 "Assign DID Numbers=> User: {}, Partner: {}, Assign_did_Data: {}".format(
                     user_id, partner_id, assign_did_data
@@ -166,6 +188,7 @@ class TalkoDIDController:
         payload: TalkoContract.UnassignDIDRequest,
         did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+        partner_scope: Optional[int] = Header(default=None, alias=SUPERADMIN_SCOPE_HEADER),
     ) -> dict:
         try:
             talko_service_logger.info(
@@ -173,7 +196,13 @@ class TalkoDIDController:
             )
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
-            partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            try:
+                partner_id = await resolve_effective_partner_id(
+                    request, grpc_client, talko_service_logger, partner_scope
+                )
+            except TalkoSuperadminDenied as denied:
+                return TalkoForbiddenPermissionResponse(detail=str(denied))
             talko_service_logger.info(
                 "Unassign DID Numbers=> User: {}, Partner: {}".format(
                     user_id, partner_id

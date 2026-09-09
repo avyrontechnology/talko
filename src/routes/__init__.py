@@ -19,6 +19,7 @@ from src.components.pstn.controllers import TalkoPSTNAgentController
 from src.components.reports.daily_lead_report.daily_lead_connection import (
     router as daily_lead_connection_router,
 )
+from src.components.rbac.controllers import TalkoAuthContextController
 from src.components.vendor.controllers import TalkoVendorController
 from src.components.vendor_config.controllers import TalkoVendorConfigController
 
@@ -88,6 +89,11 @@ class TalkoRouter:
         router.include_router(
             TalkoHealthController.router,
             prefix="/health",
+        )
+        router.include_router(
+            TalkoAuthContextController.rbac_router,
+            prefix="",
+            tags=["Auth Context"],
         )
         router.include_router(
             TalkoPSTNAgentController.router,
