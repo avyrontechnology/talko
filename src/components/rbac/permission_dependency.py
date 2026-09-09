@@ -6,6 +6,7 @@ from fastapi import HTTPException, Request
 
 # from src.components.common.auth import AuthUtility
 from src.components.rbac.constants import TalkoPermissionErrorText
+from src.components.rbac.superadmin import resolve_talko_permission
 from src.core.container import TalkoContainer
 from src.core.redis import TalkoRedisCache
 from src.grpc_client.constants import TalkoGrpcServices
@@ -42,6 +43,37 @@ class TalkoPermissionDependency:
                     "API-KEY auth detected for partner_id={}. Bypassing user-permission "
                     "check for permission: {}".format(
                         current_user_details.get("partner_id"), self.permission_name
+                    )
+                )
+                return
+            # Talko-native users carry no console permissions — resolve locally
+            # from their Talko role (superadmin/maintainer/viewer). Console
+            # JWT users fall through to the gRPC check below, unchanged.
+            if current_user_details.get("is_talko_auth"):
+                try:
+                    route_name = request.scope["route"].name
+                except Exception:
+                    route_name = ""
+                allowed = resolve_talko_permission(
+                    role=current_user_details.get("user_role") or "",
+                    route_name=route_name or "",
+                    http_method=request.method,
+                    is_superadmin=bool(current_user_details.get("is_superadmin")),
+                )
+                if not allowed:
+                    logger.error(
+                        "Talko role permission denied: role={} route={} method={}".format(
+                            current_user_details.get("user_role"),
+                            route_name,
+                            request.method,
+                        )
+                    )
+                    raise HTTPException(
+                        status_code=403, detail=TalkoPermissionErrorText.PERMISSION_DENIED
+                    )
+                logger.info(
+                    "Talko role permission granted: role={} permission={}".format(
+                        current_user_details.get("user_role"), self.permission_name
                     )
                 )
                 return

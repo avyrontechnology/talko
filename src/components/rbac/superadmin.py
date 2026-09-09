@@ -16,6 +16,7 @@ from typing import Optional
 from fastapi import Request
 
 from src.components.common.constants import TalkoCurrentUserMap
+from src.components.user_auth.models import TalkoUserRole
 from src.utils.enums import TalkoUserRoleHierarchy
 
 #: Request header carrying the target partner for superadmin calls.
@@ -24,6 +25,42 @@ SUPERADMIN_SCOPE_HEADER = "X-Partner-Scope"
 
 class TalkoSuperadminDenied(PermissionError):
     """Raised when a non-superadmin requests another partner's scope."""
+
+
+#: Route function names reserved for superadmins (global catalog and
+#: cross-partner onboarding primitives). Everything else is partner-scoped
+#: by the endpoint itself, so maintainers/viewers may use it for their own
+#: scope; viewers are additionally read-only (see resolve_talko_permission).
+ADMIN_ONLY_ROUTES = frozenset(
+    {
+        "create_partner_config",
+        "create_api_key",
+        "revoke_api_key",
+        "create_vendor",
+        "activate_vendor",
+        "deactivate_vendor",
+        "create_vendor_config",
+        "update_vendor_config",
+    }
+)
+
+
+def resolve_talko_permission(
+    *, role: str, route_name: str, http_method: str, is_superadmin: bool
+) -> bool:
+    """Local permission verdict for Talko-native users (no console roles).
+
+    - superadmin: everything.
+    - viewer: safe reads only (GET).
+    - maintainer: own-scope operations except the admin-only routes above.
+    """
+    if is_superadmin or role == TalkoUserRole.SUPERADMIN:
+        return True
+    if route_name in ADMIN_ONLY_ROUTES:
+        return False
+    if role == TalkoUserRole.VIEWER and http_method.upper() != "GET":
+        return False
+    return True
 
 
 async def is_superadmin(request: Request, grpc_client, logger) -> bool:

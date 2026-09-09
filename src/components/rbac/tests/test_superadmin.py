@@ -13,6 +13,7 @@ from src.components.rbac.superadmin import (
     TalkoSuperadminDenied,
     is_superadmin,
     resolve_effective_partner_id,
+    resolve_talko_permission,
 )
 
 
@@ -113,4 +114,69 @@ class TestResolveEffectivePartnerId:
         req = make_request({"user_id": "abc", "is_superadmin": True})
         assert (
             await resolve_effective_partner_id(req, make_grpc(), make_logger(), 9) == 9
+        )
+
+
+class TestResolveTalkoPermission:
+    def test_superadmin_allows_everything(self):
+        assert (
+            resolve_talko_permission(
+                role="superadmin",
+                route_name="create_vendor",
+                http_method="POST",
+                is_superadmin=True,
+            )
+            is True
+        )
+
+    def test_maintainer_reads_and_own_scope_writes(self):
+        assert (
+            resolve_talko_permission(
+                role="maintainer",
+                route_name="get_all_vendors",
+                http_method="GET",
+                is_superadmin=False,
+            )
+            is True
+        )
+        assert (
+            resolve_talko_permission(
+                role="maintainer",
+                route_name="assign_dids_available_for_assignment",
+                http_method="POST",
+                is_superadmin=False,
+            )
+            is True
+        )
+
+    def test_maintainer_denied_admin_only_routes(self):
+        for route in ("create_partner_config", "create_api_key", "create_vendor"):
+            assert (
+                resolve_talko_permission(
+                    role="maintainer",
+                    route_name=route,
+                    http_method="POST",
+                    is_superadmin=False,
+                )
+                is False
+            )
+
+    def test_viewer_read_only(self):
+        assert (
+            resolve_talko_permission(
+                role="viewer",
+                route_name="get_all_vendors",
+                http_method="GET",
+                is_superadmin=False,
+            )
+            is True
+        )
+        assert (
+            resolve_talko_permission(
+                role="viewer",
+                route_name="get_all_vendors",
+                http_method="POST",
+                is_superadmin=False,
+            )
+            is False
         )
