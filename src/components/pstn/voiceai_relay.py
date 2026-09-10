@@ -174,8 +174,13 @@ class TalkoVoiceaiRelay:
         self.__logger.info(
             "[VOICEAI][RELAY] Starting sid={} agent={}".format(sid, voiceai_agent_id)
         )
+        # Phase-0 latency spans (monotonic ms). first_media/first_send are
+        # filled by the pump and reported in the timings line at Ended.
+        t_run = time.monotonic()
         ticket = await self.__ticket_provider()
+        t_ticket = time.monotonic()
         vws = await self.__ws_connector(self.ws_url(voiceai_agent_id, ticket))
+        t_ws = time.monotonic()
         self.__logger.info("[VOICEAI][RELAY] voiceai socket open sid={}".format(sid))
 
         # Mark names voiceai asked Tata to ack — written by the outbound
@@ -205,6 +210,7 @@ class TalkoVoiceaiRelay:
                     pending_marks,
                     pacing_wake,
                     lambda: tata_ended,
+                    t_ws,
                 ),
                 name="voiceai_out_{}".format(sid),
             )
@@ -280,6 +286,26 @@ class TalkoVoiceaiRelay:
                     sid, pump_stats, avg_rms
                 )
             )
+            # Phase-0 latency spans: every number is ms since run() entry.
+            # ticket/ws/first_media/first_send must sum to first audible
+            # audio; any span dominating points at its owner (Talko ticket /
+            # engine connect+gen / relay pacing / Tata playout).
+            first_media = (pump_stats or {}).get("first_media_ms")
+            first_send = (pump_stats or {}).get("first_send_ms")
+            self.__logger.info(
+                "[VOICEAI][RELAY] voiceai timings sid={} ticket_ms={:.0f} "
+                "ws_ms={:.0f} first_media_ms={} first_send_ms={}".format(
+                    sid,
+                    (t_ticket - t_run) * 1000,
+                    (t_ws - t_ticket) * 1000,
+                    "{:.0f}".format(first_media)
+                    if first_media is not None
+                    else "none",
+                    "{:.0f}".format(first_send)
+                    if first_send is not None
+                    else "none",
+                )
+            )
 
     # ── pumps ────────────────────────────────────────────────────────
     #
@@ -307,6 +333,7 @@ class TalkoVoiceaiRelay:
         pending_marks: Dict[str, asyncio.Event],
         wake: asyncio.Event,
         tata_ended: Callable[[], bool],
+        t_origin: float = 0.0,
     ) -> Dict[str, Any]:
         """Forward agent audio / marks / clears to Tata. Ends on WS close.
 
@@ -349,6 +376,10 @@ class TalkoVoiceaiRelay:
                     if kind == "media":
                         rms = _mulaw_rms(payload)
                         stats["voiceai_msgs"] += 1
+                        if stats["voiceai_msgs"] == 1:
+                            stats["first_media_ms"] = (
+                                time.monotonic() - t_origin
+                            ) * 1000
                         stats["voiceai_bytes"] += len(payload)
                         stats["rms_sum"] += rms
                         stats["rms_max"] = max(stats["rms_max"], rms)
@@ -463,6 +494,10 @@ class TalkoVoiceaiRelay:
                                 chunk=chunk_no,
                             )
                             stats["fwd_frames"] += 1
+                            if stats["fwd_frames"] == 1:
+                                stats["first_send_ms"] = (
+                                    time.monotonic() - t_origin
+                                ) * 1000
                         except Exception:
                             if label is not None:
                                 pending_marks.pop(label, None)

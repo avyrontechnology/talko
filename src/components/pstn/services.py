@@ -349,6 +349,33 @@ class TalkoPSTNBridgeService:
                 return str(agent_id)
         return None
 
+    async def _run_voiceai_relay(
+        self, ws, provider, ctx, event, raw_events, voiceai_agent_id: str
+    ) -> None:
+        """Run one voiceai relay leg. Shared by the Step-2 fast path (inbound
+        voiceai DIDs) and Step 4b (outbound AI-bridge after context attach).
+        Returns normally either way; the caller breaks out to cleanup."""
+        try:
+            relay = TalkoVoiceaiRelay(
+                ws_base_url=TalkoENV.VOICEAI_WS_BASE_URL,
+                api_base_url=TalkoENV.VOICEAI_API_BASE_URL,
+                api_key=TalkoENV.VOICEAI_API_KEY,
+                logger=self.__logger,
+                ticket_timeout_seconds=TalkoENV.VOICEAI_WS_TICKET_TIMEOUT_SECONDS,
+                connect_timeout_seconds=TalkoENV.VOICEAI_WS_CONNECT_TIMEOUT_SECONDS,
+            )
+            await relay.run(
+                ws, provider, ctx, event,
+                raw_events, voiceai_agent_id,
+            )
+        except Exception as e:
+            self.__logger.error(
+                "[PSTN][CALL] ❌ voiceai relay FAILED sid={} "
+                "error={} traceback={}".format(
+                    ctx.call_sid, e, traceback.format_exc()
+                )
+            )
+
     async def _attach_pending_context(
         self, ctx: TalkoCallContext, event: Dict[str, Any]
     ) -> TalkoCallContext:
@@ -877,6 +904,48 @@ class TalkoPSTNBridgeService:
                             )
                         )
 
+                        # ── Fast path: inbound voiceai DIDs skip Steps 3-4 ──
+                        #
+                        # Everything Steps 3-4 do (room selection, pending
+                        # context attach, makun-ai session) is for the LiveKit
+                        # path. An inbound call to a voiceai-mapped DID needs
+                        # none of it: agent resolves from the DID map and the
+                        # relay needs only ws/provider/ctx/event. Outbound
+                        # AI-bridge calls still go through Steps 3-4 (their
+                        # agent id arrives via pending context attach) and hit
+                        # the shared relay at Step 4b below.
+                        # ─────────────────────────────────────────────────────
+                        start_dir = (event.get("start", {}) or {}).get(
+                            "direction", "inbound"
+                        )
+                        fast_voiceai_agent = (
+                            self._resolve_voiceai_agent_id_for_did(ctx.did_number)
+                            if start_dir != "outbound"
+                            else None
+                        )
+                        if fast_voiceai_agent and self._voiceai_configured():
+                            self.__logger.info(
+                                "[PSTN][CALL] Fast path: inbound voiceai sid={} "
+                                "agent={} — skipping Steps 3-4".format(
+                                    ctx.call_sid, fast_voiceai_agent
+                                )
+                            )
+                            # Preserve what _attach_pending_context would have
+                            # set and cleanup/observability may read (the call
+                            # has no pending context on the inbound leg).
+                            start_obj = event.get("start", {}) or {}
+                            ctx.vendor_call_id = (
+                                start_obj.get("callSid")
+                                or start_obj.get("callId")
+                                or start_obj.get("callid")
+                                or ctx.call_sid
+                            )
+                            await self._run_voiceai_relay(
+                                ws, provider, ctx, event,
+                                raw_events, fast_voiceai_agent,
+                            )
+                            break
+
                         # ── Step 3: Room selection ────────────────────────────
                         #
                         # For outbound AI-bridge calls, TalkoCallService._pre_create_session
@@ -1051,26 +1120,10 @@ class TalkoPSTNBridgeService:
                                     ctx.call_sid, voiceai_agent_id
                                 )
                             )
-                            try:
-                                relay = TalkoVoiceaiRelay(
-                                    ws_base_url=TalkoENV.VOICEAI_WS_BASE_URL,
-                                    api_base_url=TalkoENV.VOICEAI_API_BASE_URL,
-                                    api_key=TalkoENV.VOICEAI_API_KEY,
-                                    logger=self.__logger,
-                                    ticket_timeout_seconds=TalkoENV.VOICEAI_WS_TICKET_TIMEOUT_SECONDS,
-                                    connect_timeout_seconds=TalkoENV.VOICEAI_WS_CONNECT_TIMEOUT_SECONDS,
-                                )
-                                await relay.run(
-                                    ws, provider, ctx, event,
-                                    raw_events, voiceai_agent_id,
-                                )
-                            except Exception as e:
-                                self.__logger.error(
-                                    "[PSTN][CALL] ❌ voiceai relay FAILED sid={} "
-                                    "error={} traceback={}".format(
-                                        ctx.call_sid, e, traceback.format_exc()
-                                    )
-                                )
+                            await self._run_voiceai_relay(
+                                ws, provider, ctx, event,
+                                raw_events, voiceai_agent_id,
+                            )
                             break
 
                         # ── Step 5: LiveKit connect ───────────────────────────

@@ -88,7 +88,7 @@ async def fake_raw_events(frames):
         yield f
 
 
-def make_relay(vws, ticket="tick", **kwargs):
+def make_relay(vws, ticket="tick", logger=None, **kwargs):
     async def ticket_provider():
         return ticket
 
@@ -100,7 +100,7 @@ def make_relay(vws, ticket="tick", **kwargs):
         ws_base_url="wss://voiceai.local",
         api_base_url="https://voiceai.local",
         api_key="key",
-        logger=MagicMock(),
+        logger=logger or MagicMock(),
         ticket_provider=ticket_provider,
         ws_connector=ws_connector,
         **kwargs,
@@ -406,3 +406,34 @@ class TestRealtimePacing:
         )
         assert [m["media"]["chunk"] for m in _tata_medias(tata)] == list(range(1, 61))
         assert _own_mark_names(tata) == ["voiceai-chunk-1", "voiceai-chunk-51"]
+
+
+class TestLatencySpans:
+    @pytest.mark.asyncio
+    async def test_timings_line_logged_with_spans(self):
+        """Phase-0 instrumentation: Ended is followed by a machine-readable
+        timings line carrying every span (ms since run entry)."""
+        agent_audio = base64.b64encode(b"\xaa" * 160).decode()
+        vws = FakeVoiceaiSocket(
+            [json.dumps({"event": "media", "streamSid": "MZ123", "media": {"payload": agent_audio}})],
+            remote_close_when_empty=True,
+        )
+        tata = FakeTataWs()
+        logger = MagicMock()
+        relay = make_relay(vws, logger=logger)
+        start = {"event": "start", "start": {}}
+
+        async def tata_idles_then_stops():
+            while not tata.closed:
+                await asyncio.sleep(0.01)
+            yield json.dumps({"event": "stop", "streamSid": "MZ123"})
+
+        await asyncio.wait_for(
+            relay.run(tata, TalkoTataTeleProvider(), make_ctx(), start, tata_idles_then_stops(), "agent_1"),
+            timeout=10,
+        )
+        lines = [" ".join(str(c) for c in call.args) for call in logger.info.call_args_list]
+        timings = [line for line in lines if "voiceai timings" in line]
+        assert len(timings) == 1
+        for span in ("ticket_ms=", "ws_ms=", "first_media_ms=", "first_send_ms="):
+            assert span in timings[0]
