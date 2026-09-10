@@ -437,3 +437,14 @@ class TestLatencySpans:
         assert len(timings) == 1
         for span in ("ticket_ms=", "ws_ms=", "first_media_ms=", "first_send_ms="):
             assert span in timings[0]
+
+
+class TestPooledHttpClient:
+    @pytest.mark.asyncio
+    async def test_same_loop_reuses_client(self):
+        from src.components.pstn.voiceai_relay import _pooled_http_client
+
+        first = await _pooled_http_client(10.0)
+        second = await _pooled_http_client(10.0)
+        assert first is second
+        await first.aclose()

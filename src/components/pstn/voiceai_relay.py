@@ -51,6 +51,30 @@ OWN_MARK_PREFIX = "voiceai-chunk-"
 # Short final frames are padded with μ-law silence (0xFF).
 TATA_FRAME_BYTES = 160
 _MULAW_SILENCE = b"\xff"
+
+# Keep-alive HTTP clients keyed by running loop (one loop per worker
+# process for the service lifetime). Never closed explicitly; the process
+# owns them, same as the Redis pools elsewhere in the codebase.
+_pooled_http_clients: Dict[int, "httpx.AsyncClient"] = {}
+
+
+async def _pooled_http_client(timeout_seconds: float) -> "httpx.AsyncClient":
+    """Shared httpx client for engine API calls (ticket minting).
+
+    A per-call client redoes DNS+TCP+TLS (~1.4s to the engine); pooled
+    connections reuse them. Falls back to a throwaway client outside a
+    running loop (pure safety — callers always run looped).
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return httpx.AsyncClient(timeout=timeout_seconds)
+    key = id(loop)
+    client = _pooled_http_clients.get(key)
+    if client is None or client.is_closed:
+        client = httpx.AsyncClient(timeout=timeout_seconds)
+        _pooled_http_clients[key] = client
+    return client
 # Outbound pacing toward Tata (relay-specific; the LiveKit path in
 # services.py uses MAX_PENDING_MARKS=8 because its audio already arrives at
 # realtime rate so the window never binds).
@@ -86,12 +110,7 @@ def _split_frames(payload: bytes):
 
 
 def _mulaw_rms(payload: bytes) -> int:
-    """RMS energy of μ-law bytes on the 16-bit scale (0 = digital silence).
-
-    TEMP DEBUG for the silent-reply investigation: speech typically measures
-    in the hundreds–thousands; a stream of ~0s means the engine is sending
-    silence, not that Tata is dropping audio.
-    """
+    """RMS energy of μ-law bytes on the 16-bit scale (0 = digital silence)."""
     if not payload:
         return 0
     try:
@@ -141,13 +160,16 @@ class TalkoVoiceaiRelay:
         return "{}/chat/v1/{}?token={}".format(self.__ws_base_url, agent_id, ticket)
 
     async def __mint_ticket(self) -> str:
+        # Pooled client: a fresh AsyncClient per call pays a full TCP+TLS
+        # handshake to the engine (~1.4s measured) on every call. Keep-alive
+        # connections amortize that to a plain request (~0.2s).
         url = "{}/auth/ws-ticket".format(self.__api_base_url)
-        async with httpx.AsyncClient(timeout=self.__ticket_timeout) as client:
-            resp = await client.post(
-                url, headers={"Authorization": "Bearer {}".format(self.__api_key)}
-            )
-            resp.raise_for_status()
-            return resp.json()["ticket"]
+        client = await _pooled_http_client(self.__ticket_timeout)
+        resp = await client.post(
+            url, headers={"Authorization": "Bearer {}".format(self.__api_key)}
+        )
+        resp.raise_for_status()
+        return resp.json()["ticket"]
 
     async def __connect_socket(self, url: str) -> "_AiohttpVoiceaiSocket":
         session = aiohttp.ClientSession()
