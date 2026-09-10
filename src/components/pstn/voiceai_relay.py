@@ -27,8 +27,12 @@ v1 limitations (documented, not silent):
 
 import asyncio
 import audioop
+import base64
 import collections
+import hashlib
+import hmac
 import json
+import secrets
 import time
 from typing import Any, Awaitable, Callable, Deque, Dict, Optional, Set, Tuple
 
@@ -38,6 +42,27 @@ import httpx
 from src.components.pstn.dto import TalkoCallContext
 from src.components.pstn.providers.base import TalkoAbstractPSTNProvider
 from src.components.pstn.voiceai_events import forward_to_voiceai, parse_from_voiceai
+from src.core.environment import TalkoENV
+
+# Mirror of voiceai.platform.stream_token (same algorithm, stdlib only):
+# token = base64url(agent_id|expires_at|nonce) . hex(hmac_sha256(payload)).
+# Lets the relay mint WS auth locally when VOICE_STREAM_SECRET is set,
+# skipping the ~1.3s /auth/ws-ticket round trip entirely.
+_STREAM_TOKEN_TTL_S = 300
+
+
+def _mint_stream_token(agent_id: str, secret: str, ttl_s: int = _STREAM_TOKEN_TTL_S) -> str:
+    """Mint a carrier stream token the engine accepts. Raises on bad config."""
+    key = (secret or "").strip()
+    if len(key) < 16:
+        raise ValueError("VOICE_STREAM_SECRET must be at least 16 characters")
+    if not agent_id:
+        raise ValueError("agent_id is required to mint a stream token")
+    expires_at = int(time.time()) + int(ttl_s)
+    payload = "{}|{}|{}".format(agent_id, expires_at, secrets.token_hex(8)).encode("utf-8")
+    encoded = base64.urlsafe_b64encode(payload).rstrip(b"=").decode("ascii")
+    signature = hmac.new(key.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    return "{}.{}".format(encoded, signature)
 
 VOICEAI_AGENT_ID_KEY = "voiceai_agent_id"
 SEND_TIMEOUT_SECONDS = 5.0
@@ -196,11 +221,22 @@ class TalkoVoiceaiRelay:
         self.__logger.info(
             "[VOICEAI][RELAY] Starting sid={} agent={}".format(sid, voiceai_agent_id)
         )
-        # Phase-0 latency spans (monotonic ms). first_media/first_send are
-        # filled by the pump and reported in the timings line at Ended.
+        # Auth: prefer a locally-minted stream token (microseconds, no I/O)
+        # when the shared secret is provisioned; fall back to the single-use
+        # ticket POST otherwise. The timings line exposes which path ran via
+        # ticket_ms (~0 vs ~1300).
         t_run = time.monotonic()
-        ticket = await self.__ticket_provider()
+        stream_secret = (TalkoENV.VOICE_STREAM_SECRET or "").strip()
+        if len(stream_secret) >= 16:
+            ticket = _mint_stream_token(voiceai_agent_id, stream_secret)
+            auth_mode = "stream-token"
+        else:
+            ticket = await self.__ticket_provider()
+            auth_mode = "ticket"
         t_ticket = time.monotonic()
+        self.__logger.info(
+            "[VOICEAI][RELAY] auth sid={} mode={}".format(sid, auth_mode)
+        )
         vws = await self.__ws_connector(self.ws_url(voiceai_agent_id, ticket))
         t_ws = time.monotonic()
         self.__logger.info("[VOICEAI][RELAY] voiceai socket open sid={}".format(sid))

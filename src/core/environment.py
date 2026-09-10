@@ -100,6 +100,11 @@ class TalkoENV:
     # Talko-native user auth (user_auth component). No default: login refuses
     # to mint tokens until this is provisioned as a real secret.
     TALKO_JWT_SECRET = os.getenv("TALKO_JWT_SECRET", "")
+    # Shared secret with the voiceai engine for signed carrier stream tokens
+    # (see voiceai.platform.stream_token). When set, the relay mints its WS
+    # auth token locally (~0ms) instead of POSTing /auth/ws-ticket (~1.3s).
+    # Must equal the engine's VOICE_STREAM_SECRET.
+    VOICE_STREAM_SECRET = os.getenv("VOICE_STREAM_SECRET", "")
     TALKO_JWT_TTL_HOURS = int(os.getenv("TALKO_JWT_TTL_HOURS", "72"))
 
     @classmethod

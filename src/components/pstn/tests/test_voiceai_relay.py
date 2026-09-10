@@ -448,3 +448,72 @@ class TestPooledHttpClient:
         second = await _pooled_http_client(10.0)
         assert first is second
         await first.aclose()
+
+
+class TestStreamTokenAuth:
+    def test_mint_format_matches_engine_contract(self):
+        import base64 as _b64
+
+        from src.components.pstn.voiceai_relay import _mint_stream_token
+
+        before = __import__("time").time()
+        token = _mint_stream_token("agent-1", "x" * 16)
+        encoded, _, signature = token.rpartition(".")
+        assert encoded and signature and len(signature) == 64
+        payload = _b64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
+        agent, expires_at, _nonce = payload.decode().split("|", 2)
+        assert agent == "agent-1"
+        assert before + 290 < int(expires_at) <= before + 310
+
+    def test_mint_rejects_short_secret(self):
+        import pytest
+
+        from src.components.pstn.voiceai_relay import _mint_stream_token
+
+        with pytest.raises(ValueError):
+            _mint_stream_token("agent-1", "short")
+
+    @pytest.mark.asyncio
+    async def test_stream_token_skips_ticket_post(self, monkeypatch):
+        """With VOICE_STREAM_SECRET set, run() must mint locally and never
+        call the ticket provider (which would add ~1.3s per call)."""
+        from unittest.mock import MagicMock
+
+        from src.components.pstn.voiceai_relay import TalkoVoiceaiRelay
+
+        monkeypatch.setattr(
+            "src.core.environment.TalkoENV.VOICE_STREAM_SECRET", "y" * 32
+        )
+        opened = []
+
+        async def boom_ticket():
+            raise AssertionError("ticket POST must not run with stream secret")
+
+        async def ws_connector(url):
+            opened.append(url)
+            return FakeVoiceaiSocket([], remote_close_when_empty=True)
+
+        relay = TalkoVoiceaiRelay(
+            ws_base_url="wss://voiceai.local",
+            api_base_url="https://voiceai.local",
+            api_key="key",
+            logger=MagicMock(),
+            ticket_provider=boom_ticket,
+            ws_connector=ws_connector,
+        )
+        tata = FakeTataWs()
+
+        async def tata_idles_then_stops():
+            while not tata.closed:
+                await asyncio.sleep(0.01)
+            yield json.dumps({"event": "stop", "streamSid": "MZ123"})
+
+        await asyncio.wait_for(
+            relay.run(
+                tata, TalkoTataTeleProvider(), make_ctx(),
+                {"event": "start", "start": {}}, tata_idles_then_stops(), "agent_9",
+            ),
+            timeout=10,
+        )
+        assert len(opened) == 1
+        assert "agent_9" in opened[0] and "token=" in opened[0]
