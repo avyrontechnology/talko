@@ -565,7 +565,9 @@ class TalkoVoiceaiRelay:
         except Exception as e:
             send_failed = True
             self.__logger.warning(
-                "[VOICEAI][RELAY] Tata send failed sid={}: {}".format(ctx.call_sid, e)
+                "[VOICEAI][RELAY] Tata send failed sid={} type={} error={!r}".format(
+                    ctx.call_sid, type(e).__name__, e
+                )
             )
         finally:
             if not reader_task.done():
