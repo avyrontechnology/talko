@@ -95,13 +95,11 @@ async def resolve_effective_partner_id(
     grpc_client,
     logger,
     scope_override: Optional[int] = None,
-) -> int:
+) -> Optional[int]:
     """Partner id the request acts on: own scope, or the override for admins.
 
-    Raises:
-        TalkoSuperadminDenied: override targets another partner and the
-            caller is not a superadmin.
-        ValueError: no partner scope on the request at all.
+    A missing own scope with no override returns None (legacy behavior —
+    callers historically received None and handled it); it never raises.
     """
     user = getattr(request.state, "user", None) or {}
     own_partner_id = user.get(TalkoCurrentUserMap.PARTNER_ID)
@@ -119,5 +117,5 @@ async def resolve_effective_partner_id(
             "Cross-partner scope requires superadmin (ADMIN) role"
         )
     if own_partner_id is None:
-        raise ValueError("No partner scope on request")
+        return None
     return int(own_partner_id)

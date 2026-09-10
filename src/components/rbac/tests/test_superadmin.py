@@ -104,10 +104,9 @@ class TestResolveEffectivePartnerId:
         grpc_client.get_user_roles.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_missing_scope_raises(self):
+    async def test_missing_scope_returns_none_like_legacy(self):
         req = make_request({"user_id": 7})
-        with pytest.raises(ValueError):
-            await resolve_effective_partner_id(req, make_grpc(), make_logger())
+        assert await resolve_effective_partner_id(req, make_grpc(), make_logger()) is None
 
     @pytest.mark.asyncio
     async def test_scopeless_superadmin_with_override(self):
