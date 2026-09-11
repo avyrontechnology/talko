@@ -16,6 +16,7 @@ from src.components.rbac.permission_dependency import TalkoPermissionDependency
 from src.components.rbac.permission_injector import permission_check
 from src.components.rbac.superadmin import (
     TalkoSuperadminDenied,
+    is_superadmin,
     resolve_effective_partner_id,
 )
 from src.core.container import TalkoContainer
@@ -89,6 +90,13 @@ class TalkoPartnerApiKeyController:
             talko_service_logger.info(
                 "Listing partner api keys for partner_id: {}".format(partner_id)
             )
+            # Segregation: non-superadmins may only list their own partner's keys.
+            current_user_data: dict = request.state.user
+            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            if not await is_superadmin(request, grpc_client, talko_service_logger):
+                own = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+                if own is not None:
+                    partner_id = own
             keys = await partner_api_key_service.list_api_keys(partner_id)
             return TalkoSuccessResponse(data=keys)
         except Exception as e:
