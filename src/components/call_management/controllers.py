@@ -436,7 +436,7 @@ class TalkoCallController:
                             "cdr_id": str(r["_id"]),
                             "customer": r.get("customer"),
                             "lead_id": r.get("lead_id"),
-                            "service_board_id": r.get("service_board_id"),
+                            "workspace_id": r.get("workspace_id"),
                             "agent": r.get("agent"),
                             "created_at": r.get("created_at"),
                             "created_at_human": (
@@ -469,13 +469,13 @@ class TalkoCallController:
                     cdr_id = str(cdr["_id"])
                     lead_id = cdr.get("lead_id")
                     customer_number: str = cdr.get("customer", "")
-                    service_board_id = cdr.get("service_board_id")
+                    workspace_id = cdr.get("workspace_id")
 
                     base_record = {
                         "cdr_id": cdr_id,
                         "lead_id": lead_id,
                         "customer_number": customer_number,
-                        "service_board_id": service_board_id,
+                        "workspace_id": workspace_id,
                         "old_agent": WRONG_AGENT_ID,
                         "new_agent": None,
                     }
@@ -495,9 +495,9 @@ class TalkoCallController:
                         skipped += 1
                         continue
 
-                    if not service_board_id:
+                    if not workspace_id:
                         results.append(
-                            {**base_record, "status": "skipped", "reason": "No service_board_id in TalkoCDR"}
+                            {**base_record, "status": "skipped", "reason": "No workspace_id in TalkoCDR"}
                         )
                         skipped += 1
                         continue

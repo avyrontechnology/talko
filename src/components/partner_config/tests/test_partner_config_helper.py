@@ -16,9 +16,9 @@ class TestPartnerConfigHelper:
             partner_id=123,
             vendor_id=str(ObjectId()),
             vendor_config_id=str(ObjectId()),
-            enable_service_board=False,
-            board_did_counts=None,
-            service_board_ids=None,
+            enable_workspace=False,
+            workspace_did_counts=None,
+            workspace_ids=None,
             enable_agent_mapping=False,
             agent_mapping_ids=None,
             enable_round_robin=False,
@@ -97,10 +97,10 @@ class TestPartnerConfigHelper:
                 logger=logger,
             )
 
-    async def test_handle_did_assignment_with_service_board(self, config):
-        config.enable_service_board = True
-        config.board_did_counts = {"101": 2}
-        config.service_board_ids = [101]
+    async def test_handle_did_assignment_with_workspace(self, config):
+        config.enable_workspace = True
+        config.workspace_did_counts = {"101": 2}
+        config.workspace_ids = [101]
 
         did_service = AsyncMock()
         did_service.get_available_dids.return_value = ["d1", "d2"]
@@ -116,7 +116,7 @@ class TestPartnerConfigHelper:
             logger=logger,
         )
 
-        assert "service_board_ids" in result
+        assert "workspace_ids" in result
         assert did_service.update_did.call_count == 2
 
     async def test_handle_did_assignment_with_agent_mapping(self, config):
@@ -142,15 +142,15 @@ class TestPartnerConfigHelper:
             did_number="d1",
             vendor_id=str(vendor_id),
             partner_id=config.partner_id,
-            service_board_id=None,
+            workspace_id=None,
             agent_id=1001,
             vendor_config_id=ObjectId(config.vendor_config_id),
         )
 
     async def test_handle_did_assignment_round_robin_conflicts(self, config):
         config.enable_round_robin = True
-        config.enable_service_board = True
-        config.board_did_counts = {"101": 1}
+        config.enable_workspace = True
+        config.workspace_did_counts = {"101": 1}
 
         did_service = AsyncMock()
         did_service.get_available_dids.return_value = ["d1"]
@@ -158,7 +158,7 @@ class TestPartnerConfigHelper:
         logger = MagicMock()
 
         with pytest.raises(
-            TalkoBadRequestError, match="Round-robin cannot be enabled with service board."
+            TalkoBadRequestError, match="Round-robin cannot be enabled with workspace."
         ):
             await TalkoPartnerConfigHelper.handle_did_assignment(
                 config,
@@ -191,8 +191,8 @@ class TestPartnerConfigHelper:
         did_service.update_did.assert_awaited_once()
 
     def test_calculate_num_dids_all_enabled(self, config):
-        config.enable_service_board = True
-        config.board_did_counts = {"101": 2}
+        config.enable_workspace = True
+        config.workspace_did_counts = {"101": 2}
         config.enable_agent_mapping = True
         config.agent_mapping_ids = [1, 2, 3]
         config.enable_round_robin = True
@@ -215,13 +215,13 @@ class TestPartnerConfigHelper:
         assert result["round_robin_did_count"] == 1
         did_service.update_did.assert_awaited()
 
-    async def test_update_default_attendance_service_board(self, config):
-        config.enable_service_board = True
-        config.service_board_ids = [101]
+    async def test_update_default_attendance_workspace(self, config):
+        config.enable_workspace = True
+        config.workspace_ids = [101]
         vendor_id = ObjectId()
 
         did_service = AsyncMock()
-        did_service.get_dids_by_partner_service_board_and_vendor.return_value = [
+        did_service.get_dids_by_partner_workspace_and_vendor.return_value = [
             {"did_number": "111", "agent_id": 1}
         ]
 
@@ -253,14 +253,14 @@ class TestPartnerConfigHelper:
     async def test_assign_round_robin_dids_error_cases(self, config):
         vendor_id = ObjectId()
         did_service = AsyncMock()
-        config.enable_service_board = True
+        config.enable_workspace = True
         with pytest.raises(
-            TalkoBadRequestError, match="Round-robin cannot be enabled with service board."
+            TalkoBadRequestError, match="Round-robin cannot be enabled with workspace."
         ):
             await TalkoPartnerConfigHelper._assign_round_robin_dids(
                 config, ["d1"], vendor_id, did_service, MagicMock()
             )
-        config.enable_service_board = False
+        config.enable_workspace = False
         config.enable_round_robin = True
         config.round_robin_did_count = None
         with pytest.raises(TalkoBadRequestError, match="round_robin_did_count is required"):

@@ -12,12 +12,12 @@ class TalkoContract:
         ai_vendor_config_id: Optional[str] = None
         enable_round_robin: bool = False
         enable_agent_mapping: bool = False
-        enable_service_board: bool = False
-        service_board_ids: Optional[List[int]] = (
-            None  # Service boards for DID assignment
+        enable_workspace: bool = False
+        workspace_ids: Optional[List[int]] = (
+            None  # Workspaces for DID assignment
         )
-        board_did_counts: Optional[Dict[str, int]] = (
-            None  # DID counts per service board
+        workspace_did_counts: Optional[Dict[str, int]] = (
+            None  # DID counts per workspace
         )
         agent_mapping_ids: Optional[List[int]] = (
             None  # Agent IDs for mapping (one DID per ID)
@@ -34,9 +34,9 @@ class TalkoContract:
         ai_vendor_config_id: Optional[str] = None
         enable_round_robin: Optional[bool] = None
         enable_agent_mapping: Optional[bool] = None
-        enable_service_board: Optional[bool] = None
-        service_board_ids: Optional[List[int]] = None
-        board_did_counts: Optional[Dict[str, int]] = None
+        enable_workspace: Optional[bool] = None
+        workspace_ids: Optional[List[int]] = None
+        workspace_did_counts: Optional[Dict[str, int]] = None
         agent_mapping_ids: Optional[List[int]] = None
         round_robin_did_count: Optional[int] = None
         dialer_enabled: Optional[bool] = None
@@ -64,10 +64,10 @@ class TalkoContract:
         did_index: Optional[int] = None
         enable_round_robin: bool
         enable_agent_mapping: bool
-        enable_service_board: bool
+        enable_workspace: bool
         dialer_enabled: bool
-        service_board_ids: Optional[List[int]] = None
-        board_did_counts: Optional[Dict[str, int]] = None
+        workspace_ids: Optional[List[int]] = None
+        workspace_did_counts: Optional[Dict[str, int]] = None
         agent_mapping_ids: Optional[List[int]] = None
         round_robin_did_count: Optional[int] = None
         enable_agent_reassignment_on_inactive: bool = False

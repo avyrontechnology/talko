@@ -63,7 +63,7 @@ async def test_get_agent_details_success(maglo_client, mock_logger):
     mock_resp = create_mock_response(200, json_data=mock_response_data)
 
     with patch.object(maglo_client.session, "get", return_value=mock_resp):
-        result = await maglo_client.get_agent_details(agent_id=33, service_board_id=70)
+        result = await maglo_client.get_agent_details(agent_id=33, workspace_id=70)
 
         assert result == mock_response_data
         mock_logger.info.assert_called_with(
@@ -154,10 +154,11 @@ async def test_get_agent_details_params_sent_correctly(maglo_client, mock_logger
     mock_resp = create_mock_response(200, json_data={"id": 42})
 
     with patch.object(maglo_client.session, "get", return_value=mock_resp) as mock_get:
-        await maglo_client.get_agent_details(agent_id=42, service_board_id=99)
+        await maglo_client.get_agent_details(agent_id=42, workspace_id=99)
 
         # Verify the get method was called with correct params
         call_args = mock_get.call_args
+        # External Maglo wire key stays service_board_id.
         assert call_args[1]["params"] == {"agent_id": "42", "service_board_id": "99"}
 
 
@@ -175,7 +176,7 @@ async def test_upsert_ivr_lead_payload_structure(maglo_client, mock_logger):
         call_args = mock_patch.call_args
         expected_payload = {
             TalkoMagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: 12,
-            TalkoMagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: 70,
+            TalkoMagloApiConstants.DEFAULT_WORKSPACE_ID_PARAM: 70,
             TalkoMagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: "+919876543210",
         }
         assert call_args[1]["json"] == expected_payload
@@ -190,7 +191,7 @@ async def test_reassign_lead_by_phone_success(maglo_client, mock_logger):
         result = await maglo_client.reassign_lead_by_phone(
             phone_number="+919876543210",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=34,
         )
         assert result == mock_response_data
@@ -207,7 +208,7 @@ async def test_reassign_lead_by_phone_payload_structure(maglo_client, mock_logge
         await maglo_client.reassign_lead_by_phone(
             phone_number="+919876543210",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=34,
         )
 
@@ -216,7 +217,7 @@ async def test_reassign_lead_by_phone_payload_structure(maglo_client, mock_logge
         expected_payload = {
             TalkoMagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: "+919876543210",
             TalkoMagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: 12,
-            TalkoMagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: 70,
+            TalkoMagloApiConstants.DEFAULT_WORKSPACE_ID_PARAM: 70,
             TalkoMagloApiConstants.DEFAULT_AGENT_ID_PARAM: 34,
             TalkoMagloApiConstants.LEAD_PAYLOAD_PERFORMED_BY: 34,
         }
@@ -232,7 +233,7 @@ async def test_reassign_lead_by_phone_error(maglo_client, mock_logger):
             await maglo_client.reassign_lead_by_phone(
                 phone_number="+919876543210",
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 agent_id=34,
             )
 

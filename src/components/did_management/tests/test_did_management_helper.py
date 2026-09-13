@@ -14,7 +14,7 @@ class TestDidStatusUpdateHelper:
         """Creates a mock AdminDIDAction payload."""
         payload = Mock(spec=TalkoContract.AdminDIDAction)
         payload.agent_id = "agent_123"
-        payload.service_board_id = None
+        payload.workspace_id = None
         return payload
 
     @pytest.fixture
@@ -124,23 +124,23 @@ class TestDidStatusUpdateHelper:
         )
         assert result["error"]["code"] == "INVALID_ACTION"
 
-    def test_prepare_update_data_without_service_board(self, mock_payload, now_ts):
-        mock_payload.service_board_id = None
+    def test_prepare_update_data_without_workspace(self, mock_payload, now_ts):
+        mock_payload.workspace_id = None
         handler = TalkoDidStatusUpdateHelper.handle_set_available
         result = TalkoDidStatusUpdateHelper.prepare_update_data(
             handler, TalkoDIDStatus.AVAILABLE.value, mock_payload, now_ts
         )
         assert result["status"] == TalkoDIDStatus.AVAILABLE.value
         assert result["status_changed_at"] == now_ts
-        assert "service_board_id" not in result
+        assert "workspace_id" not in result
 
-    def test_prepare_update_data_with_service_board(self, mock_payload, now_ts):
-        mock_payload.service_board_id = 42
+    def test_prepare_update_data_with_workspace(self, mock_payload, now_ts):
+        mock_payload.workspace_id = 42
         handler = TalkoDidStatusUpdateHelper.handle_set_available
         result = TalkoDidStatusUpdateHelper.prepare_update_data(
             handler, TalkoDIDStatus.AVAILABLE.value, mock_payload, now_ts
         )
-        assert result["service_board_id"] == 42
+        assert result["workspace_id"] == 42
         assert result["status_changed_at"] == now_ts
 
     def test_parse_value_error_with_pipe(self):

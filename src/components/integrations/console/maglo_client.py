@@ -27,7 +27,7 @@ class TalkoMagloClient:
     async def get_agent_details(
         self,
         agent_id: int,
-        service_board_id: int,
+        workspace_id: int,
     ) -> Dict[str, Any]:
         """
         Fetch agent details from Maglo.
@@ -36,20 +36,21 @@ class TalkoMagloClient:
         """
         self.logger.debug(
             "Preparing to fetch Maglo agent details for agent_id={}, board={}".format(
-                agent_id, service_board_id
+                agent_id, workspace_id
             )
         )
         url: str = TalkoMagloApiConstants.get_agent_details_url()
         params: Dict[str, str] = {
             "agent_id": str(agent_id),
-            "service_board_id": str(service_board_id),
+            # External Maglo wire key — do not rename to workspace_id.
+            "service_board_id": str(workspace_id),
         }
 
         self.logger.debug("Maglo URL: {} with params: {}".format(url, params))
 
         self.logger.info(
             "Fetching Maglo agent details - agent_id={}, board={}".format(
-                agent_id, service_board_id
+                agent_id, workspace_id
             )
         )
 
@@ -81,7 +82,7 @@ class TalkoMagloClient:
     async def upsert_ivr_lead(
         self,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         phone_number: str,
     ) -> Dict[str, Any]:
         """
@@ -90,7 +91,7 @@ class TalkoMagloClient:
         url: str = TalkoMagloApiConstants.upsert_ivr_leads_url()
         payload: Dict[str, Any] = {
             TalkoMagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: partner_id,
-            TalkoMagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: service_board_id,
+            TalkoMagloApiConstants.DEFAULT_WORKSPACE_ID_PARAM: workspace_id,
             TalkoMagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: phone_number,
         }
 
@@ -123,7 +124,7 @@ class TalkoMagloClient:
         self,
         phone_number: str,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         agent_id: int,
     ) -> Dict[str, Any]:
         """
@@ -134,7 +135,7 @@ class TalkoMagloClient:
         payload: Dict[str, Any] = {
             TalkoMagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER: phone_number,
             TalkoMagloApiConstants.LEAD_PAYLOAD_PARTNER_ID: partner_id,
-            TalkoMagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM: service_board_id,
+            TalkoMagloApiConstants.DEFAULT_WORKSPACE_ID_PARAM: workspace_id,
             TalkoMagloApiConstants.DEFAULT_AGENT_ID_PARAM: agent_id,
             # performed_by is the new owner itself — the reassignment is
             # system-driven (no human/admin actor), so the new agent is
@@ -174,7 +175,7 @@ class TalkoMagloClient:
         """
         Fetch leads created today via POST /v1/leads-created-today
         Expects body: {"api_key": "..."}
-        Returns the 'data' part of the response (current_date + service_boards)
+        Returns the 'data' part of the response (current_date + service_boards — external Maglo key)
         """
         url: str = TalkoMagloApiConstants.leads_created_today_url()
         payload: Dict[str, str] = {

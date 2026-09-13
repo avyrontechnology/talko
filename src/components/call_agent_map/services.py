@@ -2,8 +2,8 @@ from typing import Any, Dict, List, Optional
 
 from src.components.call_agent_map.dto import TalkoContract
 from src.components.call_agent_map.messages import (
-    AGENT_NOT_MAPPED_TO_SERVICE_BOARD,
-    AGENT_SERVICE_BOARD_MAPPING_CREATED_SUCCESS,
+    AGENT_NOT_MAPPED_TO_WORKSPACE,
+    AGENT_WORKSPACE_MAPPING_CREATED_SUCCESS,
     MAX_AGENT_MAPPING_LIMIT,
     MAPPING_CREATE_SUCCESS,
     NO_AGENT_MAPPING_FOUND,
@@ -12,7 +12,7 @@ from src.components.call_agent_map.messages import (
 )
 from src.components.call_agent_map.models import (
     TalkoAgentDidMappingModel,
-    TalkoAgentServiceBoardMappingModel,
+    TalkoAgentWorkspaceMappingModel,
 )
 from src.components.call_agent_map.repository import TalkoAgentMappingRepository
 from src.components.call_agent_map.validation import TalkoAgentMapperValidator
@@ -193,30 +193,30 @@ class TalkoAgentMappingService:
             )
             raise
     
-    async def create_agent_service_board_mapping(
+    async def create_agent_workspace_mapping(
         self,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         agent_id: int,
         agent_number: Optional[str] = None,
-    ) -> TalkoContract.AgentServiceBoardMappingCreationResponse:
+    ) -> TalkoContract.AgentWorkspaceMappingCreationResponse:
         """
-        Creates a new Agent–Service Board mapping.
+        Creates a new Agent–Workspace mapping.
 
         Args:
             partner_id (int): The partner's identifier.
-            service_board_id (int): The service board's identifier.
+            workspace_id (int): The workspace's identifier.
             agent_id (int): The agent's identifier.
             agent_number (Optional[str]): The agent's phone number.
 
         Returns:
-            AgentServiceBoardMappingCreationResponse: The ID and message of the created mapping.
+            AgentWorkspaceMappingCreationResponse: The ID and message of the created mapping.
 
         Raises:
-            HTTPException: If partner config not found or agent already mapped to same service board.
+            HTTPException: If partner config not found or agent already mapped to same workspace.
         """
         try:
-            self.logger.info("Starting creation of agent service board mapping for partner_id {}, service_board_id {}, agent_id {} and agent_number {}".format(partner_id, service_board_id, agent_id, agent_number))
+            self.logger.info("Starting creation of agent workspace mapping for partner_id {}, workspace_id {}, agent_id {} and agent_number {}".format(partner_id, workspace_id, agent_id, agent_number))
             partner_config: Optional[Dict[str, Any]] = (
                 await self.partner_config_repository.find_partner_config_by_partner_id(partner_id)
             )
@@ -226,7 +226,7 @@ class TalkoAgentMappingService:
 
             mapping_dict: Dict[str, Any] = {
                 "partner_id": partner_id,
-                "service_board_id": service_board_id,
+                "workspace_id": workspace_id,
                 "agent_id": agent_id,
                 "agent_number": agent_number,
                 "is_active": True,
@@ -234,79 +234,79 @@ class TalkoAgentMappingService:
                 "updated_at": self.datetime_util.get_current_time(),
             }
 
-            mapping_data: dict = TalkoAgentServiceBoardMappingModel(**mapping_dict).model_dump()
+            mapping_data: dict = TalkoAgentWorkspaceMappingModel(**mapping_dict).model_dump()
             self.logger.info("Mapping data for Insertion: {}".format(mapping_data))
-            mapping_id: str = await self.repository.insert_agent_service_board_mapping(mapping_data)
+            mapping_id: str = await self.repository.insert_agent_workspace_mapping(mapping_data)
 
             self.logger.info(
-                "Created Agent–Service Board mapping | Service Board: {}, Agent: {}, Mapping ID: {}".format(
-                    service_board_id, agent_id, mapping_id
+                "Created Agent–Workspace mapping | Workspace: {}, Agent: {}, Mapping ID: {}".format(
+                    workspace_id, agent_id, mapping_id
                 )
             )
 
-            return TalkoContract.AgentServiceBoardMappingCreationResponse(
+            return TalkoContract.AgentWorkspaceMappingCreationResponse(
                 id=str(mapping_id),
-                message=AGENT_SERVICE_BOARD_MAPPING_CREATED_SUCCESS,
+                message=AGENT_WORKSPACE_MAPPING_CREATED_SUCCESS,
             )
 
         except Exception as e:
-            self.logger.error("Error creating Agent–Service Board mapping: {}".format(str(e)))
+            self.logger.error("Error creating Agent–Workspace mapping: {}".format(str(e)))
             raise
         
-    async def get_agents_by_service_board(self, service_board_id: int, partner_id: int) -> List[TalkoContract.AgentServiceBoardMappingResponse]:
+    async def get_agents_by_workspace(self, workspace_id: int, partner_id: int) -> List[TalkoContract.AgentWorkspaceMappingResponse]:
         """
-        Fetch all agents mapped to a given service board and partner.
+        Fetch all agents mapped to a given workspace and partner.
         """
         try:
-            agents: List[Dict[str, Any]] = await self.repository.get_agents_by_service_board_id_and_partner_id(
-                service_board_id, partner_id
+            agents: List[Dict[str, Any]] = await self.repository.get_agents_by_workspace_id_and_partner_id(
+                workspace_id, partner_id
             )
 
             if not agents:
                 self.logger.debug(
-                    "No agents found for service_board_id {} and partner_id {}".format(service_board_id, partner_id)
+                    "No agents found for workspace_id {} and partner_id {}".format(workspace_id, partner_id)
                 )
-                raise TalkoResourceNotFound(AGENT_NOT_MAPPED_TO_SERVICE_BOARD)
+                raise TalkoResourceNotFound(AGENT_NOT_MAPPED_TO_WORKSPACE)
 
             self.logger.debug(
-                "Retrieved agent–service board mapping from DB. data: {}".format(agents)
+                "Retrieved agent–workspace mapping from DB. data: {}".format(agents)
             )
 
-            response_list: List[TalkoContract.AgentServiceBoardMappingResponse] = []
+            response_list: List[TalkoContract.AgentWorkspaceMappingResponse] = []
             for item in agents:
                 item["id"] = str(item["_id"])
                 del item["_id"]
-                response_list.append(TalkoContract.AgentServiceBoardMappingResponse(**item))
+                response_list.append(TalkoContract.AgentWorkspaceMappingResponse(**item))
 
             self.logger.debug(
-                "Converted agent–service board mapping to response format. data: {}".format(response_list)
+                "Converted agent–workspace mapping to response format. data: {}".format(response_list)
             )
             self.logger.info(
-                "Retrieved all agents for service_board_id {} successfully.".format(service_board_id)
+                "Retrieved all agents for workspace_id {} successfully.".format(workspace_id)
             )
 
             return response_list
 
         except Exception as e:
             self.logger.error(
-                "Failed to retrieve agent–service board mapping data for service_board_id {} and partner_id {}: {}".format(service_board_id, partner_id, str(e))
+                "Failed to retrieve agent–workspace mapping data for workspace_id {} and partner_id {}: {}".format(workspace_id, partner_id, str(e))
             )
             raise
 
-    async def update_is_active_by_service_board_and_partner_id(self, partner_id: int, service_board_id: int, is_active: bool) -> int:
+    async def update_is_active_by_workspace_and_partner_id(self, partner_id: int, workspace_id: int, is_active: bool) -> int:
         """
-        Update active/inactive for a given service board and partner.
+        Update active/inactive for a given workspace and partner.
         Raises TalkoResourceNotFound if no mappings exist.
         """
         try:
-            self.logger.info("Updating agent mapping status for service_board_id={}and partner_id={}".format(service_board_id, partner_id))
-            updated_count = await self.repository.update_is_active_by_service_board_and_partner_id(partner_id, service_board_id, is_active)
+            self.logger.info("Updating agent mapping status for workspace_id={}and partner_id={}".format(workspace_id, partner_id))
+            updated_count = await self.repository.update_is_active_by_workspace_and_partner_id(partner_id, workspace_id, is_active)
             if updated_count == 0:
-                self.logger.warning("No mappings found for service_board_id={} and partner_id={}".format(service_board_id, partner_id))
-                raise TalkoResourceNotFound(NO_MAPPING_FOR_SB_AND_PARTNER.format(service_board_id, partner_id))
+                self.logger.warning("No mappings found for workspace_id={} and partner_id={}".format(workspace_id, partner_id))
+                raise TalkoResourceNotFound(NO_MAPPING_FOR_SB_AND_PARTNER.format(workspace_id, partner_id))
             return updated_count
         except Exception as e:
             self.logger.error(
-                "Failed to delete agent–service board mapping data: {}".format(str(e))
+                "Failed to delete agent–workspace mapping data: {}".format(str(e))
             )
             raise

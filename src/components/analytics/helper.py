@@ -54,7 +54,7 @@ class TalkoCallTrendsHelper:
         start_date: Optional[int],
         end_date: Optional[int],
         agents: List[int],
-        service_board_id: Optional[List[int]],
+        workspace_id: Optional[List[int]],
         entity_type: Optional[str],
         user_role: int,
     ) -> Tuple[Dict[str, Any], int, int, str]:
@@ -72,7 +72,7 @@ class TalkoCallTrendsHelper:
             start_date_ms=start_date_ms,
             end_date_ms=end_date_ms,
             agents=agents,
-            service_board_id=service_board_id,
+            workspace_id=workspace_id,
             entity_type=entity_type,
             user_role=user_role,
         )

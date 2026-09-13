@@ -90,7 +90,7 @@ def _base_payload(**overrides) -> Dict[str, Any]:
 def _default_did_info() -> Dict[str, Any]:
     return {
         "partner_id": 100,
-        "service_board_id": 1,
+        "workspace_id": 1,
         "vendor_id": "vendor123",
         "vendor_config_id": "config456",
     }
@@ -298,7 +298,7 @@ class TestProcessWebhookErrorCases:
     async def test_did_partner_id_zero_returns_error(self):
         handler = _make_handler()
         handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value={"partner_id": 0, "service_board_id": 1}
+            return_value={"partner_id": 0, "workspace_id": 1}
         )
 
         result = await handler.process_webhook(_base_payload())
@@ -310,7 +310,7 @@ class TestProcessWebhookErrorCases:
     async def test_did_partner_id_none_returns_error(self):
         handler = _make_handler()
         handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value={"partner_id": None, "service_board_id": 1}
+            return_value={"partner_id": None, "workspace_id": 1}
         )
 
         result = await handler.process_webhook(_base_payload())
@@ -545,7 +545,7 @@ class TestGetDidInfo:
         handler.did_management_service.get_dids_by_number = AsyncMock(
             return_value={
                 "partner_id": 100,
-                "service_board_id": 1,
+                "workspace_id": 1,
                 "vendor_id": 55,
                 "vendor_config_id": 77,
             }
@@ -555,7 +555,7 @@ class TestGetDidInfo:
 
         assert result is not None
         assert result["partner_id"] == 100
-        assert result["service_board_id"] == 1
+        assert result["workspace_id"] == 1
         assert result["vendor_id"] == "55"  # cast to str
         assert result["vendor_config_id"] == "77"
 

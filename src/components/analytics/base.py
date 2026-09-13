@@ -8,7 +8,7 @@ from src.components.analytics.dto import (
     TalkoAgentTalkTimeDistributionRequest,
     TalkoAnalyticsResponse,
     TalkoDashboardFollowupTrendsRequest,
-    TalkoPartnerServiceBoardRequest,
+    TalkoPartnerWorkspaceRequest,
     TalkoTotalAgentTalkTimeRequest,
 )
 from src.components.analytics.enums import TalkoAnalyticsType
@@ -50,9 +50,9 @@ class TalkoAnalyticsBase:
                 "schema": TalkoAgentTalkTimeDistributionRequest,
                 "method": self.__analytics_processor._get_agent_talk_time_distribution,
             },
-            TalkoAnalyticsType.PARTNER_SERVICE_BOARD.value: {
-                "schema": TalkoPartnerServiceBoardRequest,
-                "method": self.__analytics_processor._get_partner_service_board,
+            TalkoAnalyticsType.PARTNER_WORKSPACE.value: {
+                "schema": TalkoPartnerWorkspaceRequest,
+                "method": self.__analytics_processor._get_partner_workspace,
             },
             TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value: {
                 "schema": TalkoDashboardFollowupTrendsRequest,

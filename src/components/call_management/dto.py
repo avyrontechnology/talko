@@ -17,7 +17,7 @@ class TalkoContract:
         lead_id: Optional[int] = None
         lead_name: Optional[str] = None
 
-        service_board_id: Optional[int] = None
+        workspace_id: Optional[int] = None
         partner_id: Optional[int] = None
         number_type: Optional[str] = None
         lead_secret: Optional[str] = None
@@ -92,14 +92,14 @@ class TalkoContract:
                 )
             return v
 
-        # Service board mandatory for non-AI calls
+        # Workspace mandatory for non-AI calls
         @model_validator(mode="after")
-        def validate_service_board_id(self):
-            # When not using AI bridge, service_board_id is required
-            if not self.enable_ai_bridge and self.service_board_id is None:
+        def validate_workspace_id(self):
+            # When not using AI bridge, workspace_id is required
+            if not self.enable_ai_bridge and self.workspace_id is None:
                 raise PydanticCustomError(
-                    "service_board_id_required",
-                    "service_board_id is required when enable_ai_bridge is false",
+                    "workspace_id_required",
+                    "workspace_id is required when enable_ai_bridge is false",
                 )
             return self
 

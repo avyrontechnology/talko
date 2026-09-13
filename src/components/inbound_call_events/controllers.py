@@ -20,7 +20,7 @@ async def inbound_call_events_stream(
     ),
 ) -> None:
     """
-    Streams inbound-call agent-dialplan events (partner_id, service_board_id,
+    Streams inbound-call agent-dialplan events (partner_id, workspace_id,
     dedicated_did, agent_id) to a client subscribed for a given partner.
 
     TEMPORARY: auth is bypassed here (matches the pstn/tata/stream websocket) for

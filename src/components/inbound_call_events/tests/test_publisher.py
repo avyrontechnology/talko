@@ -19,7 +19,7 @@ class TestInboundCallEventPublisher:
 
         await publisher.publish_inbound_call(
             partner_id=100,
-            service_board_id=1,
+            workspace_id=1,
             dedicated_did="+919876543210",
             agent_id=50,
             agent_ids=[50, 51],
@@ -31,7 +31,7 @@ class TestInboundCallEventPublisher:
         payload = broker.publish.call_args[0][0]
         assert payload["event"] == INBOUND_CALL_EVENT_TYPE
         assert payload["partner_id"] == 100
-        assert payload["service_board_id"] == 1
+        assert payload["workspace_id"] == 1
         assert payload["dedicated_did"] == "+919876543210"
         assert payload["agent_id"] == 50
         assert payload["agent_ids"] == [50, 51]
@@ -45,7 +45,7 @@ class TestInboundCallEventPublisher:
 
         await publisher.publish_inbound_call(
             partner_id=100,
-            service_board_id=1,
+            workspace_id=1,
             dedicated_did="+919876543210",
             agent_id=None,
         )
@@ -61,7 +61,7 @@ class TestInboundCallEventPublisher:
 
         await publisher.publish_inbound_call(
             partner_id=None,
-            service_board_id=1,
+            workspace_id=1,
             dedicated_did="+919876543210",
             agent_id=50,
         )
@@ -77,7 +77,7 @@ class TestInboundCallEventPublisher:
         # Must not raise — a broken event bus should never break call routing.
         await publisher.publish_inbound_call(
             partner_id=100,
-            service_board_id=1,
+            workspace_id=1,
             dedicated_did="+919876543210",
             agent_id=50,
         )

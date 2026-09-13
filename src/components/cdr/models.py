@@ -82,7 +82,7 @@ class TalkoCDR(TalkoTimestampedModel):
     support_api_call: bool = False
     lead_id: Optional[int] = None
     lead_name: Optional[str] = None
-    service_board_id: Optional[int] = None
+    workspace_id: Optional[int] = None
     sid: Optional[str] = None
     sname: Optional[str] = None
 

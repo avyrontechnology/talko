@@ -17,7 +17,7 @@ from src.components.did_management.messages import (
     MISSING_AGENT_MAPPING_DIDS,
     MISSING_DID_ASSIGNMENT_CRITERIA,
     MISSING_ROUND_ROBIN_DIDS,
-    MISSING_SERVICE_BOARD_MAPPING_DIDS,
+    MISSING_WORKSPACE_MAPPING_DIDS,
     PARTNER_CONFIG_NOT_FOUND,
 )
 from src.components.did_management.models import TalkoDidHistoryModel, TalkoPhoneNumberManagement
@@ -52,7 +52,7 @@ class TalkoDidManagementService:
 
     async def assign_did(
         self,
-        service_board_id: int,
+        workspace_id: int,
         did_number: str,
         partner_id: int,
         vendor_id: str,
@@ -60,11 +60,11 @@ class TalkoDidManagementService:
         agent_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
-        Assign a DID to a service board, partner, and optionally an agent.
+        Assign a DID to a workspace, partner, and optionally an agent.
         """
         self.__logger.info(
-            "Starting assign_did with did_number: {}, partner_id: {}, vendor_id: {}, service_board_id: {}, agent_id: {}".format(
-                did_number, partner_id, vendor_id, service_board_id, agent_id
+            "Starting assign_did with did_number: {}, partner_id: {}, vendor_id: {}, workspace_id: {}, agent_id: {}".format(
+                did_number, partner_id, vendor_id, workspace_id, agent_id
             )
         )
         try:
@@ -79,7 +79,7 @@ class TalkoDidManagementService:
                 )
             )
             did_data: Dict[str, Any] = TalkoPhoneNumberManagement(
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
                 did_number=did_number,
                 partner_id=partner_id,
                 vendor_id=vendor_id_obj,
@@ -116,7 +116,7 @@ class TalkoDidManagementService:
                 vendor_id=vendor_id_obj,
                 agent_id=agent_id,
                 assign_date=current_timestamp,
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
                 vendor_config_id=vendor_config_obj,
             ).model_dump()
             self.__logger.debug("Created history_data: {}".format(history_data))
@@ -144,7 +144,7 @@ class TalkoDidManagementService:
                 "partner_id": 0,
                 "agent_bot_id": 0,
                 "agent_id": 0,
-                "service_board_id": 0,
+                "workspace_id": 0,
                 "status": TalkoDIDStatus.AVAILABLE.value,
                 "status_changed_at": current_timestamp,
             }
@@ -280,7 +280,7 @@ class TalkoDidManagementService:
         did_number: str,
         vendor_id: str,
         partner_id: int,
-        service_board_id: Optional[int] = None,
+        workspace_id: Optional[int] = None,
         agent_id: Optional[int] = None,
         vendor_config_id: Optional[ObjectId] = None,
     ) -> Dict[str, Any]:
@@ -288,8 +288,8 @@ class TalkoDidManagementService:
         Update a DID's assignment details.
         """
         self.__logger.info(
-            "Starting update_did for did_number: {}, partner_id: {}, vendor_id: {}, service_board_id: {}, agent_id: {}".format(
-                did_number, partner_id, vendor_id, service_board_id, agent_id
+            "Starting update_did for did_number: {}, partner_id: {}, vendor_id: {}, workspace_id: {}, agent_id: {}".format(
+                did_number, partner_id, vendor_id, workspace_id, agent_id
             )
         )
         try:
@@ -315,8 +315,8 @@ class TalkoDidManagementService:
                 )
 
             update_data: Dict[str, Any] = {}
-            if service_board_id is not None:
-                update_data["service_board_id"] = service_board_id
+            if workspace_id is not None:
+                update_data["workspace_id"] = workspace_id
             if agent_id is not None:
                 update_data["agent_id"] = agent_id
                 update_data["mapped_date"] = current_timestamp
@@ -349,8 +349,8 @@ class TalkoDidManagementService:
                 vendor_id=vendor_id_obj,
                 agent_id=agent_id or existing_did.get("agent_id"),
                 assign_date=existing_did.get("assign_date") or current_timestamp,
-                service_board_id=service_board_id
-                or existing_did.get("service_board_id"),
+                workspace_id=workspace_id
+                or existing_did.get("workspace_id"),
                 update_date=current_timestamp,
                 vendor_config_id=vendor_config_id,
             ).model_dump()
@@ -400,20 +400,20 @@ class TalkoDidManagementService:
             )
             raise
 
-    async def get_dids_by_partner_service_board_and_vendor(
+    async def get_dids_by_partner_workspace_and_vendor(
         self,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         vendor_id: str,
         vendor_config_id: Optional[str] = None,
     ) -> List[str]:
         """
-        Retrieve DIDs for a specific partner, service board, and vendor.
+        Retrieve DIDs for a specific partner, workspace, and vendor.
         """
         self.__logger.info(
-            "Starting get_dids_by_partner_service_board_and_vendor for partner_id: {}, "
-            "service_board_id: {}, vendor_id: {}, vendor_config_id: {}".format(
-                partner_id, service_board_id, vendor_id, vendor_config_id
+            "Starting get_dids_by_partner_workspace_and_vendor for partner_id: {}, "
+            "workspace_id: {}, vendor_id: {}, vendor_config_id: {}".format(
+                partner_id, workspace_id, vendor_id, vendor_config_id
             )
         )
         try:
@@ -430,30 +430,30 @@ class TalkoDidManagementService:
                 )
             )
 
-            dids = await self.__did_repository.get_dids_by_partner_service_board_and_vendor(
-                partner_id, service_board_id, vendor_id_obj, vendor_config_id_obj
+            dids = await self.__did_repository.get_dids_by_partner_workspace_and_vendor(
+                partner_id, workspace_id, vendor_id_obj, vendor_config_id_obj
             )
 
             self.__logger.debug("Retrieved DIDs: {}".format(dids))
             return dids
         except Exception as e:
             self.__logger.error(
-                "Failed to retrieve DIDs for partner_id: {}, service_board_id: {}, "
+                "Failed to retrieve DIDs for partner_id: {}, workspace_id: {}, "
                 "vendor_id: {}, vendor_config_id: {}: {}".format(
-                    partner_id, service_board_id, vendor_id, vendor_config_id, str(e)
+                    partner_id, workspace_id, vendor_id, vendor_config_id, str(e)
                 )
             )
             raise
 
-    async def get_dids_by_partner_agent_service_board_and_vendor(
-        self, partner_id: int, user_id: int, service_board_id: int, vendor_id: str
+    async def get_dids_by_partner_agent_workspace_and_vendor(
+        self, partner_id: int, user_id: int, workspace_id: int, vendor_id: str
     ) -> List[str]:
         """
-        Retrieve DIDs for a specific partner, agent, service board, and vendor.
+        Retrieve DIDs for a specific partner, agent, workspace, and vendor.
         """
         self.__logger.info(
-            "Starting get_dids_by_partner_agent_service_board_and_vendor for partner_id: {}, user_id: {}, service_board_id: {}, vendor_id: {}".format(
-                partner_id, user_id, service_board_id, vendor_id
+            "Starting get_dids_by_partner_agent_workspace_and_vendor for partner_id: {}, user_id: {}, workspace_id: {}, vendor_id: {}".format(
+                partner_id, user_id, workspace_id, vendor_id
             )
         )
         try:
@@ -461,20 +461,20 @@ class TalkoDidManagementService:
             self.__logger.debug(
                 "Converted vendor_id to ObjectId: {}".format(vendor_id_obj)
             )
-            dids = await self.__did_repository.get_dids_by_partner_agent_service_board_and_vendor(
-                partner_id, user_id, service_board_id, vendor_id_obj
+            dids = await self.__did_repository.get_dids_by_partner_agent_workspace_and_vendor(
+                partner_id, user_id, workspace_id, vendor_id_obj
             )
             self.__logger.debug("Retrieved DIDs: {}".format(dids))
             self.__logger.info(
-                "Successfully retrieved DIDs for partner_id: {}, user_id: {}, service_board_id: {}, vendor_id: {}".format(
-                    partner_id, user_id, service_board_id, vendor_id
+                "Successfully retrieved DIDs for partner_id: {}, user_id: {}, workspace_id: {}, vendor_id: {}".format(
+                    partner_id, user_id, workspace_id, vendor_id
                 )
             )
             return dids
         except Exception as e:
             self.__logger.error(
-                "Failed to retrieve DIDs for partner_id: {}, user_id: {}, service_board_id: {}, vendor_id: {}: {}".format(
-                    partner_id, user_id, service_board_id, vendor_id, str(e)
+                "Failed to retrieve DIDs for partner_id: {}, user_id: {}, workspace_id: {}, vendor_id: {}: {}".format(
+                    partner_id, user_id, workspace_id, vendor_id, str(e)
                 )
             )
             raise
@@ -503,21 +503,21 @@ class TalkoDidManagementService:
             )
             raise
 
-    async def get_dids_by_service_board(
-        self, service_board_id: int
+    async def get_dids_by_workspace(
+        self, workspace_id: int
     ) -> List[Dict[str, Any]]:
         """
-        Service method to fetch all DIDs for a service board ID.
+        Service method to fetch all DIDs for a workspace ID.
         Cleans ObjectId and converts to strings for safe schema parsing.
         """
         self.__logger.info(
-            "Starting get_dids_by_service_board for service_board_id: {}".format(
-                service_board_id
+            "Starting get_dids_by_workspace for workspace_id: {}".format(
+                workspace_id
             )
         )
         try:
-            records = await self.__did_repository.get_dids_by_service_board(
-                service_board_id
+            records = await self.__did_repository.get_dids_by_workspace(
+                workspace_id
             )
             self.__logger.debug("Retrieved records: {}".format(records))
 
@@ -544,15 +544,15 @@ class TalkoDidManagementService:
 
             result = [TalkoContract.DIDResponse(**doc) for doc in cleaned_records]
             self.__logger.info(
-                "Successfully retrieved DIDs for service_board_id: {}".format(
-                    service_board_id
+                "Successfully retrieved DIDs for workspace_id: {}".format(
+                    workspace_id
                 )
             )
             return result
         except Exception as e:
             self.__logger.error(
-                "Error fetching DIDs for service board {}: {}".format(
-                    service_board_id, str(e)
+                "Error fetching DIDs for workspace {}: {}".format(
+                    workspace_id, str(e)
                 )
             )
             raise
@@ -744,8 +744,8 @@ class TalkoDidManagementService:
                 await self._assign_round_robin_dids_to_partner(
                     vendor_id, partner_id, assign_did_data, vendor_config_id
                 )
-            elif partner_config.get("enable_service_board"):
-                await self._assign_service_board_dids_to_partner(
+            elif partner_config.get("enable_workspace"):
+                await self._assign_workspace_dids_to_partner(
                     vendor_id, partner_id, assign_did_data, vendor_config_id
                 )
             elif partner_config.get("enable_agent_mapping"):
@@ -786,31 +786,31 @@ class TalkoDidManagementService:
                 did_number=did,
                 vendor_id=str(vendor_id),
                 partner_id=partner_id,
-                service_board_id=None,
+                workspace_id=None,
                 agent_id=None,
                 vendor_config_id=vendor_config_id,
             )
 
-    async def _assign_service_board_dids_to_partner(
+    async def _assign_workspace_dids_to_partner(
         self,
         vendor_id: ObjectId,
         partner_id: int,
         assign_did_data: TalkoContract.AssignDIDToPartner,
         vendor_config_id: Optional[ObjectId] = None,
     ):
-        service_board_dids: List[TalkoContract.ServiceBoardDIDMapping] = (
-            assign_did_data.dids_for_service_board or []
+        workspace_dids: List[TalkoContract.WorkspaceDIDMapping] = (
+            assign_did_data.dids_for_workspace or []
         )
-        if not service_board_dids:
-            raise TalkoBadRequestResponse(detail=MISSING_SERVICE_BOARD_MAPPING_DIDS)
-        for mapping in service_board_dids:
-            board_id = mapping.service_board_id
+        if not workspace_dids:
+            raise TalkoBadRequestResponse(detail=MISSING_WORKSPACE_MAPPING_DIDS)
+        for mapping in workspace_dids:
+            workspace_id = mapping.workspace_id
             for did in mapping.did_numbers:
                 await self.update_did(
                     did_number=did,
                     vendor_id=str(vendor_id),
                     partner_id=partner_id,
-                    service_board_id=int(board_id),
+                    workspace_id=int(workspace_id),
                     agent_id=None,
                     vendor_config_id=vendor_config_id,
                 )
@@ -832,7 +832,7 @@ class TalkoDidManagementService:
                 did_number=mapping.get("did_number"),
                 vendor_id=str(vendor_id),
                 partner_id=partner_id,
-                service_board_id=None,
+                workspace_id=None,
                 agent_id=int(mapping.get("agent_id")),
                 vendor_config_id=vendor_config_id,
             )
@@ -994,7 +994,7 @@ class TalkoDidManagementService:
         self,
         status: Optional[str] = None,
         partner_id: Optional[int] = None,
-        service_board_id: Optional[int] = None,
+        workspace_id: Optional[int] = None,
         did_number: Optional[str] = None,
         page: int = 1,
         limit: int = 20,
@@ -1005,7 +1005,7 @@ class TalkoDidManagementService:
         Args:
             status: Optional status filter (case-insensitive aliases supported)
             partner_id: Required partner ID
-            service_board_id: Optional service board filter
+            workspace_id: Optional workspace filter
             page: Page number (1-based)
             limit: Items per page
 
@@ -1016,8 +1016,8 @@ class TalkoDidManagementService:
             ValueError: If partner_id missing or invalid status provided
         """
         self.__logger.info(
-            "Listing DIDs with filters - status: {}, partner_id: {}, service_board_id: {}, page: {}, limit: {}".format(
-                status, partner_id, service_board_id, page, limit
+            "Listing DIDs with filters - status: {}, partner_id: {}, workspace_id: {}, page: {}, limit: {}".format(
+                status, partner_id, workspace_id, page, limit
             )
         )
         if partner_id is None:
@@ -1053,7 +1053,7 @@ class TalkoDidManagementService:
         total: int
         docs, total = await self.__did_repository.get_dids_by_partner(
             partner_id=partner_id,
-            service_board_id=service_board_id,
+            workspace_id=workspace_id,
             status=normalized_status,  # use normalized value
             did_number=did_number,
             offset=page,
@@ -1078,7 +1078,7 @@ class TalkoDidManagementService:
                     "did_number": clean.get("did_number", ""),
                     "status": clean.get("status", TalkoDIDStatus.AVAILABLE.value),
                     "partner_id": clean.get("partner_id", 0),
-                    "service_board_id": clean.get("service_board_id"),
+                    "workspace_id": clean.get("workspace_id"),
                     "agent_id": clean.get("agent_id"),
                     "vendor_id": str(clean.get("vendor_id", "")),
                     "spam_count": clean.get("spam_count", 0),

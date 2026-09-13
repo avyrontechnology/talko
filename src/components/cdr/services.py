@@ -198,7 +198,7 @@ class TalkoCDRService:
             # concurrently so the display_name lookup adds ~0ms to the
             # critical path instead of stacking on top of the gRPC call.
             agent_data, display_name_map = await asyncio.gather(
-                grpc_client.get_service_board_users_details(agent_ids),
+                grpc_client.get_workspace_users_details(agent_ids),
                 self.__did_repository.get_display_names_by_dids(did_numbers),
             )
 
@@ -245,20 +245,20 @@ class TalkoCDRService:
             call_status: str = payload.get("call_status")
             TalkoGetCallRecordHistoryHelper.validate_call_status(call_status, self.__logger)
 
-            board_agent_ids = [user_id]
+            workspace_agent_ids = [user_id]
 
-            board_agent_ids, user_role = (
+            workspace_agent_ids, user_role = (
                 await self.__analytics_processor.user_hierarchy_data(
                     request_data=payload, current_user_id=user_id
                 )
             )
-            if not board_agent_ids:
+            if not workspace_agent_ids:
                 return TalkoContract.AgentCallRecordHistoryResponse(
                     call_record=[],
                     total_count=0,
                 )
 
-            self.__logger.debug("Board agent IDs for query: {}".format(board_agent_ids))
+            self.__logger.debug("Workspace agent IDs for query: {}".format(workspace_agent_ids))
 
             lead_id: Optional[int] = payload.get("lead_id")
             entity_type: Optional[str] = payload.get("entity_type")
@@ -272,7 +272,7 @@ class TalkoCDRService:
                 entity_id if entity_type == TalkoEntityType.LEAD.value else None
             )
 
-            service_board_id: int = payload.get("service_board_id")
+            workspace_id: int = payload.get("workspace_id")
             time_range: str = payload.get("time_range")
             call_status: str = payload.get("call_status")
             phone_number: str = payload.get("phone_number")
@@ -284,10 +284,10 @@ class TalkoCDRService:
             custom_fields: Optional[Dict[str, Any]] = payload.get("custom_fields")
 
             if agents:
-                board_agent_ids = agents
+                workspace_agent_ids = agents
 
             if user_role == TalkoUserRoleHierarchy.MAINTAINER.value and not agents:
-                board_agent_ids = []
+                workspace_agent_ids = []
 
             start_time: int = 0
             end_time: int = 0
@@ -300,11 +300,11 @@ class TalkoCDRService:
                 )
 
             self.__logger.debug(
-                "Filters - lead_id: {}, entity_type: {}, entity_id: {}, service_board_id: {}, start_time: {}, end_time: {}, call_status: {}, phone_number: {}, talk_time_range: {}, call_type: {}, did_number: {}".format(
+                "Filters - lead_id: {}, entity_type: {}, entity_id: {}, workspace_id: {}, start_time: {}, end_time: {}, call_status: {}, phone_number: {}, talk_time_range: {}, call_type: {}, did_number: {}".format(
                     derived_lead_id,
                     entity_type,
                     entity_id,
-                    service_board_id,
+                    workspace_id,
                     start_time,
                     end_time,
                     call_status,
@@ -317,9 +317,9 @@ class TalkoCDRService:
 
             query: dict = TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
                 lead_id=derived_lead_id,
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
                 call_status=call_status,
-                board_agent_ids=board_agent_ids,
+                workspace_agent_ids=workspace_agent_ids,
                 phone_number=phone_number,
                 start_time=start_time,
                 end_time=end_time,
@@ -392,7 +392,7 @@ class TalkoCDRService:
             # so the display_name lookup doesn't add latency on top of the
             # gRPC agent-details call.
             agent_data, display_name_map = await asyncio.gather(
-                grpc_client.get_service_board_users_details(agent_ids),
+                grpc_client.get_workspace_users_details(agent_ids),
                 self.__did_repository.get_display_names_by_dids(did_numbers),
             )
 

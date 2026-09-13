@@ -91,7 +91,7 @@ class TalkoCommonCDRHelper:
             "lead_id": cdr.get("lead_id"),
             "entity_type": cdr.get("entity_type"),
             "entity_id": cdr.get("entity_id"),
-            "service_board_id": cdr.get("service_board_id"),
+            "workspace_id": cdr.get("workspace_id"),
             "calling_mode": cdr.get("calling_mode"),
             "call_status": cdr.get("call_status"),
             "call_recording": cdr.get("call_recording") or "",
@@ -529,7 +529,7 @@ class TalkoGetCallRecordHistoryHelper:
             "lead_id": 1,
             "entity_type": 1,
             "entity_id": 1,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "calling_mode": 1,
             "call_status": 1,
             "call_recording": 1,
@@ -687,9 +687,9 @@ class TalkoGetCallRecordHistoryHelper:
     @staticmethod
     def build_call_record_history_query(
         lead_id: Optional[int],
-        service_board_id: int,
+        workspace_id: int,
         call_status: Optional[list[str]] = None,
-        board_agent_ids: Optional[list[int]] = None,
+        workspace_agent_ids: Optional[list[int]] = None,
         phone_number: Optional[str] = None,
         start_time: Optional[int] = None,
         end_time: Optional[int] = None,
@@ -711,10 +711,10 @@ class TalkoGetCallRecordHistoryHelper:
         TalkoGetCallRecordHistoryHelper.add_basic_filters(
             query=query,
             lead_id=lead_id,
-            service_board_id=service_board_id,
+            workspace_id=workspace_id,
             start_time=start_time,
             end_time=end_time,
-            board_agent_ids=board_agent_ids,
+            workspace_agent_ids=workspace_agent_ids,
             logger=logger,
             entity_type=entity_type,
             entity_id=entity_id,
@@ -879,10 +879,10 @@ class TalkoGetCallRecordHistoryHelper:
     def add_basic_filters(
         query: dict,
         lead_id: Optional[int],
-        service_board_id: int,
+        workspace_id: int,
         start_time: Optional[int],
         end_time: Optional[int],
-        board_agent_ids: Optional[list[int]] = None,
+        workspace_agent_ids: Optional[list[int]] = None,
         logger: TalkoServiceLogger = None,
         entity_type: Optional[str] = None,
         entity_id: Optional[int] = None,
@@ -913,19 +913,19 @@ class TalkoGetCallRecordHistoryHelper:
             else:
                 query.update(entity_filter)
 
-        if service_board_id is not None:
-            query["service_board_id"] = service_board_id
+        if workspace_id is not None:
+            query["workspace_id"] = workspace_id
             logger.debug(
-                "Added service_board_id filter in get call record history query helper: {}".format(
-                    service_board_id
+                "Added workspace_id filter in get call record history query helper: {}".format(
+                    workspace_id
                 )
             )
 
-        if board_agent_ids:
-            query["agent"] = {"$in": board_agent_ids}
+        if workspace_agent_ids:
+            query["agent"] = {"$in": workspace_agent_ids}
             logger.debug(
-                "Added board_agent_ids filter in get call record history query helper: {}".format(
-                    board_agent_ids
+                "Added workspace_agent_ids filter in get call record history query helper: {}".format(
+                    workspace_agent_ids
                 )
             )
 

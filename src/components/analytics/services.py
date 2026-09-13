@@ -51,7 +51,7 @@ class TalkoAnalyticsService:
                 if agent_ids:
                     grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
                     agent_data: Dict[int, Dict[str, Any]] = (
-                        await grpc_client.get_service_board_users_details(agent_ids)
+                        await grpc_client.get_workspace_users_details(agent_ids)
                     )
                     for agent in result.data["agents"]:
                         agent["agent_name"] = agent_data.get(agent["agent_id"], {}).get(

@@ -9,7 +9,7 @@ from src.components.analytics.dto import (
     TalkoAnalyticsRequest,
     TalkoAnalyticsResponse,
     TalkoDashboardFollowupTrendsRequest,
-    TalkoPartnerServiceBoardRequest,
+    TalkoPartnerWorkspaceRequest,
     TalkoTotalAgentTalkTimeRequest,
 )
 from src.components.analytics.enums import TalkoTimeInterval
@@ -37,28 +37,28 @@ def test_agent_related_requests_defaults(model_class):
     req = model_class()
     assert req.time_range is None
     assert req.agents is None
-    assert req.service_board_id is None
+    assert req.workspace_id is None
 
     req = model_class(time_range="1625097600000-1627689600000", agents=[1, 2, 3])
     assert req.time_range == "1625097600000-1627689600000"
     assert 1 in req.agents
-    assert req.service_board_id is None
+    assert req.workspace_id is None
 
 
-def test_partner_service_board_request_valid():
-    req = TalkoPartnerServiceBoardRequest(
+def test_partner_workspace_request_valid():
+    req = TalkoPartnerWorkspaceRequest(
         time_range="1625097600000-1627689600000",  # 2021-07-01 to 2021-07-31
-        service_board_id=[1, 2],
+        workspace_id=[1, 2],
     )
     assert req.time_range == "1625097600000-1627689600000"
-    assert req.service_board_id == [1, 2]
+    assert req.workspace_id == [1, 2]
 
 
-def test_partner_service_board_request_invalid_date_range():
+def test_partner_workspace_request_invalid_date_range():
     with pytest.raises(ValueError) as excinfo:
-        TalkoPartnerServiceBoardRequest(
+        TalkoPartnerWorkspaceRequest(
             time_range="1627689600000-1625097600000",  # end < start
-            service_board_id=[1],
+            workspace_id=[1],
         )
     assert analytics_messages.ENDDATE_STARTDATE_GREATER_ERROR in str(excinfo.value)
 
@@ -72,12 +72,12 @@ def test_analytics_response():
 def test_dashboard_call_trends_request_valid():
     req = TalkoDashboardFollowupTrendsRequest(
         time_range="1722470400000-1726444800000",  # 2025-08-01 to 2025-09-15
-        service_board_id=[40, 41],
+        workspace_id=[40, 41],
         metric_filter="agent_missed_calls",
         trend_basis=TalkoTimeInterval.WEEKS.value,
     )
     assert req.time_range == "1722470400000-1726444800000"
-    assert req.service_board_id == [40, 41]
+    assert req.workspace_id == [40, 41]
     assert req.metric_filter == "agent_missed_calls"
 
 
@@ -85,7 +85,7 @@ def test_dashboard_call_trends_request_invalid_metric():
     with pytest.raises(ValueError) as excinfo:
         TalkoDashboardFollowupTrendsRequest(
             time_range="1722470400000-1726444800000",
-            service_board_id=[40],
+            workspace_id=[40],
             metric_filter="invalid_metric",
             trend_basis="Weekly",
         )
@@ -96,7 +96,7 @@ def test_dashboard_call_trends_request_invalid_trend_basis():
     with pytest.raises(ValueError) as excinfo:
         TalkoDashboardFollowupTrendsRequest(
             time_range="1722470400000-1726444800000",
-            service_board_id=[40],
+            workspace_id=[40],
             metric_filter="agent_missed_calls",
             trend_basis="Yearly",
         )
@@ -107,7 +107,7 @@ def test_dashboard_call_trends_request_invalid_time_range():
     with pytest.raises(ValueError) as excinfo:
         TalkoDashboardFollowupTrendsRequest(
             time_range="1726444800000-1722470400000",  # end < start
-            service_board_id=[40],
+            workspace_id=[40],
             metric_filter="agent_missed_calls",
             trend_basis="Weekly",
         )

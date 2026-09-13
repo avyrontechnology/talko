@@ -278,7 +278,7 @@ def test_call_record_history_response_valid():
         "partner_id": 10,
         "agent": 1,
         "lead_id": 123,
-        "service_board_id": 20,
+        "workspace_id": 20,
         "calling_mode": "inbound",
         "call_status": "answered",
         "call_recording": "http://recording.com/1",
@@ -402,7 +402,7 @@ def test_call_record_history_payload_valid():
     """Test CallRecordHistoryPayload with valid data."""
     data = {
         "lead_id": 123,
-        "service_board_id": 20,
+        "workspace_id": 20,
         "time_range": "1727181060-1727184660",
         "call_status": ["answered", "missed"],
         "agents": [1, 2],
@@ -423,7 +423,7 @@ def test_call_record_history_payload_missing_optional_fields():
     data = {}
     payload = TalkoContract.CallRecordHistoryPayload(**data)
     assert payload.lead_id is None
-    assert payload.service_board_id is None
+    assert payload.workspace_id is None
     assert payload.time_range is None
     assert payload.call_status is None
     assert payload.agents is None

@@ -78,18 +78,18 @@ class TalkoDialerWebhookHandler(TalkoWebhookHandler):
 
         self.logger.debug("DID info retrieved: {}".format(did_info))
         partner_id: int = did_info["partner_id"]
-        service_board_id: Optional[int] = did_info.get("service_board_id")
+        workspace_id: Optional[int] = did_info.get("workspace_id")
         vendor_id: Optional[str] = did_info.get("vendor_id")
         vendor_config_id: Optional[str] = did_info.get("vendor_config_id")
 
         self.logger.debug(
-            "Partner ID: {}, Service Board ID: {}".format(partner_id, service_board_id)
+            "Partner ID: {}, Workspace ID: {}".format(partner_id, workspace_id)
         )
 
         # 3. Upsert IVR lead (only if customer number exists)
         upsert_res: Optional[Tuple[Any, str, Optional[int]]] = (
             await self._upsert_ivr_lead_if_needed(
-                customer_norm, partner_id, service_board_id
+                customer_norm, partner_id, workspace_id
             )
         )
 
@@ -124,7 +124,7 @@ class TalkoDialerWebhookHandler(TalkoWebhookHandler):
 
         base_fields: Dict[str, Any] = self._build_base_fields(
             partner_id,
-            service_board_id,
+            workspace_id,
             did_number,
             customer_norm,
             lead_id,
@@ -238,8 +238,8 @@ class TalkoDialerWebhookHandler(TalkoWebhookHandler):
                 return None
 
             self.logger.debug(
-                "DID info found: partner_id={}, service_board_id={}".format(
-                    partner_id, record.get("service_board_id")
+                "DID info found: partner_id={}, workspace_id={}".format(
+                    partner_id, record.get("workspace_id")
                 )
             )
 
@@ -260,7 +260,7 @@ class TalkoDialerWebhookHandler(TalkoWebhookHandler):
 
             return {
                 "partner_id": partner_id,
-                "service_board_id": record.get("service_board_id"),
+                "workspace_id": record.get("workspace_id"),
                 "vendor_id": vendor_id,
                 "vendor_config_id": vendor_config_id,
             }
@@ -273,7 +273,7 @@ class TalkoDialerWebhookHandler(TalkoWebhookHandler):
         self,
         customer_number: str,
         partner_id: int,
-        service_board_id: Optional[int],
+        workspace_id: Optional[int],
     ) -> Optional[Tuple[Any, str, Optional[int]]]:
         self.logger.debug(
             "Upserting IVR lead if needed for customer: {}".format(customer_number)
@@ -286,7 +286,7 @@ class TalkoDialerWebhookHandler(TalkoWebhookHandler):
         try:
             response: Dict[str, Any] = await self.maglo_client.upsert_ivr_lead(
                 partner_id=partner_id,
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
                 phone_number=customer_number,
             )
 
@@ -361,7 +361,7 @@ class TalkoDialerWebhookHandler(TalkoWebhookHandler):
     def _build_base_fields(
         self,
         partner_id: int,
-        service_board_id: Optional[int],
+        workspace_id: Optional[int],
         did_number: str,
         customer_norm: str,
         lead_id: Optional[int],
@@ -397,7 +397,7 @@ class TalkoDialerWebhookHandler(TalkoWebhookHandler):
             outbound_type="phone_number",
             inbound_type=None,
             partner_id=partner_id,
-            service_board_id=service_board_id,
+            workspace_id=workspace_id,
             lead_id=lead_id,
             lead_name=lead_name,
             agent=assigned_agent_id,

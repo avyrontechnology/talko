@@ -360,7 +360,7 @@ class TestAuthServiceClient:
             "Error during GetUserRoles call: Simulated error"
         )
 
-    async def test_get_service_board_users_details_success(
+    async def test_get_workspace_users_details_success(
         self, client, mock_logger, mock_auth_stub
     ):
         user_ids = [1, 2]  # Integer list
@@ -378,7 +378,7 @@ class TestAuthServiceClient:
             return_value=mock_response
         )
 
-        result = await client.get_service_board_users_details(user_ids)
+        result = await client.get_workspace_users_details(user_ids)
 
         mock_auth_stub.GetServiceBoardUsersDetails.assert_called_once()
         assert mock_auth_stub.GetServiceBoardUsersDetails.call_args[0][0].user_ids == [
@@ -400,7 +400,7 @@ class TestAuthServiceClient:
             f"Sending GetUserChildHierarchy request for user_id: {user_ids}"
         )
 
-    async def test_get_service_board_users_details_failure(
+    async def test_get_workspace_users_details_failure(
         self, client, mock_logger, mock_auth_stub
     ):
         user_ids = [1, 2]  # Integer list
@@ -408,7 +408,7 @@ class TestAuthServiceClient:
             side_effect=TalkoDummyAioRpcError()
         )
 
-        result = await client.get_service_board_users_details(user_ids)
+        result = await client.get_workspace_users_details(user_ids)
 
         mock_auth_stub.GetServiceBoardUsersDetails.assert_called_once()
         assert mock_auth_stub.GetServiceBoardUsersDetails.call_args[0][0].user_ids == [

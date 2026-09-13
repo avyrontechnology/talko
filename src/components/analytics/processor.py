@@ -4,7 +4,7 @@ from src.components.analytics.dto import (
     TalkoAgentCallAnalyticsRequest,
     TalkoAgentTalkTimeDistributionRequest,
     TalkoDashboardFollowupTrendsRequest,
-    TalkoPartnerServiceBoardRequest,
+    TalkoPartnerWorkspaceRequest,
     TalkoTotalAgentTalkTimeRequest,
 )
 from src.components.analytics.repositories import TalkoAnalyticsRepository
@@ -100,7 +100,7 @@ class TalkoAnalyticsProcessor:
                     start_date=start_date,
                     end_date=end_date,
                     agents=agent_ids,
-                    service_board_id=request_data.service_board_id,
+                    workspace_id=request_data.workspace_id,
                     entity_type=request_data.entity_type,
                     limit=limit,
                     offset=offset,
@@ -157,7 +157,7 @@ class TalkoAnalyticsProcessor:
                     start_date=start_date,
                     end_date=end_date,
                     agents=agent_ids,
-                    service_board_id=request_data.service_board_id,
+                    workspace_id=request_data.workspace_id,
                     entity_type=request_data.entity_type,
                     limit=limit,
                     offset=offset,
@@ -212,7 +212,7 @@ class TalkoAnalyticsProcessor:
                     start_date=start_date,
                     end_date=end_date,
                     agents=agent_ids,
-                    service_board_id=request_data.service_board_id,
+                    workspace_id=request_data.workspace_id,
                     entity_type=request_data.entity_type,
                     limit=limit,
                     offset=offset,
@@ -233,18 +233,18 @@ class TalkoAnalyticsProcessor:
             )
             raise
 
-    async def _get_partner_service_board(
+    async def _get_partner_workspace(
         self,
         current_user_id: int,
         partner_id: int,
-        request_data: TalkoPartnerServiceBoardRequest,
+        request_data: TalkoPartnerWorkspaceRequest,
         limit: int,
         offset: int,
     ) -> Dict[str, Any]:
         try:
             start_date, end_date = self._parse_time_range(request_data.time_range)
             self.logger.info(
-                "Fetching partner service board for user_id={}, partner_id={}, date_range=({}, {}), limit={}, offset={}".format(
+                "Fetching partner workspace for user_id={}, partner_id={}, date_range=({}, {}), limit={}, offset={}".format(
                     current_user_id,
                     partner_id,
                     start_date,
@@ -261,11 +261,11 @@ class TalkoAnalyticsProcessor:
             )
 
             result: Dict[str, Any] = (
-                await self.analytics_repository.get_partner_service_board(
+                await self.analytics_repository.get_partner_workspace(
                     partner_id=partner_id,
                     start_date=start_date,
                     end_date=end_date,
-                    service_board_id=request_data.service_board_id,
+                    workspace_id=request_data.workspace_id,
                     entity_type=request_data.entity_type,
                     limit=limit,
                     offset=offset,
@@ -277,14 +277,14 @@ class TalkoAnalyticsProcessor:
                 "Processor get partner servcie board result: {}".format(result)
             )
             self.logger.info(
-                "Partner service board fetched successfully for user_id={}, partner_id={}".format(
+                "Partner workspace fetched successfully for user_id={}, partner_id={}".format(
                     current_user_id, partner_id
                 )
             )
             return result
         except Exception as e:
             self.logger.error(
-                "Error in partner service board for user_id={}, partner_id={}, error={}".format(
+                "Error in partner workspace for user_id={}, partner_id={}, error={}".format(
                     current_user_id, partner_id, str(e)
                 )
             )
@@ -325,7 +325,7 @@ class TalkoAnalyticsProcessor:
                     start_date=start_date,
                     end_date=end_date,
                     agents=agent_ids,
-                    service_board_id=request_data.service_board_id,
+                    workspace_id=request_data.workspace_id,
                     entity_type=request_data.entity_type,
                     metric=request_data.metric_filter,
                     trend_basis=request_data.trend_basis,

@@ -179,7 +179,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
             return {}
 
     @TalkoGRPCClient.call_with_retry
-    async def get_service_board_users_details(self, user_ids):
+    async def get_workspace_users_details(self, user_ids):
         user_ids: list = (
             [user_ids]
             if isinstance(user_ids, int)
@@ -191,6 +191,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
         request = auth_pb2.GetUsersDetailsRequest(user_ids=user_ids)
 
         try:
+            # Proto RPC name is external (console-service) — do not rename.
             response = await self.stub.GetServiceBoardUsersDetails(request)
             logger.info(
                 f"Received child user list for user_id: {user_ids}: {response.user_detail}"

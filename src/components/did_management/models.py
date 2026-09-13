@@ -9,7 +9,7 @@ from src.utils.timestamped_model import TalkoTimestampedModel
 
 
 class TalkoPhoneNumberManagement(TalkoTimestampedModel):
-    service_board_id: int  # Service board identifier
+    workspace_id: int  # Workspace identifier
     did_number: str  # DID number
     partner_id: int  # Partner identifier
     vendor_id: ObjectId  # Vendor identifier
@@ -54,7 +54,7 @@ class TalkoDidHistoryModel(TalkoTimestampedModel):
     agent_id: Optional[int] = None  # Agent identifier, optional
     assign_date: int  # Timestamp of assignment
     unassign_date: Optional[int] = None  # Timestamp of unassignment
-    service_board_id: Optional[int] = None  # Service board identifier, optional
+    workspace_id: Optional[int] = None  # Workspace identifier, optional
 
     class CollectionName:
         DID_HISTORY = "did_history"

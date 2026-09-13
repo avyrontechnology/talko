@@ -11,7 +11,7 @@ class TestCallCreateDTO:
         """Test that encryption requires lead_secret and passes when provided."""
         data = {
             "lead_id": 1,
-            "service_board_id": 10,
+            "workspace_id": 10,
             "encryption_enabled": True,
             "lead_secret": "supersecret",
             "agent_number": "9876543210",
@@ -24,7 +24,7 @@ class TestCallCreateDTO:
         """Test that disabled encryption passes when to_number is provided."""
         data = {
             "lead_id": 2,
-            "service_board_id": 20,
+            "workspace_id": 20,
             "to_number": "1234567890",
             "encryption_enabled": False,
             "agent_number": "9876543210",
@@ -35,7 +35,7 @@ class TestCallCreateDTO:
     def test_valid_dedicated_did(self):
         """Test the field validator for dedicated_did with valid data."""
         data = {
-            "service_board_id": 30,
+            "workspace_id": 30,
             "agent_number": "9876543210",
             "to_number": "1234567890",
             "encryption_enabled": False,
@@ -46,7 +46,7 @@ class TestCallCreateDTO:
 
     def test_invalid_encryption_enabled_without_lead_secret(self):
         data = {
-            "service_board_id": 40,
+            "workspace_id": 40,
             "encryption_enabled": True,
             "agent_number": "9876543210",
         }
@@ -56,7 +56,7 @@ class TestCallCreateDTO:
 
     def test_invalid_encryption_disabled_without_to_number(self):
         data = {
-            "service_board_id": 50,
+            "workspace_id": 50,
             "encryption_enabled": False,
             "agent_number": "9876543210",
         }
@@ -66,7 +66,7 @@ class TestCallCreateDTO:
 
     def test_invalid_missing_agent_number(self):
         data = {
-            "service_board_id": 60,
+            "workspace_id": 60,
             "encryption_enabled": False,
             "to_number": "1234567890",
         }
@@ -76,7 +76,7 @@ class TestCallCreateDTO:
 
     def test_invalid_outbound_type_value(self):
         data = {
-            "service_board_id": 70,
+            "workspace_id": 70,
             "encryption_enabled": False,
             "to_number": "1234567890",
             "agent_number": "9876543210",
@@ -97,7 +97,7 @@ class TestCallCreateDTO:
     )
     def test_invalid_dedicated_did_formats(self, bad_did):
         data = {
-            "service_board_id": 80,
+            "workspace_id": 80,
             "agent_number": "9876543210",
             "to_number": "1234567890",
             "encryption_enabled": False,
@@ -110,7 +110,7 @@ class TestCallCreateDTO:
     def test_none_values_for_optional_fields(self):
         """Ensure validators don't crash when optional fields are None."""
         data = {
-            "service_board_id": 90,
+            "workspace_id": 90,
             "agent_number": "9876543210",
             "to_number": "1234567890",
             "encryption_enabled": False,

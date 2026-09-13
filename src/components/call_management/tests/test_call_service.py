@@ -49,7 +49,7 @@ class TestCallService:
 
         did_record = {
             "partner_id": 100,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "vendor_id": "vendor123",
             "vendor_config_id": "config456",
         }
@@ -65,7 +65,7 @@ class TestCallService:
             "target": target,
             "partner_id": 100,
             "agent_id": None,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "agent_number": None,
             "agent_ids": [
                 {"agent_id": 50, "agent_number": "111", "cloud_agent_number": None},
@@ -131,7 +131,7 @@ class TestCallService:
             lead_secret="b3d9c82198869d446788079e5e331146de19fd18470cba2ea3eb1a3a24d04bb2ded255900d4af46db350c36dc01b4d7b89af108c7df4598262ce434475e47bff4b37640334953b102fe93fae4d84218111b4cf56c154013048fd1145dd0f478a44f2dd2158fdbb0698f341190bb605bbeb85faf3f5af0608b5410597417ed48735e13caa48992cc46e94703417c8fdaef88a5424e5fcd567145d2505075c09adfc03f26765c2591f2f08423416a2487c29fee155f1c3e7f3778b7398b4ec8aa4b021fac0baf57314d7aec3cfeb28807b067656fcb2f45ef37f9039b4d64db76515be7d56bfb8836cbc5a01999308073e269669f5a2ef7b14a2839d740eeb9a4b",
             lead_id=1001,
             agent_number="8888888888",
-            service_board_id=1,
+            workspace_id=1,
             encryption_enabled=True,
         )
         to_number = "+919789346723"
@@ -183,7 +183,7 @@ class TestCallService:
             lead_id=1001,
             call_url="https://test.com",
             agent_number="8888888888",
-            service_board_id=1,
+            workspace_id=1,
             encryption_enabled=True,
         )
 
@@ -216,7 +216,7 @@ class TestCallService:
             lead_id=1001,
             call_url="https://test.com",
             agent_number="8888888888",
-            service_board_id=1,
+            workspace_id=1,
             encryption_enabled=True,
         )
 
@@ -260,7 +260,7 @@ class TestCallService:
             lead_id=1001,
             call_url="https://test.com",
             agent_number="8888888888",
-            service_board_id=1,
+            workspace_id=1,
             encryption_enabled=True,
         )
 
@@ -287,7 +287,7 @@ class TestCallService:
             number_type="primary",
             lead_id=1001,
             agent_number="8888888888",
-            service_board_id=1,
+            workspace_id=1,
         )
 
         partner_config = {"vendor_id": "vendor123", "vendor_config_id": "config456"}
@@ -322,7 +322,7 @@ class TestCallService:
             number_type="primary",
             lead_id=1001,
             cloud_agent_number="9999999999",
-            service_board_id=1,
+            workspace_id=1,
             encryption_enabled=False,
         )
 
@@ -364,7 +364,7 @@ class TestCallService:
             number_type="primary",
             lead_id=1001,
             enable_ai_bridge=True,
-            service_board_id=1,
+            workspace_id=1,
         )
 
         partner_config = {"vendor_id": "vendor123", "vendor_config_id": "config456"}
@@ -412,7 +412,7 @@ class TestCallService:
             number_type="primary",
             lead_id=1001,
             enable_ai_bridge=True,
-            service_board_id=1,
+            workspace_id=1,
             context_data={"campaign_id": "7", "recipient_id": "92"},
         )
 
@@ -455,7 +455,7 @@ class TestCallService:
             number_type="primary",
             lead_id=1001,
             agent_number="8888888888",
-            service_board_id=1,
+            workspace_id=1,
         )
 
         service._TalkoCallService__helper.get_partner_config = AsyncMock(
@@ -490,7 +490,7 @@ class TestCallService:
 
         cdr_data = {
             "partner_id": 100,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "agent": 50,
             "agent_number": "8888888888",
             "lead_id": 1001,
@@ -532,7 +532,7 @@ class TestCallService:
         publisher = deps["inbound_call_event_publisher"]
         publisher.publish_inbound_call.assert_called_once_with(
             partner_id=100,
-            service_board_id=1,
+            workspace_id=1,
             dedicated_did="+919876543210",
             agent_id=50,
             display_name="Sales Line",
@@ -562,7 +562,7 @@ class TestCallService:
 
         cdr_data = {
             "partner_id": 100,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "agent": 4940,
             "agent_number": "8888888888",
             # Real-world shape seen in QA: entity_type was already "Lead"
@@ -610,7 +610,7 @@ class TestCallService:
         publisher = deps["inbound_call_event_publisher"]
         publisher.publish_inbound_call.assert_called_once_with(
             partner_id=100,
-            service_board_id=1,
+            workspace_id=1,
             dedicated_did="+919876543210",
             agent_id=4957,
             display_name="Sales Line",
@@ -632,7 +632,7 @@ class TestCallService:
 
         did_record = {
             "partner_id": 100,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "vendor_id": "vendor123",
             "vendor_config_id": "config456",
             "display_name": "Support Line",
@@ -649,7 +649,7 @@ class TestCallService:
             "target": target,
             "partner_id": 100,
             "agent_id": 50,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "agent_number": "8888888888",
             "agent_ids": [
                 {"agent_id": 50, "agent_number": "111", "cloud_agent_number": None},
@@ -688,7 +688,7 @@ class TestCallService:
         publisher = deps["inbound_call_event_publisher"]
         publisher.publish_inbound_call.assert_called_once_with(
             partner_id=100,
-            service_board_id=1,
+            workspace_id=1,
             dedicated_did="+919876543210",
             agent_id=50,
             agent_ids=[50, 51],
@@ -714,7 +714,7 @@ class TestCallService:
 
         did_record = {
             "partner_id": 100,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "vendor_id": "vendor123",
             "vendor_config_id": "config456",
             "display_name": "Support Line",
@@ -731,7 +731,7 @@ class TestCallService:
             "target": target,
             "partner_id": 100,
             "agent_id": None,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "agent_number": None,
             "agent_ids": [],
             "lead_id": None,
@@ -766,7 +766,7 @@ class TestCallService:
             customer_number="+911234567890",
             call_to_number="+919876543210",
             partner_id=100,
-            service_board_id=1,
+            workspace_id=1,
             vendor_id="vendor123",
             vendor_config_id="config456",
             create_lead=False,
@@ -798,7 +798,7 @@ class TestCallService:
         deps["inbound_call_event_publisher"].publish_inbound_call.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_generate_dialplan_no_cdr_did_without_service_board_skips_event_publish(
+    async def test_generate_dialplan_no_cdr_did_without_workspace_skips_event_publish(
         self,
     ):
         service, deps = make_service()
@@ -854,7 +854,7 @@ class TestCallService:
         assert result[0]["transfer"]["data"] == []
 
     @pytest.mark.asyncio
-    async def test_generate_dialplan_no_cdr_did_without_service_board(self):
+    async def test_generate_dialplan_no_cdr_did_without_workspace(self):
         service, deps = make_service()
         repository = deps["repository"]
         did_management_service = deps["did_management_service"]
@@ -895,7 +895,7 @@ class TestCallService:
 
         did_record = {
             "partner_id": 100,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "vendor_id": "vendor123",
             "vendor_config_id": "config456",
         }
@@ -908,7 +908,7 @@ class TestCallService:
             "target": target,
             "partner_id": 100,
             "agent_id": None,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "agent_number": None,
             "agent_ids": [],
             "lead_id": None,
@@ -949,7 +949,7 @@ class TestCallService:
 
         cdr_data = {
             "partner_id": 100,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "agent": 50,
             "agent_number": "8888888888",
             "lead_id": 1001,
@@ -987,7 +987,7 @@ class TestCallService:
 
         did_record = {
             "partner_id": 100,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "vendor_id": "vendor123",
             "vendor_config_id": "config456",
         }
@@ -1003,7 +1003,7 @@ class TestCallService:
             "target": target,
             "partner_id": 100,
             "agent_id": None,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "agent_number": None,
             "agent_ids": [],
             "lead_id": None,
@@ -1079,7 +1079,7 @@ class TestCallService:
 
         did_record = {
             "partner_id": 100,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "vendor_id": "vendor123",
             "vendor_config_id": "config456",
         }
@@ -1095,7 +1095,7 @@ class TestCallService:
             "target": target,
             "partner_id": 100,
             "agent_id": None,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "agent_number": None,
             "agent_ids": [],
             "lead_id": None,
@@ -1139,7 +1139,7 @@ class TestCallService:
 
         did_record = {
             "partner_id": 100,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "vendor_id": "vendor123",
             "vendor_config_id": "config456",
         }
@@ -1155,7 +1155,7 @@ class TestCallService:
             "target": target,
             "partner_id": 100,
             "agent_id": None,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "agent_number": None,
             "agent_ids": [],
             "lead_id": None,

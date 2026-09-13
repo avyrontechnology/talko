@@ -182,8 +182,8 @@ class TestAnalyticsRepository:
 
     @pytest.mark.asyncio
     @patch("src.components.analytics.repositories.TalkoDateRangeHelper.adjust_date_range")
-    async def test_get_partner_service_board_success(self, mock_adjust):
-        """Test successful retrieval of partner service board analytics."""
+    async def test_get_partner_workspace_success(self, mock_adjust):
+        """Test successful retrieval of partner workspace analytics."""
         fake_result = [
             {
                 "partner_id": 42,
@@ -204,25 +204,25 @@ class TestAnalyticsRepository:
                 analytics_constants.GTE_CONDITION: 1000,
                 analytics_constants.LTE_CONDITION: 2000,
             },
-            "service_board_id": {analytics_constants.IN_CONDITION: [99]},
+            "workspace_id": {analytics_constants.IN_CONDITION: [99]},
         }
 
-        await self.repo.get_partner_service_board(
+        await self.repo.get_partner_workspace(
             partner_id=42,
             start_date=1000,
             end_date=2000,
-            service_board_id=[99],
+            workspace_id=[99],
             limit=10,
             offset=1,
         )
         self.mock_logger.info.assert_any_call(
-            "Successfully retrieved partner service board analytics for partner_id: 42"
+            "Successfully retrieved partner workspace analytics for partner_id: 42"
         )
         self.mock_collection.aggregate.assert_called()
         self.mock_logger.debug.assert_any_call(
-            f"Retrieving partner service board analytics for partner_id: 42, "
+            f"Retrieving partner workspace analytics for partner_id: 42, "
             f"start_date: 1000, end_date: 2000, period: {TalkoDateRangePeriod.CUSTOM.value}, "
-            f"service_board_id: [99]"
+            f"workspace_id: [99]"
         )
 
     @pytest.mark.asyncio
@@ -275,7 +275,7 @@ class TestAnalyticsRepository:
             start_date=1000,
             end_date=2000,
             agents=[123],
-            service_board_id=[11],
+            workspace_id=[11],
             metric="total_calls",
             trend_basis="daily",
             limit=10,

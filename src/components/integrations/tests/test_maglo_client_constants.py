@@ -92,7 +92,8 @@ class TestMagloApiConstants:
 
     def test_query_parameter_constants(self):
         """Test that query parameter constants are defined"""
-        assert TalkoMagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM == "service_board_id"
+        # Value is the external Maglo wire key.
+        assert TalkoMagloApiConstants.DEFAULT_WORKSPACE_ID_PARAM == "service_board_id"
         assert TalkoMagloApiConstants.DEFAULT_AGENT_ID_PARAM == "agent_id"
         assert TalkoMagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER == "phone_number"
         assert TalkoMagloApiConstants.LEAD_PAYLOAD_PARTNER_ID == "partner_id"
@@ -188,7 +189,7 @@ class TestMagloApiConstants:
     def test_parameter_and_field_names_no_spaces(self):
         """Test that parameter and field names don't contain spaces"""
         constants_to_check = [
-            TalkoMagloApiConstants.DEFAULT_SERVICE_BOARD_ID_PARAM,
+            TalkoMagloApiConstants.DEFAULT_WORKSPACE_ID_PARAM,
             TalkoMagloApiConstants.DEFAULT_AGENT_ID_PARAM,
             TalkoMagloApiConstants.LEAD_PAYLOAD_PHONE_NUMBER,
             TalkoMagloApiConstants.LEAD_PAYLOAD_PARTNER_ID,

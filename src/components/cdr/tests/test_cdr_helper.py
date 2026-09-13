@@ -44,7 +44,7 @@ def fake_cdr_dict():
         "partner_id": 10,
         "agent": 1,
         "lead_id": 5,
-        "service_board_id": 20,
+        "workspace_id": 20,
         "calling_mode": INBOUND,
         "call_status": "missed",
         "call_recording": "http://recording.com/1",
@@ -70,7 +70,7 @@ def fake_filtered_cdr_dict():
         "partner_id": cdr["partner_id"],
         "agent": cdr["agent"],
         "lead_id": cdr["lead_id"],
-        "service_board_id": cdr["service_board_id"],
+        "workspace_id": cdr["workspace_id"],
         "calling_mode": cdr["calling_mode"],
         "call_status": cdr["call_status"],
         "call_recording": cdr["call_recording"],
@@ -212,7 +212,7 @@ class TestCommonCDRHelper:
             "partner_id": 10,
             "agent": "",
             "lead_id": None,
-            "service_board_id": None,
+            "workspace_id": None,
             "calling_mode": None,
             "call_status": None,
             "call_recording": "",
@@ -283,7 +283,7 @@ class TestCommonCDRHelper:
             partner_id=1009,
             agent=30,
             lead_id=2,
-            service_board_id=2,
+            workspace_id=2,
             calling_mode="clicktocall",
             call_status="initiated",
             call_recording="",
@@ -322,7 +322,7 @@ class TestCommonCDRHelper:
             partner_id=1009,
             agent=30,  # Agent ID not in agent_data
             lead_id=2,
-            service_board_id=2,
+            workspace_id=2,
             calling_mode="clicktocall",
             call_status="initiated",
             call_recording="",
@@ -700,7 +700,7 @@ class TestGetAgentCallLogsHelper:
             partner_id=1009,
             agent=30,  # Agent ID not in agent_data
             lead_id=2,
-            service_board_id=2,
+            workspace_id=2,
             calling_mode="clicktocall",
             call_status="initiated",
             call_recording="",
@@ -749,7 +749,7 @@ class TestGetAgentCallLogsHelper:
             "partner_id": 1009,
             "agent": 30,
             "lead_id": 2,
-            "service_board_id": 2,
+            "workspace_id": 2,
             "calling_mode": "clicktocall",
             "call_status": "initiated",
             "call_recording": "",
@@ -799,7 +799,7 @@ class TestGetAgentCallLogsHelper:
             partner_id=1009,
             agent=30,
             lead_id=2,
-            service_board_id=2,
+            workspace_id=2,
             calling_mode="clicktocall",
             call_status="initiated",
             call_recording="",
@@ -910,7 +910,7 @@ class TestGetCallRecordHistoryHelper:
             "partner_id": 1,
             "agent": 1,
             "lead_id": 1,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "calling_mode": 1,
             "call_status": 1,
             "call_recording": 1,
@@ -1190,9 +1190,9 @@ class TestGetCallRecordHistoryHelper:
             with patch("src.components.cdr.constants.TalkoTalkTimeRange", TalkoMockTalkTimeRange):
                 query = TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
                     lead_id=5,
-                    service_board_id=20,
+                    workspace_id=20,
                     call_status=["answered", "missed"],
-                    board_agent_ids=[1, 2],
+                    workspace_agent_ids=[1, 2],
                     phone_number="9999999999",
                     start_time=1727181060000,
                     end_time=1727184660000,
@@ -1205,7 +1205,7 @@ class TestGetCallRecordHistoryHelper:
                 expected = {
                     "partner_id": 10,
                     "lead_id": 5,
-                    "service_board_id": 20,
+                    "workspace_id": 20,
                     "agent": {"$in": [1, 2]},
                     "created_at": {"$gte": 1727181060000, "$lte": 1727184660000},
                     "call_status": {"$in": ["answered", "missed"]},
@@ -1217,7 +1217,7 @@ class TestGetCallRecordHistoryHelper:
                 assert query == expected
                 mock_logger.info.assert_any_call("Building call record history query")
                 mock_logger.debug.assert_any_call(
-                    f"Parameters - lead_id: 5, service_board_id: 20, call_status: ['answered', 'missed'], board_agent_ids: [1, 2], phone_number: 9999999999, start_time: 1727181060000, end_time: 1727184660000, partner_id: 10, talk_time_range: ['0_1'], call_type: incoming, did_number: 8888888888"
+                    f"Parameters - lead_id: 5, workspace_id: 20, call_status: ['answered', 'missed'], workspace_agent_ids: [1, 2], phone_number: 9999999999, start_time: 1727181060000, end_time: 1727184660000, partner_id: 10, talk_time_range: ['0_1'], call_type: incoming, did_number: 8888888888"
                 )
                 mock_logger.debug.assert_any_call(
                     f"Constructed query: {expected} in get call record history query helper"
@@ -1227,9 +1227,9 @@ class TestGetCallRecordHistoryHelper:
         """Test build_call_record_history_query with partial filters."""
         query = TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
             lead_id=None,
-            service_board_id=None,
+            workspace_id=None,
             call_status=None,
-            board_agent_ids=None,
+            workspace_agent_ids=None,
             phone_number=None,
             start_time=1727181060000,
             end_time=None,
@@ -1246,7 +1246,7 @@ class TestGetCallRecordHistoryHelper:
         assert query == expected
         mock_logger.info.assert_any_call("Building call record history query")
         mock_logger.debug.assert_any_call(
-            "Parameters - lead_id: None, service_board_id: None, call_status: None, board_agent_ids: None, phone_number: None, start_time: 1727181060000, end_time: None, partner_id: 10, talk_time_range: None, call_type: None, did_number: None"
+            "Parameters - lead_id: None, workspace_id: None, call_status: None, workspace_agent_ids: None, phone_number: None, start_time: 1727181060000, end_time: None, partner_id: 10, talk_time_range: None, call_type: None, did_number: None"
         )
 
     def test_build_call_record_history_query_invalid_call_type(self, mock_logger):
@@ -1254,7 +1254,7 @@ class TestGetCallRecordHistoryHelper:
         with pytest.raises(ValueError, match="Invalid call_type: invalid"):
             TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
                 lead_id=5,
-                service_board_id=20,
+                workspace_id=20,
                 call_type="invalid",
                 partner_id=10,
                 logger=mock_logger,
@@ -1274,7 +1274,7 @@ class TestGetCallRecordHistoryHelper:
                 ):
                     TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
                         lead_id=5,
-                        service_board_id=20,
+                        workspace_id=20,
                         talk_time_range=["invalid"],
                         partner_id=10,
                         logger=mock_logger,
@@ -1289,16 +1289,16 @@ class TestGetCallRecordHistoryHelper:
         TalkoGetCallRecordHistoryHelper._add_basic_filters(
             query,
             lead_id=5,
-            service_board_id=20,
+            workspace_id=20,
             start_time=1727181060000,
             end_time=1727184660000,
-            board_agent_ids=[1, 2],
+            workspace_agent_ids=[1, 2],
             logger=mock_logger,
         )
         expected = {
             "partner_id": 10,
             "lead_id": 5,
-            "service_board_id": 20,
+            "workspace_id": 20,
             "agent": {"$in": [1, 2]},
             "created_at": {"$gte": 1727181060000, "$lte": 1727184660000},
         }
@@ -1308,10 +1308,10 @@ class TestGetCallRecordHistoryHelper:
             "Added lead_id filter: 5 in get call record history query helper"
         )
         mock_logger.debug.assert_any_call(
-            "Added service_board_id filter: 20 in get call record history query helper"
+            "Added workspace_id filter: 20 in get call record history query helper"
         )
         mock_logger.debug.assert_any_call(
-            "Added board_agent_ids filter: [1, 2] in get call record history query helper"
+            "Added workspace_agent_ids filter: [1, 2] in get call record history query helper"
         )
         mock_logger.debug.assert_any_call(
             "Added time range filter: 1727181060000 to 1727184660000 in get call record history query helper"
@@ -1323,10 +1323,10 @@ class TestGetCallRecordHistoryHelper:
         TalkoGetCallRecordHistoryHelper._add_basic_filters(
             query,
             lead_id=None,
-            service_board_id=None,
+            workspace_id=None,
             start_time=1727181060000,
             end_time=None,
-            board_agent_ids=None,
+            workspace_agent_ids=None,
             logger=mock_logger,
         )
         expected = {
@@ -1345,10 +1345,10 @@ class TestGetCallRecordHistoryHelper:
         TalkoGetCallRecordHistoryHelper._add_basic_filters(
             query,
             lead_id=None,
-            service_board_id=None,
+            workspace_id=None,
             start_time=None,
             end_time=1727184660000,
-            board_agent_ids=None,
+            workspace_agent_ids=None,
             logger=mock_logger,
         )
         expected = {
@@ -1518,7 +1518,7 @@ class TestGetCallRecordHistoryHelper:
             partner_id=1009,
             agent=30,  # Agent ID not in agent_data
             lead_id=2,
-            service_board_id=2,
+            workspace_id=2,
             calling_mode="clicktocall",
             call_status="initiated",
             call_recording="",
@@ -1564,7 +1564,7 @@ class TestGetCallRecordHistoryHelper:
             partner_id=1009,
             agent=30,  # Agent ID not in agent_data
             lead_id=2,
-            service_board_id=2,
+            workspace_id=2,
             calling_mode="clicktocall",
             call_status="initiated",
             call_recording="",
@@ -1609,7 +1609,7 @@ class TestGetCallRecordHistoryHelper:
             partner_id=1009,
             agent=30,  # Agent ID not in agent_data
             lead_id=2,
-            service_board_id=2,
+            workspace_id=2,
             calling_mode="clicktocall",
             call_status="initiated",
             call_recording="",
@@ -1636,7 +1636,7 @@ class TestGetCallRecordHistoryHelper:
             partner_id=1009,
             agent=30,  # Agent ID not in agent_data
             lead_id=2,
-            service_board_id=2,
+            workspace_id=2,
             calling_mode="clicktocall",
             call_status="initiated",
             call_recording="",
@@ -1663,7 +1663,7 @@ class TestGetCallRecordHistoryHelper:
             partner_id=1009,
             agent=30,  # Agent ID not in agent_data
             lead_id=2,
-            service_board_id=2,
+            workspace_id=2,
             calling_mode="clicktocall",
             call_status="initiated",
             call_recording="",

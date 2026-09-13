@@ -82,17 +82,17 @@ class TalkoPartnerConfigService:
                 )
 
             # Validate mutual exclusivity
-            if config.enable_round_robin and config.enable_service_board:
+            if config.enable_round_robin and config.enable_workspace:
                 raise TalkoBadRequestError(
-                    "Round-robin and service board cannot be enabled simultaneously."
+                    "Round-robin and workspace cannot be enabled simultaneously."
                 )
 
             # Validate required fields
-            if config.enable_service_board and (
-                not config.service_board_ids or not config.board_did_counts
+            if config.enable_workspace and (
+                not config.workspace_ids or not config.workspace_did_counts
             ):
                 raise TalkoBadRequestError(
-                    "service_board_ids and board_did_counts are required when enable_service_board is true."
+                    "workspace_ids and workspace_did_counts are required when enable_workspace is true."
                 )
             if config.enable_agent_mapping and not config.agent_mapping_ids:
                 raise TalkoBadRequestError(

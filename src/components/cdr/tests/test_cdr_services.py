@@ -16,7 +16,7 @@ def fake_cdr_dict():
         "partner_id": 10,
         "agent": 1,
         "lead_id": "5",
-        "service_board_id": 20,
+        "workspace_id": 20,
         "calling_mode": "outbound",
         "call_status": "completed",
         "call_recording": "http://recording.com/1",
@@ -48,7 +48,7 @@ def fake_call_log_dict():
         "partner_id": 10,
         "agent": 2,
         "lead_id": 6,
-        "service_board_id": 21,
+        "workspace_id": 21,
         "calling_mode": "inbound",
         "call_status": "missed",
         "call_recording": "http://recording.com/2",
@@ -149,7 +149,7 @@ class TestCDRService:
                 "call_actions": [],
                 "call_uuid": "uuid-123",
                 "hangup_by": "agent",
-                "service_board_id": 22,
+                "workspace_id": 22,
             }
         ]
 
@@ -209,7 +209,7 @@ class TestCDRService:
         mock_common_helper.attach_agent_names.return_value = None
 
         grpc_client = AsyncMock()
-        grpc_client.get_service_board_users_details.return_value = {
+        grpc_client.get_workspace_users_details.return_value = {
             2: {"name": "agent"}
         }
         mock_get_service.return_value = grpc_client
@@ -358,7 +358,7 @@ class TestCDRService:
             "partner_id": 10,
             "agent": 2,
             "lead_id": 6,
-            "service_board_id": 21,
+            "workspace_id": 21,
             "calling_mode": "inbound",
             "call_status": "missed",
             "call_recording": "http://recording.com/2",
@@ -382,7 +382,7 @@ class TestCDRService:
         }
 
         grpc_client = AsyncMock()
-        grpc_client.get_service_board_users_details.return_value = {
+        grpc_client.get_workspace_users_details.return_value = {
             2: {"name": "agent"}
         }
         mock_get_service.return_value = grpc_client

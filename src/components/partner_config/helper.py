@@ -94,9 +94,9 @@ class TalkoPartnerConfigHelper:
         assigned_dids: List[str] = available_dids[:num_dids]
         config_dict: Dict[str, Any] = {"vendor_id": str(vendor_id), "is_active": True}
 
-        if config.enable_service_board and config.board_did_counts:
-            service_board_mapping: Dict[str, Any] = (
-                await TalkoPartnerConfigHelper._assign_service_board_dids(
+        if config.enable_workspace and config.workspace_did_counts:
+            workspace_mapping: Dict[str, Any] = (
+                await TalkoPartnerConfigHelper._assign_workspace_dids(
                     config,
                     assigned_dids,
                     vendor_id,
@@ -105,7 +105,7 @@ class TalkoPartnerConfigHelper:
                     vendor_config_id,
                 )
             )
-            config_dict.update(service_board_mapping)
+            config_dict.update(workspace_mapping)
 
         if config.enable_agent_mapping and config.agent_mapping_ids:
             agent_mapping_data: Dict[str, Any] = (
@@ -141,7 +141,7 @@ class TalkoPartnerConfigHelper:
         return config_dict
 
     @staticmethod
-    async def _assign_service_board_dids(
+    async def _assign_workspace_dids(
         config: TalkoContract.PartnerConfigCreate,
         assigned_dids: List[str],
         vendor_id: ObjectId,
@@ -150,28 +150,28 @@ class TalkoPartnerConfigHelper:
         vendor_config_id: Optional[ObjectId] = None,
     ) -> Dict[str, Any]:
         """
-        Assigns DIDs for service board configurations.
+        Assigns DIDs for workspace configurations.
         """
-        service_board_mapping: Dict[int, List[str]] = {}
+        workspace_mapping: Dict[int, List[str]] = {}
         start_idx: int = 0
-        for board_id, count in config.board_did_counts.items():
+        for workspace_id, count in config.workspace_did_counts.items():
             if count > 0:
                 end_idx: int = start_idx + count
                 dids: List[str] = assigned_dids[start_idx:end_idx]
-                service_board_mapping[board_id] = dids
+                workspace_mapping[workspace_id] = dids
                 for did in dids:
                     await did_management_service.update_did(
                         did_number=did,
                         vendor_id=str(vendor_id),
                         partner_id=config.partner_id,
-                        service_board_id=int(board_id),
+                        workspace_id=int(workspace_id),
                         agent_id=None,
                         vendor_config_id=vendor_config_id,
                     )
                 start_idx = end_idx
         return {
-            "service_board_ids": config.service_board_ids,
-            "board_did_counts": config.board_did_counts,
+            "workspace_ids": config.workspace_ids,
+            "workspace_did_counts": config.workspace_did_counts,
         }
 
     @staticmethod
@@ -188,7 +188,7 @@ class TalkoPartnerConfigHelper:
         """
         start_idx: int = (
             len(assigned_dids)
-            if config.enable_service_board and config.board_did_counts
+            if config.enable_workspace and config.workspace_did_counts
             else 0
         )
         agent_mapping_dids: List[str] = assigned_dids[
@@ -199,7 +199,7 @@ class TalkoPartnerConfigHelper:
                 did_number=did,
                 vendor_id=str(vendor_id),
                 partner_id=config.partner_id,
-                service_board_id=None,
+                workspace_id=None,
                 agent_id=agent_id,
                 vendor_config_id=vendor_config_id,
             )
@@ -217,15 +217,15 @@ class TalkoPartnerConfigHelper:
         """
         Assigns DIDs for round-robin configurations.
         """
-        if config.enable_service_board:
-            raise TalkoBadRequestError("Round-robin cannot be enabled with service board.")
+        if config.enable_workspace:
+            raise TalkoBadRequestError("Round-robin cannot be enabled with workspace.")
         if not config.round_robin_did_count:
             raise TalkoBadRequestError(
                 "round_robin_did_count is required when enable_round_robin is true."
             )
 
         start_idx: int = 0
-        if config.enable_service_board and config.board_did_counts:
+        if config.enable_workspace and config.workspace_did_counts:
             start_idx += len(assigned_dids)
         if config.enable_agent_mapping and config.agent_mapping_ids:
             start_idx += len(assigned_dids)
@@ -238,7 +238,7 @@ class TalkoPartnerConfigHelper:
                 did_number=did,
                 vendor_id=str(vendor_id),
                 partner_id=config.partner_id,
-                service_board_id=None,
+                workspace_id=None,
                 agent_id=None,
                 vendor_config_id=vendor_config_id,
             )
@@ -250,8 +250,8 @@ class TalkoPartnerConfigHelper:
         Calculates the total number of DIDs required internally.
         """
         num_dids: int = 0
-        if config.enable_service_board and config.board_did_counts:
-            num_dids += sum(config.board_did_counts.values())
+        if config.enable_workspace and config.workspace_did_counts:
+            num_dids += sum(config.workspace_did_counts.values())
         if config.enable_agent_mapping and config.agent_mapping_ids:
             num_dids += len(config.agent_mapping_ids)
         if config.enable_round_robin and config.round_robin_did_count:
@@ -266,7 +266,7 @@ class TalkoPartnerConfigHelper:
         logger: TalkoServiceLogger,
     ) -> Dict[str, Any]:
         """
-        Update default attendance for service board or round-robin.
+        Update default attendance for workspace or round-robin.
 
         Args:
             config (TalkoContract.PartnerConfigCreate): Partner config data.
@@ -278,13 +278,13 @@ class TalkoPartnerConfigHelper:
             Dict[str, Any]: Updated attendance data to merge into config_dict.
         """
         attendance_data = {}
-        if config.enable_service_board and config.service_board_ids:
+        if config.enable_workspace and config.workspace_ids:
             service_default_attendance = {}
-            for service_board_id in config.service_board_ids:
-                dids = await did_management_service.get_dids_by_partner_service_board_and_vendor(
-                    config.partner_id, service_board_id, str(vendor_id)
+            for workspace_id in config.workspace_ids:
+                dids = await did_management_service.get_dids_by_partner_workspace_and_vendor(
+                    config.partner_id, workspace_id, str(vendor_id)
                 )
-                service_default_attendance[service_board_id] = [
+                service_default_attendance[workspace_id] = [
                     {"phone_number": did["did_number"], "agent_id": did.get("agent_id")}
                     for did in dids
                 ]

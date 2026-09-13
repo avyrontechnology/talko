@@ -18,14 +18,14 @@ class TalkoAgentDidMappingModel(TalkoTimestampedModel):
     model_config: ConfigDict = ConfigDict(arbitrary_types_allowed=True)
 
 
-class TalkoAgentServiceBoardMappingModel(TalkoTimestampedModel):
+class TalkoAgentWorkspaceMappingModel(TalkoTimestampedModel):
     partner_id: Optional[int] = None  # Partner identifier
-    service_board_id: int  # Service Board identifier
+    workspace_id: int  # Workspace identifier
     agent_id: int  # Agent identifier
     agent_number: Optional[str] = None  # Agent's phone number
     is_active: bool = True  # Active status of the mapping
 
     class CollectionName:
-        AGENT_SERVICE_BOARD_MAPPING = "agent_service_board_mapping"
+        AGENT_WORKSPACE_MAPPING = "agent_workspace_mapping"
 
     model_config: ConfigDict = ConfigDict(arbitrary_types_allowed=True)

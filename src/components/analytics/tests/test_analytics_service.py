@@ -102,7 +102,7 @@ class TestAnalyticsService:
             "src.components.analytics.services.TalkoRPCServiceFactory.get_service"
         ) as mock_get_service:
             mock_grpc_client = AsyncMock()
-            mock_grpc_client.get_service_board_users_details = AsyncMock(
+            mock_grpc_client.get_workspace_users_details = AsyncMock(
                 return_value={1: {"name": "Alice"}, 2: {"name": "Bob"}}
             )
             mock_get_service.return_value = mock_grpc_client
@@ -129,7 +129,7 @@ class TestAnalyticsService:
             assert (
                 result.data["agents"][1]["total_placed_calls"] == 4
             )  # Verify total_placed_calls
-            mock_grpc_client.get_service_board_users_details.assert_awaited_once_with(
+            mock_grpc_client.get_workspace_users_details.assert_awaited_once_with(
                 [1, 2]
             )
             mock_logger.info.assert_any_call(

@@ -555,30 +555,30 @@ class TestGetDidsByPartnerAndVendor:
         )
 
 
-class TestGetDidsByPartnerServiceBoardAndVendor:
+class TestGetDidsByPartnerWorkspaceAndVendor:
 
     @pytest.mark.asyncio
     async def test_success(self, did_repository, mock_db_manager, mock_logger):
-        partner_id, service_board_id, vendor_id = 1, 100, ObjectId()
+        partner_id, workspace_id, vendor_id = 1, 100, ObjectId()
         docs = [{"did_number": "12345"}, {"did_number": "67890"}]
         col = AsyncMock()
         col.find = Mock(return_value=TalkoAsyncIteratorMock(docs))
         _wire(mock_db_manager, col)
 
-        result = await did_repository.get_dids_by_partner_service_board_and_vendor(
-            partner_id, service_board_id, vendor_id
+        result = await did_repository.get_dids_by_partner_workspace_and_vendor(
+            partner_id, workspace_id, vendor_id
         )
 
         col.find.assert_called_once_with(
             {
                 "partner_id": partner_id,
-                "service_board_id": service_board_id,
+                "workspace_id": workspace_id,
                 "vendor_id": vendor_id,
             }
         )
         assert result == ["12345", "67890"]
         mock_logger.info.assert_called_with(
-            "Fetched DIDs get did by partner service board and vendor: ['12345', '67890']"
+            "Fetched DIDs get did by partner workspace and vendor: ['12345', '67890']"
         )
         mock_logger.error.assert_not_called()
 
@@ -589,28 +589,28 @@ class TestGetDidsByPartnerServiceBoardAndVendor:
         _wire(mock_db_manager, col)
 
         with pytest.raises(Exception, match="Database error"):
-            await did_repository.get_dids_by_partner_service_board_and_vendor(
+            await did_repository.get_dids_by_partner_workspace_and_vendor(
                 1, 100, ObjectId()
             )
 
         mock_logger.error.assert_called_once_with(
-            "Failed to fetch DIDs for partner 1, service_board 100: Database error"
+            "Failed to fetch DIDs for partner 1, workspace 100: Database error"
         )
 
 
-class TestGetDidsByPartnerAgentServiceBoardAndVendor:
+class TestGetDidsByPartnerAgentWorkspaceAndVendor:
 
     @pytest.mark.asyncio
     async def test_success(self, did_repository, mock_db_manager, mock_logger):
-        partner_id, user_id, service_board_id, vendor_id = 1, 200, 100, ObjectId()
+        partner_id, user_id, workspace_id, vendor_id = 1, 200, 100, ObjectId()
         docs = [{"did_number": "12345"}, {"did_number": "67890"}]
         col = AsyncMock()
         col.find = Mock(return_value=TalkoAsyncIteratorMock(docs))
         _wire(mock_db_manager, col)
 
         result = (
-            await did_repository.get_dids_by_partner_agent_service_board_and_vendor(
-                partner_id, user_id, service_board_id, vendor_id
+            await did_repository.get_dids_by_partner_agent_workspace_and_vendor(
+                partner_id, user_id, workspace_id, vendor_id
             )
         )
 
@@ -618,13 +618,13 @@ class TestGetDidsByPartnerAgentServiceBoardAndVendor:
             {
                 "partner_id": partner_id,
                 "agent_id": user_id,
-                "service_board_id": service_board_id,
+                "workspace_id": workspace_id,
                 "vendor_id": vendor_id,
             }
         )
         assert result == ["12345", "67890"]
         mock_logger.info.assert_called_with(
-            "Fetched DIDs get did by partner agent service board and vendor: "
+            "Fetched DIDs get did by partner agent workspace and vendor: "
             "['12345', '67890']"
         )
         mock_logger.error.assert_not_called()
@@ -636,12 +636,12 @@ class TestGetDidsByPartnerAgentServiceBoardAndVendor:
         _wire(mock_db_manager, col)
 
         with pytest.raises(Exception, match="Database error"):
-            await did_repository.get_dids_by_partner_agent_service_board_and_vendor(
+            await did_repository.get_dids_by_partner_agent_workspace_and_vendor(
                 1, 200, 100, ObjectId()
             )
 
         mock_logger.error.assert_called_once_with(
-            "Failed to fetch DIDs for partner 1, agent 200, service_board 100: "
+            "Failed to fetch DIDs for partner 1, agent 200, workspace 100: "
             "Database error"
         )
 
@@ -731,14 +731,14 @@ class TestGetDidByNumber:
         )
 
 
-class TestGetDidsByServiceBoard:
+class TestGetDidsByWorkspace:
 
     @pytest.mark.asyncio
     async def test_success(self, did_repository, mock_db_manager, mock_logger):
-        service_board_id = 100
+        workspace_id = 100
         records = [
-            {"did_number": "12345", "service_board_id": service_board_id},
-            {"did_number": "67890", "service_board_id": service_board_id},
+            {"did_number": "12345", "workspace_id": workspace_id},
+            {"did_number": "67890", "workspace_id": workspace_id},
         ]
         mock_cursor = AsyncMock()
         mock_cursor.to_list = AsyncMock(return_value=records)
@@ -746,11 +746,11 @@ class TestGetDidsByServiceBoard:
         col.find = Mock(return_value=mock_cursor)
         _wire(mock_db_manager, col)
 
-        result = await did_repository.get_dids_by_service_board(service_board_id)
+        result = await did_repository.get_dids_by_workspace(workspace_id)
 
         col.find.assert_called_once_with(
             {
-                "service_board_id": service_board_id,
+                "workspace_id": workspace_id,
                 "status": TalkoDIDStatus.AVAILABLE.value,
             }
         )
@@ -766,7 +766,7 @@ class TestGetDidsByServiceBoard:
         col.find = Mock(return_value=mock_cursor)
         _wire(mock_db_manager, col)
 
-        result = await did_repository.get_dids_by_service_board(999)
+        result = await did_repository.get_dids_by_workspace(999)
         assert result == []
 
     @pytest.mark.asyncio
@@ -778,10 +778,10 @@ class TestGetDidsByServiceBoard:
         _wire(mock_db_manager, col)
 
         with pytest.raises(Exception, match="Database error"):
-            await did_repository.get_dids_by_service_board(100)
+            await did_repository.get_dids_by_workspace(100)
 
         mock_logger.error.assert_called_once_with(
-            "Failed to fetch DIDs for service_board_id=100: Database error"
+            "Failed to fetch DIDs for workspace_id=100: Database error"
         )
 
 
@@ -855,7 +855,7 @@ class TestUnassignDidToPartner:
                 "$set": {
                     "partner_id": 0,
                     "agent_id": None,
-                    "service_board_id": None,
+                    "workspace_id": None,
                 }
             },
         )
@@ -1093,7 +1093,7 @@ class TestGetDidsByPartner:
     ):
         partner_id = 1
         user_id = 200
-        service_board_id = 100
+        workspace_id = 100
         vendor_id = ObjectId()
         vendor_config_id = ObjectId()
         status = "active"
@@ -1106,7 +1106,7 @@ class TestGetDidsByPartner:
         _, total = await did_repository.get_dids_by_partner(
             partner_id,
             user_id=user_id,
-            service_board_id=service_board_id,
+            workspace_id=workspace_id,
             vendor_id=vendor_id,
             vendor_config_id=vendor_config_id,
             status=status,
@@ -1116,7 +1116,7 @@ class TestGetDidsByPartner:
             "partner_id": partner_id,
             "is_active": True,
             "agent_id": user_id,
-            "service_board_id": service_board_id,
+            "workspace_id": workspace_id,
             "vendor_id": vendor_id,
             "vendor_config_id": vendor_config_id,
             "status": status,
@@ -1136,13 +1136,13 @@ class TestGetDidsByPartner:
         _wire(mock_db_manager, col)
 
         await did_repository.get_dids_by_partner(
-            1, user_id=None, vendor_id=None, service_board_id=None
+            1, user_id=None, vendor_id=None, workspace_id=None
         )
 
         call_query = col.count_documents.call_args[0][0]
         assert "agent_id" not in call_query
         assert "vendor_id" not in call_query
-        assert "service_board_id" not in call_query
+        assert "workspace_id" not in call_query
 
     @pytest.mark.asyncio
     async def test_failure(self, did_repository, mock_db_manager, mock_logger):

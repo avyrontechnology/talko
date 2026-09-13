@@ -65,7 +65,7 @@ class TestCallProcessorHelperCompleteCoverage:
             agent_id=123,
             partner_id=456,
             active_did_pool=["911111111111"],
-            service_board_id=1,
+            workspace_id=1,
         )
 
         assert result is None
@@ -76,13 +76,13 @@ class TestCallProcessorHelperCompleteCoverage:
         self.did_management_service.get_dids_by_number.return_value = {
             "is_active": True,
             "partner_id": 123,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "status": "Mapped",
         }
 
         # Should not raise
         await self.helper.validate_given_did(
-            did="911111111111", partner_id=123, service_board_id=1
+            did="911111111111", partner_id=123, workspace_id=1
         )
 
     @pytest.mark.asyncio
@@ -97,12 +97,12 @@ class TestCallProcessorHelperCompleteCoverage:
         self.did_management_service.get_dids_by_number.return_value = {
             "is_active": True,
             "partner_id": 123,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "status": "Available",
         }
 
         await self.helper.validate_given_did(
-            did="911111111111", partner_id=123, service_board_id=1
+            did="911111111111", partner_id=123, workspace_id=1
         )
 
     @pytest.mark.asyncio
@@ -111,13 +111,13 @@ class TestCallProcessorHelperCompleteCoverage:
         self.did_management_service.get_dids_by_number.return_value = {
             "is_active": True,
             "partner_id": 123,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "status": "Cooling Period",
         }
 
         with pytest.raises(TalkoBadRequestError, match="cannot be used for calls"):
             await self.helper.validate_given_did(
-                did="911111111111", partner_id=123, service_board_id=1
+                did="911111111111", partner_id=123, workspace_id=1
             )
 
     @pytest.mark.asyncio
@@ -152,59 +152,59 @@ class TestCallProcessorHelperCompleteCoverage:
             await self.helper.validate_given_did(did="911111111111", partner_id=123)
 
     @pytest.mark.asyncio
-    async def test_validate_given_did_wrong_service_board(self):
+    async def test_validate_given_did_wrong_workspace(self):
         self.did_management_service.get_dids_by_number.return_value = {
             "is_active": True,
             "partner_id": 123,
-            "service_board_id": 99,
+            "workspace_id": 99,
             "status": "Mapped",
         }
 
-        # If the message is "DID is restricted to service board 99"
-        # This regex "restricted to service board" should match unless the wording is different
-        with pytest.raises(TalkoBadRequestError, match="restricted to service board"):
+        # If the message is "DID is restricted to workspace 99"
+        # This regex "restricted to workspace" should match unless the wording is different
+        with pytest.raises(TalkoBadRequestError, match="restricted to workspace"):
             await self.helper.validate_given_did(
-                did="911111111111", partner_id=123, service_board_id=1
+                did="911111111111", partner_id=123, workspace_id=1
             )
 
     @pytest.mark.asyncio
-    async def test_validate_given_did_no_service_board_restriction(self):
-        """Test validation when DID has no service board restriction"""
+    async def test_validate_given_did_no_workspace_restriction(self):
+        """Test validation when DID has no workspace restriction"""
         self.did_management_service.get_dids_by_number.return_value = {
             "is_active": True,
             "partner_id": 123,
-            "service_board_id": 1,
+            "workspace_id": 1,
             "status": "Mapped",
         }
 
         # Should not raise
         await self.helper.validate_given_did(
-            did="911111111111", partner_id=123, service_board_id=1
+            did="911111111111", partner_id=123, workspace_id=1
         )
 
     @pytest.mark.asyncio
-    async def test_select_did_service_board_enabled_no_id(self):
-        """Test when service board is enabled but no service_board_id provided"""
-        partner_config = {"enable_service_board": True, "vendor_id": "v1"}
+    async def test_select_did_workspace_enabled_no_id(self):
+        """Test when workspace is enabled but no workspace_id provided"""
+        partner_config = {"enable_workspace": True, "vendor_id": "v1"}
 
-        with pytest.raises(TalkoBadRequestError, match="Service board ID is required"):
+        with pytest.raises(TalkoBadRequestError, match="Workspace ID is required"):
             await self.helper.select_did(
                 partner_config=partner_config,
                 partner_id=123,
                 user_id=456,
-                service_board_id=None,
+                workspace_id=None,
             )
 
     @pytest.mark.asyncio
-    async def test_select_did_service_board_enabled(self):
-        """Test DID selection with service board enabled"""
+    async def test_select_did_workspace_enabled(self):
+        """Test DID selection with workspace enabled"""
         partner_config = {
-            "enable_service_board": True,
+            "enable_workspace": True,
             "vendor_id": "v1",
             "did_indices": {"1": 0},
         }
 
-        self.did_management_service.get_dids_by_partner_service_board_and_vendor.return_value = [
+        self.did_management_service.get_dids_by_partner_workspace_and_vendor.return_value = [
             "911111111111"
         ]
         self.repository.update_partner_config_did_indices.return_value = {
@@ -215,7 +215,7 @@ class TestCallProcessorHelperCompleteCoverage:
             partner_config=partner_config,
             partner_id=123,
             user_id=456,
-            service_board_id=1,
+            workspace_id=1,
         )
 
         assert result == "911111111111"
@@ -229,7 +229,7 @@ class TestCallProcessorHelperCompleteCoverage:
             "did_indices": {"round_robin": 0},
         }
 
-        self.did_management_service.get_dids_by_partner_agent_service_board_and_vendor.return_value = [
+        self.did_management_service.get_dids_by_partner_agent_workspace_and_vendor.return_value = [
             "911111111111",
             "922222222222",
         ]
@@ -270,7 +270,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_prepare_cdr_exception(self):
         """Test prepare_cdr exception handling"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             lead_id=None,
             encryption_enabled=False,
@@ -297,7 +297,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_extract_to_number_primary(self):
         """Test extracting primary number"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             number_type=TalkoNumberType.PRIMARY_NUMBER.value,
             encryption_enabled=False,
@@ -312,7 +312,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_extract_to_number_additional(self):
         """Test extracting additional number"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             number_type=TalkoNumberType.ADDITIONAL_NUMBER.value,
             encryption_enabled=False,
@@ -327,7 +327,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_extract_to_number_whatsapp(self):
         """Test extracting WhatsApp number"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             number_type=TalkoNumberType.WHATSAPP_NUMBER.value,
             encryption_enabled=False,
@@ -342,7 +342,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_extract_to_number_not_found(self):
         """Test when no valid number is found"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             number_type=TalkoNumberType.PRIMARY_NUMBER.value,
             encryption_enabled=False,
@@ -357,7 +357,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_extract_to_number_exception_handling(self):
         """Test exception handling in extract_to_number"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             number_type="invalid_type",  # Invalid type
             encryption_enabled=False,
@@ -386,7 +386,7 @@ class TestCallProcessorHelperCompleteCoverage:
             request_data=request_data,
             partner_id=123,
             agent_id=None,  # None values
-            service_board_id=None,
+            workspace_id=None,
             agent_number=None,
             agent_ids=None,
             lead_id=None,
@@ -440,8 +440,8 @@ class TestCallProcessorHelperCompleteCoverage:
         self.repository.get_vendor_config.assert_called_with("v1", "config123")
 
     @pytest.mark.asyncio
-    async def test_select_did_round_robin_with_service_board(self):
-        """Test round robin DID selection with service board"""
+    async def test_select_did_round_robin_with_workspace(self):
+        """Test round robin DID selection with workspace"""
         partner_config = {
             "enable_round_robin": True,
             "vendor_id": "v1",
@@ -460,7 +460,7 @@ class TestCallProcessorHelperCompleteCoverage:
             partner_config=partner_config,
             partner_id=123,
             user_id=456,
-            service_board_id=1,
+            workspace_id=1,
         )
 
         assert result in ["911111111111", "922222222222"]
@@ -484,7 +484,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_prepare_cdr_with_all_fields(self):
         """Test prepare_cdr with all optional fields"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             lead_id=100,
             lead_name="Test Lead",
@@ -516,14 +516,14 @@ class TestCallProcessorHelperCompleteCoverage:
         """Test when mapped DID is not in active pool"""
         self.agent_mapping_repository.get_agent_did_mapping.return_value = {
             "did": ["933333333333"],  # Not in active pool
-            "service_board_id": 1,
+            "workspace_id": 1,
         }
 
         result = await self.helper.get_agent_assign_did_in_agent_mapping(
             agent_id=123,
             partner_id=456,
             active_did_pool=["911111111111", "922222222222"],
-            service_board_id=1,
+            workspace_id=1,
         )
 
         assert result is None
@@ -546,31 +546,31 @@ class TestCallProcessorHelperCompleteCoverage:
         """Test when assigned DID is not in the active pool"""
         self.agent_mapping_repository.get_agent_did_mapping.return_value = {
             "did": ["999999999"],  # Not in active pool
-            "service_board_id": 1,
+            "workspace_id": 1,
         }
 
         result = await self.helper.get_agent_assign_did_in_agent_mapping(
             agent_id=123,
             partner_id=456,
             active_did_pool=["911111111111", "922222222222"],
-            service_board_id=1,
+            workspace_id=1,
         )
 
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_agent_assign_did_mapping_without_service_board_check(self):
-        """Test when service_board_id is None (no service board check)"""
+    async def test_get_agent_assign_did_mapping_without_workspace_check(self):
+        """Test when workspace_id is None (no workspace check)"""
         self.agent_mapping_repository.get_agent_did_mapping.return_value = {
             "did": ["911111111111"],
-            "service_board_id": 99,  # Different service board, but no check
+            "workspace_id": 99,  # Different workspace, but no check
         }
 
         result = await self.helper.get_agent_assign_did_in_agent_mapping(
             agent_id=123,
             partner_id=456,
             active_did_pool=["911111111111"],
-            service_board_id=None,  # No service board check
+            workspace_id=None,  # No workspace check
         )
 
         assert result == "911111111111"
@@ -578,7 +578,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_prepare_cdr_with_none_lead_name(self):
         """Test prepare_cdr when lead_name is None"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             lead_id=100,
             lead_name=None,  # None lead_name
@@ -605,7 +605,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_prepare_cdr_with_empty_lead_name(self):
         """Test prepare_cdr when lead_name is empty string"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             lead_id=100,
             lead_name="",  # Empty string
@@ -630,7 +630,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_decrypt_lead_data_no_secret(self):
         """Test decrypt_lead_data when lead_secret is None"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             encryption_enabled=False,
             to_number="919876543210",
@@ -648,7 +648,7 @@ class TestCallProcessorHelperCompleteCoverage:
         mock_decrypt.side_effect = ValueError("Decryption failed")
 
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             encryption_enabled=True,
             lead_secret="bad-secret",
@@ -662,15 +662,15 @@ class TestCallProcessorHelperCompleteCoverage:
         self.logger.error.assert_called()
 
     @pytest.mark.asyncio
-    async def test_assign_round_robin_with_service_board_index(self):
-        """Test round robin assignment with service board specific index"""
+    async def test_assign_round_robin_with_workspace_index(self):
+        """Test round robin assignment with workspace specific index"""
         partner_config = {
-            "enable_service_board": True,
+            "enable_workspace": True,
             "vendor_id": "v1",
-            "did_indices": {"5": 1},  # Service board 5 has index 1
+            "did_indices": {"5": 1},  # Workspace 5 has index 1
         }
 
-        self.did_management_service.get_dids_by_partner_service_board_and_vendor.return_value = [
+        self.did_management_service.get_dids_by_partner_workspace_and_vendor.return_value = [
             "911111111111",
             "922222222222",
             "933333333333",
@@ -684,15 +684,15 @@ class TestCallProcessorHelperCompleteCoverage:
             partner_config=partner_config,
             partner_id=123,
             user_id=456,
-            service_board_id=5,
+            workspace_id=5,
         )
 
         # Should use index 1, so should get the second DID
         assert result == "922222222222"
 
     @pytest.mark.asyncio
-    async def test_assign_round_robin_without_service_board_uses_round_robin_key(self):
-        """Test that round robin uses 'round_robin' key when service_board_id is None"""
+    async def test_assign_round_robin_without_workspace_uses_round_robin_key(self):
+        """Test that round robin uses 'round_robin' key when workspace_id is None"""
         partner_config = {
             "enable_round_robin": True,
             "vendor_id": "v1",
@@ -713,21 +713,21 @@ class TestCallProcessorHelperCompleteCoverage:
             partner_config=partner_config,
             partner_id=123,
             user_id=456,
-            service_board_id=None,
+            workspace_id=None,
         )
 
         assert result == "933333333333"
 
     @pytest.mark.asyncio
-    async def test_assign_round_robin_with_new_service_board_index(self):
-        """Test round robin when service board index doesn't exist yet"""
+    async def test_assign_round_robin_with_new_workspace_index(self):
+        """Test round robin when workspace index doesn't exist yet"""
         partner_config = {
-            "enable_service_board": True,
+            "enable_workspace": True,
             "vendor_id": "v1",
-            "did_indices": {"round_robin": 0},  # Service board 10 not in indices
+            "did_indices": {"round_robin": 0},  # Workspace 10 not in indices
         }
 
-        self.did_management_service.get_dids_by_partner_service_board_and_vendor.return_value = [
+        self.did_management_service.get_dids_by_partner_workspace_and_vendor.return_value = [
             "911111111111",
             "922222222222",
         ]
@@ -740,10 +740,10 @@ class TestCallProcessorHelperCompleteCoverage:
             partner_config=partner_config,
             partner_id=123,
             user_id=456,
-            service_board_id=10,
+            workspace_id=10,
         )
 
-        # Should start at index 0 for new service board
+        # Should start at index 0 for new workspace
         assert result == "911111111111"
 
     @pytest.mark.asyncio
@@ -755,7 +755,7 @@ class TestCallProcessorHelperCompleteCoverage:
             "did_indices": {"round_robin": 0},
         }
 
-        self.did_management_service.get_dids_by_partner_agent_service_board_and_vendor.return_value = [
+        self.did_management_service.get_dids_by_partner_agent_workspace_and_vendor.return_value = [
             "911111111111",
             "922222222222",
         ]
@@ -763,14 +763,14 @@ class TestCallProcessorHelperCompleteCoverage:
         # Agent has valid mapping
         self.agent_mapping_repository.get_agent_did_mapping.return_value = {
             "did": ["922222222222"],
-            "service_board_id": 1,
+            "workspace_id": 1,
         }
 
         result = await self.helper.select_did(
             partner_config=partner_config,
             partner_id=123,
             user_id=456,
-            service_board_id=1,
+            workspace_id=1,
         )
 
         # Should return the mapped DID
@@ -822,12 +822,12 @@ class TestCallProcessorHelperCompleteCoverage:
             await self.helper.get_partner_config(123)
 
     @pytest.mark.asyncio
-    async def test_select_did_missing_service_board_error(self):
-        """Covers lines 255-261: Validation error when service board is required."""
-        partner_config = {"enable_service_board": True, "vendor_id": "v1"}
-        with pytest.raises(TalkoBadRequestError, match="Service board ID is required"):
+    async def test_select_did_missing_workspace_error(self):
+        """Covers lines 255-261: Validation error when workspace is required."""
+        partner_config = {"enable_workspace": True, "vendor_id": "v1"}
+        with pytest.raises(TalkoBadRequestError, match="Workspace ID is required"):
             await self.helper.select_did(
-                partner_config, 123, 456, service_board_id=None
+                partner_config, 123, 456, workspace_id=None
             )
 
     @pytest.mark.asyncio
@@ -850,7 +850,7 @@ class TestCallProcessorHelperCompleteCoverage:
             "vendor_id": "v1",
             "did_indices": {"round_robin": 0},
         }
-        self.did_management_service.get_dids_by_partner_agent_service_board_and_vendor.return_value = [
+        self.did_management_service.get_dids_by_partner_agent_workspace_and_vendor.return_value = [
             "9111"
         ]
 
@@ -921,14 +921,14 @@ class TestCallProcessorHelperCompleteCoverage:
         """Test when assigned DID exists but is not in the active pool"""
         self.agent_mapping_repository.get_agent_did_mapping.return_value = {
             "did": ["999999999"],  # DID not in active pool
-            "service_board_id": 1,
+            "workspace_id": 1,
         }
 
         result = await self.helper.get_agent_assign_did_in_agent_mapping(
             agent_id=123,
             partner_id=456,
             active_did_pool=["911111111111", "922222222222"],
-            service_board_id=1,
+            workspace_id=1,
         )
 
         assert result is None
@@ -945,7 +945,7 @@ class TestCallProcessorHelperCompleteCoverage:
                 agent_id=123,
                 partner_id=456,
                 active_did_pool=["911111111111"],
-                service_board_id=1,
+                workspace_id=1,
             )
 
         self.logger.error.assert_called()
@@ -955,7 +955,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_prepare_cdr_lead_name_none_becomes_empty_string(self):
         """Test that None lead_name becomes empty string in TalkoCDR"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             lead_id=100,
             lead_name=None,  # None should become ""
@@ -981,7 +981,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_prepare_cdr_lead_name_empty_string(self):
         """Test that empty string lead_name stays empty string"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             lead_id=100,
             lead_name="",  # Empty string
@@ -1006,7 +1006,7 @@ class TestCallProcessorHelperCompleteCoverage:
     def test_decrypt_lead_data_returns_empty_dict_when_no_secret(self):
         """Test decrypt_lead_data returns empty dict when lead_secret is not provided"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             encryption_enabled=False,
             to_number="919876543210",
@@ -1027,7 +1027,7 @@ class TestCallProcessorHelperCompleteCoverage:
         mock_decrypt.side_effect = ValueError("Hex decryption failed")
 
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             encryption_enabled=True,
             lead_secret="invalid-hex-secret",
@@ -1052,7 +1052,7 @@ class TestCallProcessorHelperCompleteCoverage:
         mock_decrypt.side_effect = RuntimeError("Unexpected crypto error")
 
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             encryption_enabled=True,
             lead_secret="some-secret",
@@ -1139,31 +1139,31 @@ class TestCallProcessorHelperCompleteCoverage:
         assert cdr["lead_name"] is None
 
     @pytest.mark.asyncio
-    async def test_get_agent_assign_did_with_service_board_mismatch(self):
-        """Test when agent is mapped to different service board"""
+    async def test_get_agent_assign_did_with_workspace_mismatch(self):
+        """Test when agent is mapped to different workspace"""
         self.agent_mapping_repository.get_agent_did_mapping.return_value = {
             "did": ["911111111111"],
-            "service_board_id": 99,  # Different from requested
+            "workspace_id": 99,  # Different from requested
         }
 
         result = await self.helper.get_agent_assign_did_in_agent_mapping(
             agent_id=123,
             partner_id=456,
             active_did_pool=["911111111111"],
-            service_board_id=1,  # Requesting service board 1
+            workspace_id=1,  # Requesting workspace 1
         )
 
-        # Should return None due to service board mismatch
+        # Should return None due to workspace mismatch
         assert result is None
 
         # Verify debug log was called
         debug_calls = [call[0][0] for call in self.logger.debug.call_args_list]
-        assert any("mapped to different service board" in msg for msg in debug_calls)
+        assert any("mapped to different workspace" in msg for msg in debug_calls)
 
     def test_prepare_cdr_with_actual_lead_name(self):
         """Test prepare_cdr with actual non-empty lead_name"""
         call_data = TalkoContract.CallCreate(
-            service_board_id=1,
+            workspace_id=1,
             agent_number="9123456789",
             lead_id=100,
             lead_name="John Doe",  # Actual name

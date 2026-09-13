@@ -25,29 +25,29 @@ class TalkoContract:
         id: str
         message: str
 
-    # request response schemas for agent service board mapping
+    # request response schemas for agent workspace mapping
 
-    class AgentServiceBoardMappingCreate(BaseModel):
+    class AgentWorkspaceMappingCreate(BaseModel):
         partner_id: int
-        service_board_id: int
+        workspace_id: int
         agent_id: int
         agent_number: Optional[str] = None
         is_active: Optional[bool] = True
 
-    class AgentServiceBoardMappingUpdate(BaseModel):
+    class AgentWorkspaceMappingUpdate(BaseModel):
         agent_number: Optional[str] = None
         is_active: Optional[bool] = None
 
-    class AgentServiceBoardMappingResponse(BaseModel):
+    class AgentWorkspaceMappingResponse(BaseModel):
         id: str
         partner_id: int
-        service_board_id: int
+        workspace_id: int
         agent_id: int
         agent_number: Optional[str] = None
         is_active: bool
         created_at: Optional[int] = None
         updated_at: Optional[int] = None
 
-    class AgentServiceBoardMappingCreationResponse(BaseModel):
+    class AgentWorkspaceMappingCreationResponse(BaseModel):
         id: str
         message: str    

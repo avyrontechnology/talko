@@ -185,7 +185,7 @@ class TestAgentMappingRepository:
         mock_logger.error.assert_called_once()
         assert "bulk insert of agent DID mappings" in mock_logger.error.call_args[0][0]
 
-    async def test_insert_agent_service_board_mapping_success(self, setup):
+    async def test_insert_agent_workspace_mapping_success(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = AsyncMock()
         mock_collection.insert_one.return_value.inserted_id = "12345"
@@ -195,17 +195,17 @@ class TestAgentMappingRepository:
         
         mapping_data = {
             "partner_id": 4,
-            "service_board_id": 21,
+            "workspace_id": 21,
             "agent_id": 12,
             "agent_number": 9000000000,
             "is_active": True
         }
 
-        result = await repo.insert_agent_service_board_mapping(mapping_data)
+        result = await repo.insert_agent_workspace_mapping(mapping_data)
         assert result == "12345"
         mock_logger.debug.assert_called_once()
 
-    async def test_insert_agent_service_board_mapping_exception(self, setup):
+    async def test_insert_agent_workspace_mapping_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = AsyncMock()
         mock_collection.insert_one.side_effect = Exception("Insert error")
@@ -215,17 +215,17 @@ class TestAgentMappingRepository:
 
         mapping_data = {
             "partner_id": 4,
-            "service_board_id": 21,
+            "workspace_id": 21,
             "agent_id": 12,
             "agent_number": 9000000000,
             "is_active": True
         }
 
         with pytest.raises(Exception, match="Insert error"):
-            await repo.insert_agent_service_board_mapping(mapping_data)
+            await repo.insert_agent_workspace_mapping(mapping_data)
         mock_logger.error.assert_called_once()
 
-    async def test_get_agents_by_service_board_id_and_partner_id_success(self, setup):
+    async def test_get_agents_by_workspace_id_and_partner_id_success(self, setup):
         repo, mock_db_manager, mock_logger = setup
 
         # Cursor mock
@@ -246,17 +246,17 @@ class TestAgentMappingRepository:
         mock_db_manager.collection.return_value = mock_cm
 
         # Call the repo method
-        result = await repo.get_agents_by_service_board_id_and_partner_id(21, 4)
+        result = await repo.get_agents_by_workspace_id_and_partner_id(21, 4)
 
         assert result == mock_agents
         mock_collection.find.assert_called_once_with(
-            {"service_board_id": 21, "partner_id": 4, "is_active": True}
+            {"workspace_id": 21, "partner_id": 4, "is_active": True}
         )
         mock_logger.debug.assert_called_once()
 
 
 
-    async def test_get_agents_by_service_board_id_and_partner_id_exception(self, setup):
+    async def test_get_agents_by_workspace_id_and_partner_id_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
 
         # Cursor mock with exception on to_list
@@ -274,13 +274,13 @@ class TestAgentMappingRepository:
 
         # Exception check
         with pytest.raises(Exception, match="Find error"):
-            await repo.get_agents_by_service_board_id_and_partner_id(21, 4)
+            await repo.get_agents_by_workspace_id_and_partner_id(21, 4)
 
         mock_logger.error.assert_called_once()
 
 
 
-    async def test_update_is_active_by_service_board_and_partner_id_success(self, setup):
+    async def test_update_is_active_by_workspace_and_partner_id_success(self, setup):
         repo, mock_db_manager, mock_logger = setup
 
         mock_collection = AsyncMock()
@@ -292,18 +292,18 @@ class TestAgentMappingRepository:
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
 
-        result = await repo.update_is_active_by_service_board_and_partner_id(
-            partner_id=4, service_board_id=21, is_active=False
+        result = await repo.update_is_active_by_workspace_and_partner_id(
+            partner_id=4, workspace_id=21, is_active=False
         )
 
         assert result == 3
         mock_collection.update_many.assert_called_once_with(
-            {"service_board_id": 21, "partner_id": 4},
+            {"workspace_id": 21, "partner_id": 4},
             {"$set": {"is_active": False}},
         )
         mock_logger.info.assert_called_once()
 
-    async def test_update_is_active_by_service_board_and_partner_id_exception(self, setup):
+    async def test_update_is_active_by_workspace_and_partner_id_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
         
         mock_collection = AsyncMock()
@@ -314,8 +314,8 @@ class TestAgentMappingRepository:
         mock_db_manager.collection.return_value = mock_cm
 
         with pytest.raises(Exception, match="Update error"):
-            await repo.update_is_active_by_service_board_and_partner_id(
-                partner_id=4, service_board_id=21, is_active=True
+            await repo.update_is_active_by_workspace_and_partner_id(
+                partner_id=4, workspace_id=21, is_active=True
             )
 
         mock_logger.error.assert_called_once()

@@ -11,7 +11,7 @@ from src.utils.datetime_util import TalkoDateTimeUtil
 
 class TalkoInboundCallEventPublisher:
     """
-    Publishes agent-dialplan resolution results (partner, service board, DID, agent)
+    Publishes agent-dialplan resolution results (partner, workspace, DID, agent)
     for an inbound call so subscribed websocket clients get notified in real time.
 
     Also publishes the same-shaped event for outbound calls (see
@@ -27,7 +27,7 @@ class TalkoInboundCallEventPublisher:
     async def publish_inbound_call(
         self,
         partner_id: Optional[int],
-        service_board_id: Optional[int],
+        workspace_id: Optional[int],
         dedicated_did: Optional[str],
         agent_id: Optional[int],
         agent_ids: Optional[List[int]] = None,
@@ -43,7 +43,7 @@ class TalkoInboundCallEventPublisher:
         payload = {
             "event": INBOUND_CALL_EVENT_TYPE,
             "partner_id": partner_id,
-            "service_board_id": service_board_id,
+            "workspace_id": workspace_id,
             "dedicated_did": dedicated_did,
             "agent_id": agent_id,
             "agent_ids": agent_ids or [],
@@ -65,7 +65,7 @@ class TalkoInboundCallEventPublisher:
     async def publish_outbound_call(
         self,
         partner_id: Optional[int],
-        service_board_id: Optional[int],
+        workspace_id: Optional[int],
         dedicated_did: Optional[str],
         agent_id: Optional[int],
         agent_ids: Optional[List[int]] = None,
@@ -81,7 +81,7 @@ class TalkoInboundCallEventPublisher:
         payload = {
             "event": OUTBOUND_CALL_EVENT_TYPE,
             "partner_id": partner_id,
-            "service_board_id": service_board_id,
+            "workspace_id": workspace_id,
             "dedicated_did": dedicated_did,
             "agent_id": agent_id,
             "agent_ids": agent_ids or [],

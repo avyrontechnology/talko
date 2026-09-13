@@ -18,7 +18,7 @@ class TalkoAnalyticsRequest(BaseModel):
 class TalkoAgentCallAnalyticsRequest(BaseModel):
     time_range: Optional[str] = None
     agents: Optional[List[int]] = None
-    service_board_id: Optional[List[int]] = None
+    workspace_id: Optional[List[int]] = None
     entity_type: Optional[str] = TalkoEntityType.LEAD.value
 
     model_config = ConfigDict(
@@ -26,7 +26,7 @@ class TalkoAgentCallAnalyticsRequest(BaseModel):
             "example": {
                 "time_range": "1749148200000-1756992444404",
                 "agents": [1, 2, 3],
-                "service_board_id": [1, 2],
+                "workspace_id": [1, 2],
                 "entity_type": TalkoEntityType.LEAD.value,
             }
         }
@@ -36,7 +36,7 @@ class TalkoAgentCallAnalyticsRequest(BaseModel):
 class TalkoTotalAgentTalkTimeRequest(BaseModel):
     time_range: Optional[str] = None
     agents: Optional[List[int]] = None
-    service_board_id: Optional[List[int]] = None
+    workspace_id: Optional[List[int]] = None
     entity_type: Optional[str] = TalkoEntityType.LEAD.value
 
     model_config = ConfigDict(
@@ -44,7 +44,7 @@ class TalkoTotalAgentTalkTimeRequest(BaseModel):
             "example": {
                 "time_range": "1749148200000-1756992444404",
                 "agents": [1, 2, 3],
-                "service_board_id": [1, 2],
+                "workspace_id": [1, 2],
                 "entity_type": TalkoEntityType.LEAD.value,
             }
         }
@@ -54,7 +54,7 @@ class TalkoTotalAgentTalkTimeRequest(BaseModel):
 class TalkoAgentTalkTimeDistributionRequest(BaseModel):
     time_range: Optional[str] = None
     agents: Optional[List[int]] = None
-    service_board_id: Optional[List[int]] = None
+    workspace_id: Optional[List[int]] = None
     entity_type: Optional[str] = TalkoEntityType.LEAD.value
 
     model_config = ConfigDict(
@@ -62,16 +62,16 @@ class TalkoAgentTalkTimeDistributionRequest(BaseModel):
             "example": {
                 "time_range": "1749148200000-1756992444404",
                 "agents": [1, 2, 3],
-                "service_board_id": [1, 2],
+                "workspace_id": [1, 2],
                 "entity_type": TalkoEntityType.LEAD.value,
             }
         }
     )
 
 
-class TalkoPartnerServiceBoardRequest(BaseModel):
+class TalkoPartnerWorkspaceRequest(BaseModel):
     time_range: Optional[str] = None
-    service_board_id: Optional[List[int]] = None
+    workspace_id: Optional[List[int]] = None
     entity_type: Optional[str] = TalkoEntityType.LEAD.value
 
     @field_validator("time_range")
@@ -87,7 +87,7 @@ class TalkoPartnerServiceBoardRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "time_range": "1749148200000-1756992444404",
-                "service_board_id": [1, 2],
+                "workspace_id": [1, 2],
                 "entity_type": TalkoEntityType.LEAD.value,
             }
         }
@@ -96,7 +96,7 @@ class TalkoPartnerServiceBoardRequest(BaseModel):
 
 class TalkoDashboardFollowupTrendsRequest(BaseModel):
     time_range: Optional[str] = None
-    service_board_id: Optional[List[int]] = None
+    workspace_id: Optional[List[int]] = None
     entity_type: Optional[str] = TalkoEntityType.LEAD.value
     metric_filter: str
     trend_basis: str
@@ -142,7 +142,7 @@ class TalkoDashboardFollowupTrendsRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "time_range": "1749148200000-1756992444404",
-                "service_board_id": [1, 2],
+                "workspace_id": [1, 2],
                 "entity_type": TalkoEntityType.LEAD.value,
                 "metric_filter": "agent_missed_calls",
                 "trend_basis": TalkoTimeInterval.WEEKS.value,

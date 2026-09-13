@@ -9,17 +9,17 @@ from src.utils.enums import TalkoRingType  # Assuming TalkoRingType is an enum d
 class TestPartnerConfigModel:
 
     def test_mutual_exclusivity_raises_value_error(self):
-        """Should raise ValueError if both round_robin and service_board are True"""
+        """Should raise ValueError if both round_robin and workspace are True"""
         with pytest.raises(ValidationError) as exc_info:
             TalkoPartnerConfigModel(
                 partner_id=1,
                 is_active=True,
                 vendor_id=ObjectId(),
                 enable_round_robin=True,
-                enable_service_board=True,
+                enable_workspace=True,
             )
 
-        assert "Round-robin and service board cannot be enabled simultaneously" in str(
+        assert "Round-robin and workspace cannot be enabled simultaneously" in str(
             exc_info.value
         )
 
@@ -30,49 +30,49 @@ class TestPartnerConfigModel:
             is_active=True,
             vendor_id=ObjectId(),
             enable_round_robin=True,
-            enable_service_board=False,
+            enable_workspace=False,
             round_robin_did_count=10,
         )
         assert model.enable_round_robin is True
-        assert model.enable_service_board is False
+        assert model.enable_workspace is False
 
-    def test_mutual_exclusivity_passes_for_service_board_only(self):
-        """Should pass if only service_board is True"""
+    def test_mutual_exclusivity_passes_for_workspace_only(self):
+        """Should pass if only workspace is True"""
         model = TalkoPartnerConfigModel(
             partner_id=1,
             is_active=True,
             vendor_id=ObjectId(),
             enable_round_robin=False,
-            enable_service_board=True,
-            service_board_ids=[456],
+            enable_workspace=True,
+            workspace_ids=[456],
         )
         assert model.enable_round_robin is False
-        assert model.enable_service_board is True
+        assert model.enable_workspace is True
 
     def test_mutual_exclusivity_passes_if_both_false(self):
-        """Should pass if both round_robin and service_board are False"""
+        """Should pass if both round_robin and workspace are False"""
         model = TalkoPartnerConfigModel(
             partner_id=1,
             is_active=True,
             vendor_id=ObjectId(),
             enable_round_robin=False,
-            enable_service_board=False,
+            enable_workspace=False,
         )
         assert model.enable_round_robin is False
-        assert model.enable_service_board is False
+        assert model.enable_workspace is False
 
-    def test_service_board_requires_ids(self):
-        """Should raise ValueError if service_board is enabled without service_board_ids"""
+    def test_workspace_requires_ids(self):
+        """Should raise ValueError if workspace is enabled without workspace_ids"""
         with pytest.raises(ValidationError) as exc_info:
             TalkoPartnerConfigModel(
                 partner_id=1,
                 is_active=True,
                 vendor_id=ObjectId(),
                 enable_round_robin=False,
-                enable_service_board=True,
-                service_board_ids=None,
+                enable_workspace=True,
+                workspace_ids=None,
             )
-        assert "Service board IDs are required when service board is enabled" in str(
+        assert "Workspace IDs are required when workspace is enabled" in str(
             exc_info.value
         )
 
@@ -84,7 +84,7 @@ class TestPartnerConfigModel:
                 is_active=True,
                 vendor_id=ObjectId(),
                 enable_round_robin=True,
-                enable_service_board=False,
+                enable_workspace=False,
                 round_robin_did_count=None,
             )
         assert (
@@ -99,7 +99,7 @@ class TestPartnerConfigModel:
             is_active=True,
             vendor_id=ObjectId(),
             enable_round_robin=True,
-            enable_service_board=False,
+            enable_workspace=False,
             round_robin_did_count=10,
             did_indices={},  # Override default to exclude "round_robin"
         )
@@ -114,7 +114,7 @@ class TestPartnerConfigModel:
                 is_active=True,
                 vendor_id=ObjectId(),
                 enable_round_robin=True,
-                enable_service_board=False,
+                enable_workspace=False,
                 round_robin_did_count=10,
                 round_robin_default_attendance={
                     "default": [{"number": "123"}, {"number": "456"}]

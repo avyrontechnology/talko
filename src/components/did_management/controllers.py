@@ -35,45 +35,45 @@ class TalkoDIDController:
     did_router = APIRouter()
 
     @did_router.get(
-        "/by-service-board",
+        "/by-workspace",
         response_model=List[TalkoContract.DIDResponse],
     )
     @permission_check(TalkoPermissionDependency)
     @inject
-    async def get_dids_by_service_board(
+    async def get_dids_by_workspace(
         request: Request,
-        service_board_id: int = Query(..., description="Service board ID"),
+        workspace_id: int = Query(..., description="Workspace ID"),
         did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> List[TalkoContract.DIDResponse]:
         try:
             talko_service_logger.info(
-                "Fetching DIDs for service_board_id {}".format(service_board_id)
+                "Fetching DIDs for workspace_id {}".format(workspace_id)
             )
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
             partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
             talko_service_logger.info(
-                "User: {}, Partner: {}, ServiceBoard: {}, fetching DIDs initiated.".format(
-                    user_id, partner_id, service_board_id
+                "User: {}, Partner: {}, Workspace: {}, fetching DIDs initiated.".format(
+                    user_id, partner_id, workspace_id
                 )
             )
 
             dids: List[TalkoContract.DIDResponse] = (
-                await did_service.get_dids_by_service_board(service_board_id)
+                await did_service.get_dids_by_workspace(workspace_id)
             )
 
             talko_service_logger.info(
-                "Retrieved {} DIDs for service_board_id {}".format(
-                    len(dids), service_board_id
+                "Retrieved {} DIDs for workspace_id {}".format(
+                    len(dids), workspace_id
                 )
             )
             return TalkoSuccessResponse(dids)
 
         except Exception as e:
             talko_service_logger.error(
-                "Unexpected error retrieving DIDs for service_board_id {}: {}".format(
-                    service_board_id, str(e)
+                "Unexpected error retrieving DIDs for workspace_id {}: {}".format(
+                    workspace_id, str(e)
                 )
             )
             return TalkoInternalServerErrorResponse(detail=str(e))
@@ -308,8 +308,8 @@ class TalkoDIDController:
             None,
             description="Filter by DID status (available, mapped, cooling_period, cooldown_completed)",
         ),
-        service_board_id: Optional[int] = Query(
-            None, description="Filter by service board ID"
+        workspace_id: Optional[int] = Query(
+            None, description="Filter by workspace ID"
         ),
         did_number: Optional[str] = Query(
             None,
@@ -329,14 +329,14 @@ class TalkoDIDController:
                     user_id, status
                 )
                 + "partner={}, board={}, did number={}, page={}, limit={}".format(
-                    partner_id, service_board_id, did_number, page, limit
+                    partner_id, workspace_id, did_number, page, limit
                 )
             )
 
             result: TalkoContract.DIDListResponse = await did_service.list_dids(
                 status=status,
                 partner_id=partner_id,
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
                 did_number=did_number,
                 page=page,
                 limit=limit,

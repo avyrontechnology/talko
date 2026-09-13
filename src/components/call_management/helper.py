@@ -106,7 +106,7 @@ class TalkoCallProcessorHelper:
         agent_id: int,
         partner_id: int,
         active_did_pool: List[str],
-        service_board_id: Optional[int] = None,
+        workspace_id: Optional[int] = None,
     ) -> Optional[str]:
         try:
             mapping: Optional[Dict[str, Any]] = (
@@ -118,12 +118,12 @@ class TalkoCallProcessorHelper:
                 assigned_did = mapping.get("did", [None])[0]
                 if assigned_did in active_did_pool:
                     if (
-                        service_board_id
-                        and mapping.get("service_board_id") != service_board_id
+                        workspace_id
+                        and mapping.get("workspace_id") != workspace_id
                     ):
                         self.__logger.debug(
-                            "Agent {} mapped to different service board {}".format(
-                                agent_id, mapping.get("service_board_id")
+                            "Agent {} mapped to different workspace {}".format(
+                                agent_id, mapping.get("workspace_id")
                             )
                         )
                         return None
@@ -144,7 +144,7 @@ class TalkoCallProcessorHelper:
         self,
         did: str,
         partner_id: int,
-        service_board_id: Optional[int] = None,
+        workspace_id: Optional[int] = None,
     ) -> None:
         self.__logger.info(
             "Validating provided DID {} for partner {}".format(did, partner_id)
@@ -193,12 +193,12 @@ class TalkoCallProcessorHelper:
                 "DID {} is not assigned to your partner account".format(did)
             )
 
-        if service_board_id is not None:
-            did_board_id = did_record.get("service_board_id")
-            if did_board_id is not None and str(did_board_id) != str(service_board_id):
+        if workspace_id is not None:
+            did_workspace_id = did_record.get("workspace_id")
+            if did_workspace_id is not None and str(did_workspace_id) != str(workspace_id):
                 raise TalkoBadRequestError(
-                    "DID {} is restricted to service board {}, but request is for service board {}".format(
-                        did, did_board_id, service_board_id
+                    "DID {} is restricted to workspace {}, but request is for workspace {}".format(
+                        did, did_workspace_id, workspace_id
                     )
                 )
 
@@ -211,42 +211,42 @@ class TalkoCallProcessorHelper:
         partner_config: Dict[str, Any],
         partner_id: int,
         user_id: int,
-        service_board_id: Optional[int] = None,
+        workspace_id: Optional[int] = None,
     ) -> str:
         try:
             self.__logger.info(
-                "Selecting DID for partner {}, user {}, service_board_id {}".format(
-                    partner_id, user_id, service_board_id
+                "Selecting DID for partner {}, user {}, workspace_id {}".format(
+                    partner_id, user_id, workspace_id
                 )
             )
             enable_agent_mapping: bool = partner_config.get(
                 "enable_agent_mapping", False
             )
-            enable_service_board: bool = partner_config.get(
-                "enable_service_board", False
+            enable_workspace: bool = partner_config.get(
+                "enable_workspace", False
             )
             enable_round_robin: bool = partner_config.get("enable_round_robin", False)
             vendor_id: str = str(partner_config.get("vendor_id"))
 
-            if enable_service_board and not service_board_id:
+            if enable_workspace and not workspace_id:
                 self.__logger.error(
-                    "Service board ID is required when service boards are enabled"
+                    "Workspace ID is required when workspaces are enabled"
                 )
                 raise TalkoBadRequestError(
-                    "Service board ID is required when service boards are enabled."
+                    "Workspace ID is required when workspaces are enabled."
                 )
 
             if enable_agent_mapping:
                 dids: List[str] = (
-                    await self.__did_management_service.get_dids_by_partner_agent_service_board_and_vendor(
-                        partner_id, user_id, service_board_id, vendor_id
+                    await self.__did_management_service.get_dids_by_partner_agent_workspace_and_vendor(
+                        partner_id, user_id, workspace_id, vendor_id
                     )
                 )
-            elif enable_service_board:
+            elif enable_workspace:
                 dids: List[str] = (
-                    await self.__did_management_service.get_dids_by_partner_service_board_and_vendor(
+                    await self.__did_management_service.get_dids_by_partner_workspace_and_vendor(
                         partner_id,
-                        service_board_id,
+                        workspace_id,
                         vendor_id,
                         vendor_config_id=partner_config.get("vendor_config_id"),
                     )
@@ -268,13 +268,13 @@ class TalkoCallProcessorHelper:
                 )
                 raise TalkoResourceNotFound(NO_DID_ASSIGNED_TO_PARTNER)
 
-            if enable_round_robin or enable_service_board:
+            if enable_round_robin or enable_workspace:
                 from_number: str = await self._assign_round_robin_did(
-                    partner_config, partner_id, dids, service_board_id
+                    partner_config, partner_id, dids, workspace_id
                 )
             elif enable_agent_mapping:
                 from_number = await self.get_agent_assign_did_in_agent_mapping(
-                    user_id, partner_id, dids, service_board_id
+                    user_id, partner_id, dids, workspace_id
                 )
                 if not from_number:
                     from_number = await self._assign_round_robin_did(
@@ -298,7 +298,7 @@ class TalkoCallProcessorHelper:
         partner_config: Dict[str, Any],
         partner_id: int,
         did_list: List[str],
-        service_board_id: Optional[int] = None,
+        workspace_id: Optional[int] = None,
     ) -> str:
         if not did_list:
             self.__logger.error(
@@ -308,7 +308,7 @@ class TalkoCallProcessorHelper:
             )
             raise TalkoResourceNotFound(NO_DID_ASSIGNED_TO_PARTNER)
 
-        index_key = "round_robin" if service_board_id is None else str(service_board_id)
+        index_key = "round_robin" if workspace_id is None else str(workspace_id)
         self.__logger.debug(
             "Current did_indices: {}".format(partner_config["did_indices"])
         )
@@ -465,7 +465,7 @@ class TalkoCallProcessorHelper:
                 entity_type=entity_fields["entity_type"],
                 entity_id=entity_fields["entity_id"],
                 entity_name=entity_fields["entity_name"],
-                service_board_id=call_data.service_board_id,
+                workspace_id=call_data.workspace_id,
                 start_stamp=0,
                 end_stamp=0,
                 answer_stamp=0,
@@ -545,7 +545,7 @@ class TalkoCallProcessorHelper:
         request_data: Dict,
         partner_id: int,
         agent_id: Optional[int] = None,
-        service_board_id: Optional[int] = None,
+        workspace_id: Optional[int] = None,
         agent_number: Optional[str] = None,
         agent_ids: Optional[List[Dict]] = None,
         lead_id: Optional[int] = None,
@@ -561,13 +561,13 @@ class TalkoCallProcessorHelper:
         self.__logger.info("Creating new TalkoCDR for incoming call")
         self.__logger.debug("Request data for TalkoCDR creation: {}".format(request_data))
         self.__logger.debug(
-            "Partner ID: {}, agent id: {}, service board id: {}, agent_numbers: {}, "
+            "Partner ID: {}, agent id: {}, workspace id: {}, agent_numbers: {}, "
             "agent_ids: {}, lead_id: {}, lead_name: {}, vendor_id: {}, "
             "vendor_config_id: {}, inbound_type: {}, cloud_agent_number: {}, "
             "entity_type: {}, entity_id: {}, entity_name: {}".format(
                 partner_id,
                 agent_id,
-                service_board_id,
+                workspace_id,
                 agent_number,
                 agent_ids,
                 lead_id,
@@ -626,7 +626,7 @@ class TalkoCallProcessorHelper:
             entity_type=entity_fields["entity_type"],
             entity_id=entity_fields["entity_id"],
             entity_name=entity_fields["entity_name"],
-            service_board_id=service_board_id,
+            workspace_id=workspace_id,
             start_stamp=start_stamp,
             end_stamp=0,
             answer_stamp=0,

@@ -49,7 +49,7 @@ class TalkoAgentDialPlanResolver:
     async def resolve_for_single_agent(
         self,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         agent_id: int,
         fallback_agent_number: Optional[str] = None,
         reassign_inactive_agent: bool = False,
@@ -66,14 +66,14 @@ class TalkoAgentDialPlanResolver:
         reassigned_lead_id: Optional[int] = None
         if reassign_inactive_agent and await self._is_agent_inactive(agent_id):
             new_agent_id, reassigned_lead_id = await self._reassign_to_active_agent(
-                partner_id, service_board_id, agent_id, customer_number
+                partner_id, workspace_id, agent_id, customer_number
             )
             if new_agent_id:
                 agent_id = new_agent_id
                 resolved_agent_id = new_agent_id
 
         is_cloud_enabled, extension, agent_id, agent_name, agent_number = (
-            await self._get_cloud_phonic_info(partner_id, service_board_id, agent_id)
+            await self._get_cloud_phonic_info(partner_id, workspace_id, agent_id)
         )
 
         self.__logger.debug(
@@ -135,7 +135,7 @@ class TalkoAgentDialPlanResolver:
         customer_number: str,
         call_to_number: str,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         vendor_id: Optional[str] = None,
         vendor_config_id: Optional[str] = None,
         create_lead: Optional[bool] = False,
@@ -151,7 +151,7 @@ class TalkoAgentDialPlanResolver:
             "Resolving inbound no-TalkoCDR call from {} to DID {} ".format(
                 customer_number, call_to_number
             )
-            + "(partner {}, board {})".format(partner_id, service_board_id)
+            + "(partner {}, board {})".format(partner_id, workspace_id)
         )
 
         assigned_agent_id: Optional[int] = None
@@ -160,7 +160,7 @@ class TalkoAgentDialPlanResolver:
 
         if create_lead:
             lead_id, lead_name, assigned_agent_id = await self._get_or_create_lead(
-                customer_number, partner_id, service_board_id
+                customer_number, partner_id, workspace_id
             )
 
             self.__logger.info(
@@ -174,7 +174,7 @@ class TalkoAgentDialPlanResolver:
         if assigned_agent_id:
             target, agent_ids_list = await self._resolve_single_assigned_agent(
                 partner_id,
-                service_board_id,
+                workspace_id,
                 assigned_agent_id,
                 reassign_inactive_agent=reassign_inactive_agent,
                 customer_number=customer_number,
@@ -195,9 +195,9 @@ class TalkoAgentDialPlanResolver:
             )
         else:
             target, agent_ids_list, inbound_round_robin_next_index = (
-                await self._resolve_all_service_board_agents(
+                await self._resolve_all_workspace_agents(
                     partner_id,
-                    service_board_id,
+                    workspace_id,
                     enable_inbound_round_robin=enable_inbound_round_robin,
                     inbound_round_robin_index=inbound_round_robin_index,
                 )
@@ -252,7 +252,7 @@ class TalkoAgentDialPlanResolver:
             "agent_ids": agent_ids_list,
             "target": target,
             "partner_id": partner_id,
-            "service_board_id": service_board_id,
+            "workspace_id": workspace_id,
             "vendor_id": vendor_id,
             "vendor_config_id": vendor_config_id,
             "inbound_round_robin_next_index": inbound_round_robin_next_index,
@@ -261,7 +261,7 @@ class TalkoAgentDialPlanResolver:
     async def _resolve_single_assigned_agent(
         self,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         agent_id: int,
         reassign_inactive_agent: bool = False,
         customer_number: Optional[str] = None,
@@ -276,13 +276,13 @@ class TalkoAgentDialPlanResolver:
         reassigned_lead_id: Optional[int] = None
         if reassign_inactive_agent and await self._is_agent_inactive(agent_id):
             new_agent_id, reassigned_lead_id = await self._reassign_to_active_agent(
-                partner_id, service_board_id, agent_id, customer_number
+                partner_id, workspace_id, agent_id, customer_number
             )
             if new_agent_id:
                 agent_id = new_agent_id
 
         is_cloud, extension, _, _, agent_number = await self._get_cloud_phonic_info(
-            partner_id, service_board_id, agent_id
+            partner_id, workspace_id, agent_id
         )
 
         self.__logger.debug(
@@ -327,10 +327,10 @@ class TalkoAgentDialPlanResolver:
 
         return target, agent_ids_list
 
-    async def _resolve_all_service_board_agents(
+    async def _resolve_all_workspace_agents(
         self,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         enable_inbound_round_robin: bool = False,
         inbound_round_robin_index: int = 0,
     ) -> Tuple[TalkoTransferTarget, List[Dict[str, Optional[Any]]], Optional[int]]:
@@ -343,25 +343,25 @@ class TalkoAgentDialPlanResolver:
         Returns the advanced cursor for persistence.
         """
         self.__logger.debug(
-            "Resolving all agents for service board {} (partner {})".format(
-                service_board_id, partner_id
+            "Resolving all agents for workspace {} (partner {})".format(
+                workspace_id, partner_id
             )
         )
-        agents = await self.__agent_mapping_repo.get_agents_by_service_board_id_and_partner_id(
-            service_board_id=service_board_id, partner_id=partner_id
+        agents = await self.__agent_mapping_repo.get_agents_by_workspace_id_and_partner_id(
+            workspace_id=workspace_id, partner_id=partner_id
         )
 
         if not agents:
             self.__logger.warning(
                 "No agents in board {} (partner {})".format(
-                    service_board_id, partner_id
+                    workspace_id, partner_id
                 )
             )
             return TalkoTransferTarget(type="number", data=[]), [], None
 
         self.__logger.debug(
             "Found {} agents in board {} (partner {})".format(
-                len(agents), service_board_id, partner_id
+                len(agents), workspace_id, partner_id
             )
         )
 
@@ -398,7 +398,7 @@ class TalkoAgentDialPlanResolver:
             regular_number = agent.get("agent_number")
 
             is_cloud, extension, _, _, _ = await self._get_cloud_phonic_info(
-                partner_id, service_board_id, agent_id
+                partner_id, workspace_id, agent_id
             )
 
             if is_cloud and extension:
@@ -553,7 +553,7 @@ class TalkoAgentDialPlanResolver:
     async def _reassign_to_active_agent(
         self,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         current_agent_id: int,
         customer_number: Optional[str],
     ) -> Tuple[Optional[int], Optional[int]]:
@@ -565,8 +565,8 @@ class TalkoAgentDialPlanResolver:
         agent is available; reassigned_lead_id is None if the Maglo call
         fails (the agent swap still stands, just without a confirmed lead id).
         """
-        agents = await self.__agent_mapping_repo.get_agents_by_service_board_id_and_partner_id(
-            service_board_id=service_board_id, partner_id=partner_id
+        agents = await self.__agent_mapping_repo.get_agents_by_workspace_id_and_partner_id(
+            workspace_id=workspace_id, partner_id=partner_id
         )
         candidates = [a for a in agents if a.get("agent_id") != current_agent_id]
 
@@ -574,7 +574,7 @@ class TalkoAgentDialPlanResolver:
             self.__logger.warning(
                 "Assigned agent {} inactive but no other agents on board {} "
                 "(partner {}); keeping original assignment.".format(
-                    current_agent_id, service_board_id, partner_id
+                    current_agent_id, workspace_id, partner_id
                 )
             )
             return None, None
@@ -588,14 +588,14 @@ class TalkoAgentDialPlanResolver:
 
         self.__logger.info(
             "Reassigning lead from inactive agent {} to agent {} (partner {}, board {})".format(
-                current_agent_id, new_agent_id, partner_id, service_board_id
+                current_agent_id, new_agent_id, partner_id, workspace_id
             )
         )
 
         reassigned_lead_id: Optional[int] = None
         if customer_number and new_agent_id:
             reassigned_lead_id = await self._notify_maglo_reassignment(
-                customer_number, partner_id, service_board_id, new_agent_id
+                customer_number, partner_id, workspace_id, new_agent_id
             )
 
         return new_agent_id, reassigned_lead_id
@@ -604,7 +604,7 @@ class TalkoAgentDialPlanResolver:
         self,
         customer_number: str,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         new_agent_id: int,
     ) -> Optional[int]:
         """Notifies Maglo of the reassignment and returns the confirmed
@@ -613,7 +613,7 @@ class TalkoAgentDialPlanResolver:
             result = await self.__maglo_client.reassign_lead_by_phone(
                 phone_number=customer_number,
                 partner_id=partner_id,
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
                 agent_id=new_agent_id,
             )
             return (result or {}).get("lead_request_id")
@@ -657,12 +657,12 @@ class TalkoAgentDialPlanResolver:
         self,
         customer_number: str,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
     ) -> Tuple[Optional[int], Optional[str], Optional[int]]:
         try:
             response_data = await self.__maglo_client.upsert_ivr_lead(
                 partner_id=partner_id,
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
                 phone_number=customer_number,
             )
 
@@ -699,7 +699,7 @@ class TalkoAgentDialPlanResolver:
             return None, None, None
 
     async def _get_cloud_phonic_info(
-        self, partner_id: int, service_board_id: int, agent_id: int
+        self, partner_id: int, workspace_id: int, agent_id: int
     ) -> Tuple[bool, Optional[str], Optional[int], Optional[str], Optional[str]]:
         """Fetch from Maglo whether cloud phonic is enabled and get the extension username"""
         try:
@@ -711,7 +711,7 @@ class TalkoAgentDialPlanResolver:
 
             response = await self.__maglo_client.get_agent_details(
                 agent_id=agent_id,
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
             )
 
             self.__logger.debug(
@@ -747,10 +747,10 @@ class TalkoAgentDialPlanResolver:
         except ValueError as ve:
             # TalkoMagloClient raises ValueError on non-200 status (including 404)
             error_str = str(ve)
-            if "404" in error_str and "Service board with id" in error_str:
+            if "404" in error_str and "Workspace with id" in error_str:
                 self.__logger.warning(
-                    "Maglo service board {} not found for agent {} (partner {}) → ".format(
-                        service_board_id, agent_id, partner_id
+                    "Maglo workspace {} not found for agent {} (partner {}) → ".format(
+                        workspace_id, agent_id, partner_id
                     )
                     + "falling back to regular phone number"
                 )

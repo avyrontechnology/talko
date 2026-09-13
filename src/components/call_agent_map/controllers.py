@@ -125,32 +125,32 @@ class TalkoCallAgentMappingController:
             )
             raise TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
         
-    # routes for agent to service board mapping
+    # routes for agent to workspace mapping
     @router.post(
-        "/service-board-mapping",
-        response_model=TalkoContract.AgentServiceBoardMappingCreationResponse,
+        "/workspace-mapping",
+        response_model=TalkoContract.AgentWorkspaceMappingCreationResponse,
         status_code=status.HTTP_201_CREATED,
     )
     @permission_check(TalkoPermissionDependency)
     @inject
-    async def create_agent_service_board_mapping(
+    async def create_agent_workspace_mapping(
         request: Request,
-        call_agent_data: TalkoContract.AgentServiceBoardMappingCreate,
+        call_agent_data: TalkoContract.AgentWorkspaceMappingCreate,
         call_agent_service: TalkoAgentMappingService = Depends(
             Provide[TalkoContainer.call_agent_mapping_service]
         ),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-    ) -> TalkoContract.AgentServiceBoardMappingCreationResponse:
+    ) -> TalkoContract.AgentWorkspaceMappingCreationResponse:
         try:
             talko_service_logger.info(
                 "Received call agent mapping creation request: {}".format(
                     call_agent_data
                 )
             )
-            mapping_response: TalkoContract.AgentServiceBoardMappingCreationResponse = (
-                await call_agent_service.create_agent_service_board_mapping(
+            mapping_response: TalkoContract.AgentWorkspaceMappingCreationResponse = (
+                await call_agent_service.create_agent_workspace_mapping(
                     call_agent_data.partner_id,
-                    call_agent_data.service_board_id,
+                    call_agent_data.workspace_id,
                     call_agent_data.agent_id,
                     call_agent_data.agent_number
                 )
@@ -181,34 +181,34 @@ class TalkoCallAgentMappingController:
 
 
     @router.get(
-        "/service-board-mapping",
-        response_model=List[TalkoContract.AgentServiceBoardMappingResponse],
+        "/workspace-mapping",
+        response_model=List[TalkoContract.AgentWorkspaceMappingResponse],
     )
     @permission_check(TalkoPermissionDependency)
     @inject
-    async def get_agents_by_service_board(
+    async def get_agents_by_workspace(
         request: Request,
-        service_board_id: int,
+        workspace_id: int,
         partner_id: int,
         call_agent_service: TalkoAgentMappingService = Depends(
             Provide[TalkoContainer.call_agent_mapping_service]
         ),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-    ) -> List[TalkoContract.AgentServiceBoardMappingResponse]:
+    ) -> List[TalkoContract.AgentWorkspaceMappingResponse]:
         try:
             talko_service_logger.info(
-                "Request received to fetch agents for service_board_id={}, partner_id={}".format(service_board_id, partner_id)
+                "Request received to fetch agents for workspace_id={}, partner_id={}".format(workspace_id, partner_id)
             )
             
-            mapping_response: List[TalkoContract.AgentServiceBoardMappingResponse] = (
-                await call_agent_service.get_agents_by_service_board(service_board_id, partner_id)
+            mapping_response: List[TalkoContract.AgentWorkspaceMappingResponse] = (
+                await call_agent_service.get_agents_by_workspace(workspace_id, partner_id)
             )
             
             return TalkoSuccessResponse(data=mapping_response)
         
         except ValueError as e:
             talko_service_logger.error(
-                "Error fetching agents for service board: {}".format(str(e))
+                "Error fetching agents for workspace: {}".format(str(e))
             )
             return TalkoBadRequestResponse(detail=BAD_REQUEST)
         
@@ -231,24 +231,24 @@ class TalkoCallAgentMappingController:
             raise TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)  
         
     @router.patch(
-        "/service-board-mapping/{partner_id}/{service_board_id}/status",
+        "/workspace-mapping/{partner_id}/{workspace_id}/status",
         status_code=status.HTTP_200_OK,
     )
     @inject
-    async def update_agent_service_board_mapping_status(
+    async def update_agent_workspace_mapping_status(
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         is_active: bool,
         call_agent_service: TalkoAgentMappingService = Depends(Provide[TalkoContainer.call_agent_mapping_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ):
         """
-        Update the 'is_active' field for all agent-service-board mappings 
-        for a given partner_id and service_board_id.
+        Update the 'is_active' field for all agent-workspace mappings 
+        for a given partner_id and workspace_id.
         """
         try:
-            updated_count = await call_agent_service.update_is_active_by_service_board_and_partner_id(
-                partner_id, service_board_id, is_active
+            updated_count = await call_agent_service.update_is_active_by_workspace_and_partner_id(
+                partner_id, workspace_id, is_active
             )
             return TalkoSuccessResponse(
                 data={
@@ -261,6 +261,6 @@ class TalkoCallAgentMappingController:
             return TalkoResourceNotFoundResponse(detail=SOMETHING_WENT_WRONG)
         except Exception as e:
             talko_service_logger.error(
-                "Unexpected error updating 'is_active' for service_board_id={}, partner_id={}: {}".format(service_board_id, partner_id, str(e))
+                "Unexpected error updating 'is_active' for workspace_id={}, partner_id={}: {}".format(workspace_id, partner_id, str(e))
             )
             raise

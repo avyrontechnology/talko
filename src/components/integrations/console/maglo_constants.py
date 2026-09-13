@@ -56,7 +56,8 @@ class TalkoMagloApiConstants:
 
     # Query parameter defaults / common values
     API_KEY_FIELD = "api_key"
-    DEFAULT_SERVICE_BOARD_ID_PARAM = "service_board_id"
+    # External Maglo wire key — value must stay "service_board_id".
+    DEFAULT_WORKSPACE_ID_PARAM = "service_board_id"
     DEFAULT_AGENT_ID_PARAM = "agent_id"
     LEAD_PAYLOAD_PHONE_NUMBER = "phone_number"
     LEAD_PAYLOAD_PARTNER_ID = "partner_id"

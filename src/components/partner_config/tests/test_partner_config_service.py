@@ -58,9 +58,9 @@ class TestPartnerConfigService:
                     "did_index": 0,
                     "enable_round_robin": False,
                     "enable_agent_mapping": False,
-                    "enable_service_board": False,
-                    "service_board_ids": [],
-                    "board_did_counts": {},
+                    "enable_workspace": False,
+                    "workspace_ids": [],
+                    "workspace_did_counts": {},
                     "agent_mapping_ids": [],
                     "round_robin_did_count": None,
                 }
@@ -76,15 +76,15 @@ class TestPartnerConfigService:
         assert response.id is not None
         assert response.message == "Partner config created successfully."
 
-    async def test_create_partner_config_round_robin_and_service_board_error(
+    async def test_create_partner_config_round_robin_and_workspace_error(
         self, monkeypatch
     ):
         config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
-            enable_service_board=True,
-            board_did_counts={"101": 1},
-            service_board_ids=[101],
+            enable_workspace=True,
+            workspace_did_counts={"101": 1},
+            workspace_ids=[101],
             enable_round_robin=True,
             round_robin_did_count=1,
         )
@@ -96,18 +96,18 @@ class TestPartnerConfigService:
         )
 
         with pytest.raises(
-            TalkoBadRequestError, match="Round-robin and service board cannot"
+            TalkoBadRequestError, match="Round-robin and workspace cannot"
         ):
             await self.service.create_partner_config(config)
 
     async def test_create_partner_config_missing_required_fields(self, monkeypatch):
-        # Missing board_did_counts and service_board_ids
+        # Missing workspace_did_counts and workspace_ids
         config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
-            enable_service_board=True,
-            board_did_counts=None,
-            service_board_ids=None,
+            enable_workspace=True,
+            workspace_did_counts=None,
+            workspace_ids=None,
             enable_agent_mapping=True,
             agent_mapping_ids=None,
             enable_round_robin=True,
@@ -122,7 +122,7 @@ class TestPartnerConfigService:
 
         with pytest.raises(
             TalkoBadRequestError,
-            match="Round-robin and service board cannot be enabled simultaneously",
+            match="Round-robin and workspace cannot be enabled simultaneously",
         ):
             await self.service.create_partner_config(config)
 
@@ -138,9 +138,9 @@ class TestPartnerConfigService:
                 "did_index": 0,
                 "enable_round_robin": False,
                 "enable_agent_mapping": False,
-                "enable_service_board": False,
-                "service_board_ids": [],
-                "board_did_counts": {},
+                "enable_workspace": False,
+                "workspace_ids": [],
+                "workspace_did_counts": {},
                 "agent_mapping_ids": [],
                 "round_robin_did_count": None,
                 "created_at": 1234567890,
@@ -166,9 +166,9 @@ class TestPartnerConfigService:
             "did_index": 0,
             "enable_round_robin": False,
             "enable_agent_mapping": False,
-            "enable_service_board": False,
-            "service_board_ids": [],
-            "board_did_counts": {},
+            "enable_workspace": False,
+            "workspace_ids": [],
+            "workspace_did_counts": {},
             "agent_mapping_ids": [],
             "round_robin_did_count": None,
             "created_at": 1234567890,
@@ -209,13 +209,13 @@ class TestPartnerConfigServiceValidation:
         )
 
     @pytest.mark.asyncio
-    async def test_missing_service_board_fields_raises(self, monkeypatch):
+    async def test_missing_workspace_fields_raises(self, monkeypatch):
         config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
-            enable_service_board=True,
-            service_board_ids=None,
-            board_did_counts=None,
+            enable_workspace=True,
+            workspace_ids=None,
+            workspace_did_counts=None,
             enable_agent_mapping=False,
             agent_mapping_ids=None,
             enable_round_robin=False,
@@ -234,7 +234,7 @@ class TestPartnerConfigServiceValidation:
         )
 
         with pytest.raises(
-            TalkoBadRequestError, match="service_board_ids and board_did_counts are required"
+            TalkoBadRequestError, match="workspace_ids and workspace_did_counts are required"
         ):
             await self.service.create_partner_config(config)
 
@@ -243,7 +243,7 @@ class TestPartnerConfigServiceValidation:
         config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
-            enable_service_board=False,
+            enable_workspace=False,
             enable_agent_mapping=True,
             agent_mapping_ids=None,
             enable_round_robin=False,
@@ -269,7 +269,7 @@ class TestPartnerConfigServiceValidation:
         config = TalkoContract.PartnerConfigCreate(
             partner_id=1,
             vendor_id=str(ObjectId()),
-            enable_service_board=False,
+            enable_workspace=False,
             enable_agent_mapping=False,
             enable_round_robin=True,
             round_robin_did_count=None,

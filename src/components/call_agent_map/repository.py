@@ -4,7 +4,7 @@ from pymongo.results import InsertOneResult, UpdateResult
 
 from src.components.call_agent_map.models import (
     TalkoAgentDidMappingModel,
-    TalkoAgentServiceBoardMappingModel,
+    TalkoAgentWorkspaceMappingModel,
 )
 from src.core.doc_db import TalkoDocDatabaseSessionManager
 from src.exceptions import TalkoBadRequestError
@@ -272,9 +272,9 @@ class TalkoAgentMappingRepository:
             )
             raise
 
-    async def insert_agent_service_board_mapping(self, mapping_dict: Dict[str, Any]) -> str:
+    async def insert_agent_workspace_mapping(self, mapping_dict: Dict[str, Any]) -> str:
         """
-        Inserts a new Agent–Service Board mapping into the database.
+        Inserts a new Agent–Workspace mapping into the database.
 
         Args:
             mapping_dict (Dict[str, Any]): The mapping data to insert.
@@ -285,60 +285,60 @@ class TalkoAgentMappingRepository:
         try:
             self.logger.debug("Inserting mapping data: ".format(mapping_dict))
             async with self.db_manager.collection(
-                TalkoAgentServiceBoardMappingModel.CollectionName.AGENT_SERVICE_BOARD_MAPPING
+                TalkoAgentWorkspaceMappingModel.CollectionName.AGENT_WORKSPACE_MAPPING
             ) as collection:
                 result: InsertOneResult = await collection.insert_one(mapping_dict)
                 inserted_id: str = str(result.inserted_id)
                 self.logger.debug(
-                    "Inserted Agent–Service Board mapping with id: {}".format(inserted_id)
+                    "Inserted Agent–Workspace mapping with id: {}".format(inserted_id)
                 )
                 return inserted_id
         except Exception as e:
-            self.logger.error("Error inserting Agent–Service Board mapping: {}".format(str(e)))
+            self.logger.error("Error inserting Agent–Workspace mapping: {}".format(str(e)))
             raise
 
-    async def get_agents_by_service_board_id_and_partner_id(self, service_board_id: int, partner_id: int) -> List[Dict[str, Any]]:
+    async def get_agents_by_workspace_id_and_partner_id(self, workspace_id: int, partner_id: int) -> List[Dict[str, Any]]:
         """
-        Fetch all agents mapped to a given service board id and partner_id
+        Fetch all agents mapped to a given workspace id and partner_id
         """
         try:
             async with self.db_manager.collection(
-                TalkoAgentServiceBoardMappingModel.CollectionName.AGENT_SERVICE_BOARD_MAPPING
+                TalkoAgentWorkspaceMappingModel.CollectionName.AGENT_WORKSPACE_MAPPING
             ) as collection:
                 agents: List[Dict[str, Any]] = await collection.find(
-                    {"service_board_id": service_board_id, "partner_id":partner_id, "is_active": True}
+                    {"workspace_id": workspace_id, "partner_id":partner_id, "is_active": True}
                 ).to_list(length=None)
                 self.logger.debug(
-                    "Fetched agents for service_board_id {} and partner_id {}: {}".format(service_board_id, partner_id, agents)
+                    "Fetched agents for workspace_id {} and partner_id {}: {}".format(workspace_id, partner_id, agents)
                 )
                 return agents
         except Exception as e:
-            self.logger.error("Error fetching agents for service_board_id {} and partner_id {}: {}".format(service_board_id, partner_id, str(e)))
+            self.logger.error("Error fetching agents for workspace_id {} and partner_id {}: {}".format(workspace_id, partner_id, str(e)))
             raise
 
-    async def update_is_active_by_service_board_and_partner_id(
-        self, partner_id: int, service_board_id: int, is_active: bool
+    async def update_is_active_by_workspace_and_partner_id(
+        self, partner_id: int, workspace_id: int, is_active: bool
     ) -> int:
         """
-        Update active/inactive status for all agent-service-board mappings for a given service_board_id and partner_id
+        Update active/inactive status for all agent-workspace mappings for a given workspace_id and partner_id
 
         Returns:
             int: Number of updated records
         """
         try:
             async with self.db_manager.collection(
-                TalkoAgentServiceBoardMappingModel.CollectionName.AGENT_SERVICE_BOARD_MAPPING
+                TalkoAgentWorkspaceMappingModel.CollectionName.AGENT_WORKSPACE_MAPPING
             ) as collection:
                 result = await collection.update_many(
-                    {"service_board_id": service_board_id, "partner_id": partner_id},
+                    {"workspace_id": workspace_id, "partner_id": partner_id},
                     {"$set": {"is_active": is_active}},
                 )
                 self.logger.info(
-                    "Updated 'is_active'={} for {} mappings (service_board_id={}, partner_id={})".format(
-                        is_active, result.modified_count, service_board_id, partner_id
+                    "Updated 'is_active'={} for {} mappings (workspace_id={}, partner_id={})".format(
+                        is_active, result.modified_count, workspace_id, partner_id
                     )
                 )
                 return result.modified_count
         except Exception as e:
-            self.logger.error("Failed to update status of mappings for service_board_id={} and partner_id={}: {}".format(service_board_id, partner_id, str(e)))
+            self.logger.error("Failed to update status of mappings for workspace_id={} and partner_id={}: {}".format(workspace_id, partner_id, str(e)))
             raise

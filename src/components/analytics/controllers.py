@@ -46,7 +46,7 @@ class TalkoAnalyticsController:
         ),
         payload: str = Query(
             ...,
-            description='Analytic-specific data as JSON string (e.g., {"time_range": "1749148200000-1756992444404", "service_board_id": [40]})',
+            description='Analytic-specific data as JSON string (e.g., {"time_range": "1749148200000-1756992444404", "workspace_id": [40]})',
         ),
         offset: int = Query(
             TalkoPaginationConstants.offset,

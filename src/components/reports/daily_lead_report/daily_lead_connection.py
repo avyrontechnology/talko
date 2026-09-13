@@ -34,7 +34,7 @@ async def daily_lead_connection_csv(api_key: str = Query(...)):
         writer = csv.DictWriter(
             output,
             fieldnames=[
-                "service_board_id",
+                "workspace_id",
                 "agent_id",
                 "agent_name",
                 "total_leads",

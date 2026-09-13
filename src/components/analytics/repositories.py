@@ -58,7 +58,7 @@ class TalkoAnalyticsRepository:
         start_date: Optional[int],
         end_date: Optional[int],
         agents: Optional[List[int]],
-        service_board_id: Optional[List[int]] = None,
+        workspace_id: Optional[List[int]] = None,
         entity_type: Optional[str] = None,
         limit: int = 10,
         offset: int = 1,
@@ -87,7 +87,7 @@ class TalkoAnalyticsRepository:
                     start_date_ms,
                     end_date_ms,
                     agents=agents,
-                    service_board_id=service_board_id,
+                    workspace_id=workspace_id,
                     entity_type=entity_type,
                     user_role=user_role,
                 )
@@ -351,7 +351,7 @@ class TalkoAnalyticsRepository:
         start_date: Optional[int],
         end_date: Optional[int],
         agents: Optional[List[int]],
-        service_board_id: Optional[List[int]] = None,
+        workspace_id: Optional[List[int]] = None,
         entity_type: Optional[str] = None,
         limit: int = 10,
         offset: int = 1,
@@ -380,7 +380,7 @@ class TalkoAnalyticsRepository:
                     start_date_ms,
                     end_date_ms,
                     agents=agents,
-                    service_board_id=service_board_id,
+                    workspace_id=workspace_id,
                     entity_type=entity_type,
                     user_role=user_role,
                 )
@@ -472,7 +472,7 @@ class TalkoAnalyticsRepository:
         start_date: Optional[int],
         end_date: Optional[int],
         agents: Optional[List[int]],
-        service_board_id: Optional[List[int]] = None,
+        workspace_id: Optional[List[int]] = None,
         entity_type: Optional[str] = None,
         limit: int = 10,
         offset: int = 1,
@@ -501,7 +501,7 @@ class TalkoAnalyticsRepository:
                     start_date_ms,
                     end_date_ms,
                     agents=agents,
-                    service_board_id=service_board_id,
+                    workspace_id=workspace_id,
                     entity_type=entity_type,
                     user_role=user_role,
                 )
@@ -620,12 +620,12 @@ class TalkoAnalyticsRepository:
             )
             raise
 
-    async def get_partner_service_board(
+    async def get_partner_workspace(
         self,
         partner_id: int,
         start_date: Optional[int],
         end_date: Optional[int],
-        service_board_id: Optional[List[int]] = None,
+        workspace_id: Optional[List[int]] = None,
         entity_type: Optional[str] = None,
         limit: int = 10,
         offset: int = 1,
@@ -646,16 +646,16 @@ class TalkoAnalyticsRepository:
                     self.__date_range_helper.adjust_date_range(start_date, end_date)
                 )
                 self.__logger.debug(
-                    f"Retrieving partner service board analytics for partner_id: {partner_id}, "
+                    f"Retrieving partner workspace analytics for partner_id: {partner_id}, "
                     f"start_date: {start_date_ms}, end_date: {end_date_ms}, period: {period}, "
-                    f"service_board_id: {'all' if service_board_id is None or len(service_board_id) == 0 else service_board_id}"
+                    f"workspace_id: {'all' if workspace_id is None or len(workspace_id) == 0 else workspace_id}"
                 )
                 query = self.__query_builder.build_query(
                     partner_id,
                     start_date_ms,
                     end_date_ms,
                     agents=agents,
-                    service_board_id=service_board_id,
+                    workspace_id=workspace_id,
                     entity_type=entity_type,
                     user_role=user_role,
                 )
@@ -722,11 +722,11 @@ class TalkoAnalyticsRepository:
                     },
                 ]
 
-                self.__logger.debug(f"Partner service board pipeline: {pipeline}")
+                self.__logger.debug(f"Partner workspace pipeline: {pipeline}")
                 result = await collection.aggregate(pipeline).to_list()
                 self.__logger.debug(f"Aggregation result: {result}")
                 self.__logger.info(
-                    f"Successfully retrieved partner service board analytics for partner_id: {partner_id}"
+                    f"Successfully retrieved partner workspace analytics for partner_id: {partner_id}"
                 )
                 metrics = {
                     analytics_constants.TOTAL_CALLS: 0,
@@ -777,11 +777,11 @@ class TalkoAnalyticsRepository:
                         ],
                     },
                 }
-                self.__logger.debug(f"Get partner service board final data: {response}")
+                self.__logger.debug(f"Get partner workspace final data: {response}")
                 return response
         except Exception as e:
             self.__logger.error(
-                f"Failed to retrieve partner service board analytics: {str(e)}"
+                f"Failed to retrieve partner workspace analytics: {str(e)}"
             )
             raise
 
@@ -791,7 +791,7 @@ class TalkoAnalyticsRepository:
         start_date: Optional[int],
         end_date: Optional[int],
         agents: List[int],
-        service_board_id: Optional[List[int]],
+        workspace_id: Optional[List[int]],
         entity_type: Optional[str],
         metric: str,
         trend_basis: str,
@@ -807,11 +807,11 @@ class TalkoAnalyticsRepository:
                 )
             )
             self.__logger.debug(
-                "Parameters — start_date: {}, end_date: {}, agents: {}, service_board_id: {}, limit: {}, offset: {}, user_role: {}".format(
+                "Parameters — start_date: {}, end_date: {}, agents: {}, workspace_id: {}, limit: {}, offset: {}, user_role: {}".format(
                     start_date,
                     end_date,
                     agents,
-                    service_board_id,
+                    workspace_id,
                     limit,
                     offset,
                     user_role,
@@ -827,7 +827,7 @@ class TalkoAnalyticsRepository:
                     start_date,
                     end_date,
                     agents,
-                    service_board_id,
+                    workspace_id,
                     entity_type,
                     user_role,
                 )

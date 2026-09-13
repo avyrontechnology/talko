@@ -241,7 +241,7 @@ class TalkoContract:
         lead_id: Optional[int] = None
         entity_type: Optional[str] = None
         entity_id: Optional[int] = None
-        service_board_id: Optional[int] = None
+        workspace_id: Optional[int] = None
         calling_mode: str
         call_status: str
         call_recording: Optional[str] = None
@@ -310,7 +310,7 @@ class TalkoContract:
         lead_id: Optional[int] = None
         entity_type: Optional[str] = None
         entity_id: Optional[int] = None
-        service_board_id: Optional[int] = None
+        workspace_id: Optional[int] = None
         time_range: Optional[str] = None
         call_status: Optional[List[str]] = None
         agents: Optional[List[int]] = None

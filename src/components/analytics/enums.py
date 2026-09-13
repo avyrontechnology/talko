@@ -6,7 +6,7 @@ class TalkoAnalyticsType(str, Enum):
     AGENT_CALL_ANALYTICS = "agent_call_analytics"
     TOTAL_AGENT_TALK_TIME = "total_agent_talk_time"
     AGENT_TALK_TIME_DISTRIBUTION = "agent_talk_time_distribution"
-    PARTNER_SERVICE_BOARD = "partner_service_board"
+    PARTNER_WORKSPACE = "partner_workspace"
     DASHBOARD_CALL_TRENDS = "dashboard_call_trends"
 
 

@@ -295,7 +295,7 @@ class TalkoCDRController:
                 "entity_type": "Lead",
                 "entity_id": 123,
                 "lead_id": 123,
-                "service_board_id": 3,
+                "workspace_id": 3,
                 "time_range": "1232323-132213",
                 "call_status": ["missed"],
                 "agents": [1, 2, 3],
@@ -364,7 +364,7 @@ class TalkoCDRController:
                     detail=(
                         "Payload must be a valid JSON string. Example: "
                         '{"entity_type": "Lead", "entity_id": 123, "lead_id": 123, '
-                        '"service_board_id": 3, "time_range": "1232323-132213", '
+                        '"workspace_id": 3, "time_range": "1232323-132213", '
                         '"call_status": ["missed", "answered"], "agents": [1, 2, 3], '
                         '"phone_number": "1234567890", "call_type": "inbound"}'
                     )

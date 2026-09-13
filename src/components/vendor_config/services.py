@@ -112,7 +112,7 @@ class TalkoVendorConfigService:
 
             for did_number in config.available_did:
                 await self.__did_management_service.assign_did(
-                    service_board_id=0,
+                    workspace_id=0,
                     did_number=did_number,
                     partner_id=0,
                     vendor_id=str(vendor_id),
@@ -244,7 +244,7 @@ class TalkoVendorConfigService:
                 vendor_id: ObjectId = ObjectId(updated_config["vendor_id"])
                 for did_number in update.available_did:
                     await self.__did_management_service.assign_did(
-                        service_board_id=0,
+                        workspace_id=0,
                         did_number=did_number,
                         partner_id=0,
                         vendor_id=str(vendor_id),

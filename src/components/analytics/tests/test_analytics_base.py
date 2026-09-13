@@ -7,7 +7,7 @@ from src.components.analytics.dto import (
     TalkoAgentCallAnalyticsRequest,
     TalkoAnalyticsResponse,
     TalkoDashboardFollowupTrendsRequest,
-    TalkoPartnerServiceBoardRequest,
+    TalkoPartnerWorkspaceRequest,
 )
 from src.components.analytics.enums import TalkoAnalyticsType, TalkoMetric, TalkoTimeInterval
 from src.exceptions import TalkoInvalidAnalyticTypeError, TalkoPayloadValidationError
@@ -35,7 +35,7 @@ class TestAnalyticsBase:
             "data": {
                 "time_range": "1735689600000-1738272000000",  # 2025-01-01 to 2025-01-31
                 "agents": [1, 2],
-                "service_board_id": [1, 3],
+                "workspace_id": [1, 3],
             },
         }
 
@@ -50,7 +50,7 @@ class TestAnalyticsBase:
             request_data=TalkoAgentCallAnalyticsRequest(
                 time_range="1735689600000-1738272000000",
                 agents=[1, 2],
-                service_board_id=[1, 3],
+                workspace_id=[1, 3],
             ),
             limit=10,
             offset=1,
@@ -103,10 +103,10 @@ class TestAnalyticsBase:
     async def test_process_analytics_method_exception(self, setup_analytics_base):
         service, mock_processor, mock_logger = setup_analytics_base
 
-        mock_processor._get_partner_service_board.side_effect = Exception("boom")
+        mock_processor._get_partner_workspace.side_effect = Exception("boom")
 
         request = {
-            "analytics_type": TalkoAnalyticsType.PARTNER_SERVICE_BOARD.value,
+            "analytics_type": TalkoAnalyticsType.PARTNER_WORKSPACE.value,
             "data": {
                 "time_range": "1743465600000-1746057600000",  # 2025-04-01 to 2025-04-30
             },
@@ -116,17 +116,17 @@ class TestAnalyticsBase:
             await service.process_analytics(1, 123, request, limit=10, offset=1)
 
         assert str(exc_info.value) == "boom"
-        mock_processor._get_partner_service_board.assert_awaited_once_with(
+        mock_processor._get_partner_workspace.assert_awaited_once_with(
             current_user_id=1,
             partner_id=123,
-            request_data=TalkoPartnerServiceBoardRequest(
+            request_data=TalkoPartnerWorkspaceRequest(
                 time_range="1743465600000-1746057600000"
             ),
             limit=10,
             offset=1,
         )
         mock_logger.error.assert_any_call(
-            f"Error processing analytics {TalkoAnalyticsType.PARTNER_SERVICE_BOARD.value}: boom"
+            f"Error processing analytics {TalkoAnalyticsType.PARTNER_WORKSPACE.value}: boom"
         )
 
     async def test_process_analytics_dashboard_call_trends_success(
@@ -149,7 +149,7 @@ class TestAnalyticsBase:
             "analytics_type": TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value,
             "data": {
                 "time_range": "1722470400000-1726444800000",  # 2025-08-01 to 2025-09-15
-                "service_board_id": [40, 41],
+                "workspace_id": [40, 41],
                 "metric_filter": "agent_missed_calls",
                 "trend_basis": TalkoTimeInterval.WEEKS.value,
             },
@@ -165,7 +165,7 @@ class TestAnalyticsBase:
             partner_id=123,
             request_data=TalkoDashboardFollowupTrendsRequest(
                 time_range="1722470400000-1726444800000",
-                service_board_id=[40, 41],
+                workspace_id=[40, 41],
                 metric_filter="agent_missed_calls",
                 trend_basis="Weekly",
             ),
@@ -189,7 +189,7 @@ class TestAnalyticsBase:
             "analytics_type": TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value,
             "data": {
                 "time_range": 12345,  # invalid type
-                "service_board_id": "wrong",  # invalid type
+                "workspace_id": "wrong",  # invalid type
                 "metric_filter": 999,  # invalid type
                 "trend_basis": "Yearly",  # invalid value
             },

@@ -91,7 +91,7 @@ class TestAssignDid:
         partner_id = 1
         vendor_id = "507f1f77bcf86cd799439011"
         vendor_config_id = "507f1f77bcf86cd799439012"
-        service_board_id = 100
+        workspace_id = 100
         agent_id = 200
 
         vendor_id_obj = ObjectId(vendor_id)
@@ -99,7 +99,7 @@ class TestAssignDid:
         ts = mock_datetime_util.get_current_time.return_value
 
         expected_did_data = {
-            "service_board_id": service_board_id,
+            "workspace_id": workspace_id,
             "did_number": did_number,
             "partner_id": partner_id,
             "vendor_id": vendor_id_obj,
@@ -129,7 +129,7 @@ class TestAssignDid:
         mock_did_repository.insert_did_history = AsyncMock(return_value=None)
 
         await did_management_service.assign_did(
-            service_board_id=service_board_id,
+            workspace_id=workspace_id,
             did_number=did_number,
             partner_id=partner_id,
             vendor_id=vendor_id,
@@ -145,7 +145,7 @@ class TestAssignDid:
         assert called_with["partner_id"] == partner_id
         assert called_with["vendor_id"] == vendor_id_obj
         assert called_with["vendor_config_id"] == vendor_config_id_obj
-        assert called_with["service_board_id"] == service_board_id
+        assert called_with["workspace_id"] == workspace_id
         assert called_with["agent_id"] == agent_id
         assert called_with["assign_date"] == ts
         assert called_with["mapped_date"] == ts
@@ -418,7 +418,7 @@ class TestUpdateDid:
         vendor_id_obj = ObjectId(vendor_id)
         vendor_config_id_obj = ObjectId(self._vcid)
         partner_id = 1
-        service_board_id = 100
+        workspace_id = 100
         agent_id = 200
         ts = mock_datetime_util.get_current_time.return_value
 
@@ -427,11 +427,11 @@ class TestUpdateDid:
             "vendor_id": vendor_id_obj,
             "partner_id": None,
             "assign_date": None,
-            "service_board_id": None,
+            "workspace_id": None,
             "agent_id": None,
         }
         expected_update_data = {
-            "service_board_id": service_board_id,
+            "workspace_id": workspace_id,
             "agent_id": agent_id,
             "mapped_date": ts,
             "partner_id": partner_id,
@@ -447,7 +447,7 @@ class TestUpdateDid:
             "vendor_config_id": vendor_config_id_obj,
             "agent_id": agent_id,
             "assign_date": ANY,
-            "service_board_id": service_board_id,
+            "workspace_id": workspace_id,
             "created_at": ANY,
             "updated_at": ANY,
             "unassign_date": None,
@@ -462,7 +462,7 @@ class TestUpdateDid:
             did_number,
             vendor_id,
             partner_id,
-            service_board_id,
+            workspace_id,
             agent_id,
             vendor_config_id=vendor_config_id_obj,
         )
@@ -474,8 +474,8 @@ class TestUpdateDid:
         assert result == updated_did
         mock_logger.info.assert_any_call(
             "Starting update_did for did_number: {}, partner_id: {}, vendor_id: {}, "
-            "service_board_id: {}, agent_id: {}".format(
-                did_number, partner_id, vendor_id, service_board_id, agent_id
+            "workspace_id: {}, agent_id: {}".format(
+                did_number, partner_id, vendor_id, workspace_id, agent_id
             )
         )
         mock_logger.info.assert_any_call(
@@ -522,7 +522,7 @@ class TestUpdateDid:
             "vendor_id": vendor_id_obj,
             "partner_id": partner_id,
             "assign_date": ts,
-            "service_board_id": None,
+            "workspace_id": None,
             "agent_id": None,
         }
         expected_update_data = {"status": TalkoDIDStatus.MAPPED.value}
@@ -568,7 +568,7 @@ class TestUpdateDid:
             "partner_id": partner_id,
             "assign_date": ts,
             "updated_at": ts,
-            "service_board_id": None,
+            "workspace_id": None,
             "agent_id": None,
         }
         expected_update_data = {"status": TalkoDIDStatus.MAPPED.value}
@@ -605,7 +605,7 @@ class TestUpdateDid:
         vendor_id = self._vid
         vendor_id_obj = ObjectId(vendor_id)
         partner_id = 1
-        service_board_id = 100
+        workspace_id = 100
         ts = mock_datetime_util.get_current_time.return_value
 
         existing_did = {
@@ -613,11 +613,11 @@ class TestUpdateDid:
             "vendor_id": vendor_id_obj,
             "partner_id": partner_id,
             "assign_date": ts,
-            "service_board_id": None,
+            "workspace_id": None,
             "agent_id": None,
         }
         expected_update_data = {
-            "service_board_id": service_board_id,
+            "workspace_id": workspace_id,
             "updated_at": ts,
             "status": TalkoDIDStatus.MAPPED.value,
         }
@@ -630,7 +630,7 @@ class TestUpdateDid:
             TalkoResourceNotFound, match="Failed to update DID {}".format(did_number)
         ):
             await did_management_service.update_did(
-                did_number, vendor_id, partner_id, service_board_id=service_board_id
+                did_number, vendor_id, partner_id, workspace_id=workspace_id
             )
 
         mock_did_repository.update_did_attendance.assert_awaited_with(
@@ -654,7 +654,7 @@ class TestUpdateDid:
             "vendor_id": vendor_id_obj,
             "partner_id": 1,
             "assign_date": None,
-            "service_board_id": None,
+            "workspace_id": None,
             "agent_id": None,
         }
         mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(
@@ -706,61 +706,61 @@ class TestGetDidsByPartner:
         assert "DB error" in mock_logger.error.call_args[0][0]
 
     @pytest.mark.asyncio
-    async def test_get_dids_by_partner_service_board_success(
+    async def test_get_dids_by_partner_workspace_success(
         self, did_management_service, mock_did_repository, mock_logger
     ):
-        mock_did_repository.get_dids_by_partner_service_board_and_vendor = AsyncMock(
+        mock_did_repository.get_dids_by_partner_workspace_and_vendor = AsyncMock(
             return_value=["12345"]
         )
         result = (
-            await did_management_service.get_dids_by_partner_service_board_and_vendor(
+            await did_management_service.get_dids_by_partner_workspace_and_vendor(
                 1, 100, self._vid
             )
         )
-        mock_did_repository.get_dids_by_partner_service_board_and_vendor.assert_awaited_with(
+        mock_did_repository.get_dids_by_partner_workspace_and_vendor.assert_awaited_with(
             1, 100, ObjectId(self._vid)
         )
         assert result == ["12345"]
 
     @pytest.mark.asyncio
-    async def test_get_dids_by_partner_service_board_failure(
+    async def test_get_dids_by_partner_workspace_failure(
         self, did_management_service, mock_did_repository, mock_logger
     ):
         """Covers lines 456-462."""
-        mock_did_repository.get_dids_by_partner_service_board_and_vendor = AsyncMock(
+        mock_did_repository.get_dids_by_partner_workspace_and_vendor = AsyncMock(
             side_effect=Exception("DB error")
         )
         with pytest.raises(Exception, match="DB error"):
-            await did_management_service.get_dids_by_partner_service_board_and_vendor(
+            await did_management_service.get_dids_by_partner_workspace_and_vendor(
                 1, 100, self._vid
             )
         mock_logger.error.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_dids_by_partner_agent_service_board_success(
+    async def test_get_dids_by_partner_agent_workspace_success(
         self, did_management_service, mock_did_repository, mock_logger
     ):
-        mock_did_repository.get_dids_by_partner_agent_service_board_and_vendor = (
+        mock_did_repository.get_dids_by_partner_agent_workspace_and_vendor = (
             AsyncMock(return_value=["12345"])
         )
-        result = await did_management_service.get_dids_by_partner_agent_service_board_and_vendor(
+        result = await did_management_service.get_dids_by_partner_agent_workspace_and_vendor(
             1, 200, 100, self._vid
         )
-        mock_did_repository.get_dids_by_partner_agent_service_board_and_vendor.assert_awaited_with(
+        mock_did_repository.get_dids_by_partner_agent_workspace_and_vendor.assert_awaited_with(
             1, 200, 100, ObjectId(self._vid)
         )
         assert result == ["12345"]
 
     @pytest.mark.asyncio
-    async def test_get_dids_by_partner_agent_service_board_failure(
+    async def test_get_dids_by_partner_agent_workspace_failure(
         self, did_management_service, mock_did_repository, mock_logger
     ):
         """Covers lines 468-486."""
-        mock_did_repository.get_dids_by_partner_agent_service_board_and_vendor = (
+        mock_did_repository.get_dids_by_partner_agent_workspace_and_vendor = (
             AsyncMock(side_effect=Exception("DB error"))
         )
         with pytest.raises(Exception, match="DB error"):
-            await did_management_service.get_dids_by_partner_agent_service_board_and_vendor(
+            await did_management_service.get_dids_by_partner_agent_workspace_and_vendor(
                 1, 200, 100, self._vid
             )
         mock_logger.error.assert_called_once()
@@ -801,25 +801,25 @@ class TestGetDidsByNumber:
 
 
 @pytest.mark.asyncio
-class TestGetDidsByServiceBoard:
+class TestGetDidsByWorkspace:
 
     async def test_success(
         self, did_management_service, mock_did_repository, mock_logger
     ):
         vendor_id = ObjectId()
-        mock_did_repository.get_dids_by_service_board = AsyncMock(
+        mock_did_repository.get_dids_by_workspace = AsyncMock(
             return_value=[
                 {
                     "_id": ObjectId(),
                     "did_number": "12345",
-                    "service_board_id": 123,
+                    "workspace_id": 123,
                     "vendor_id": vendor_id,
                     "partner_id": 1,
                     "agent_id": 42,
                 }
             ]
         )
-        result = await did_management_service.get_dids_by_service_board(123)
+        result = await did_management_service.get_dids_by_workspace(123)
         assert len(result) == 1
         assert isinstance(result[0], TalkoContract.DIDResponse)
         assert result[0].did_number == "12345"
@@ -827,21 +827,21 @@ class TestGetDidsByServiceBoard:
         mock_logger.error.assert_not_called()
 
     async def test_empty(self, did_management_service, mock_did_repository):
-        mock_did_repository.get_dids_by_service_board = AsyncMock(return_value=[])
-        assert await did_management_service.get_dids_by_service_board(999) == []
+        mock_did_repository.get_dids_by_workspace = AsyncMock(return_value=[])
+        assert await did_management_service.get_dids_by_workspace(999) == []
 
     async def test_exception(
         self, did_management_service, mock_did_repository, mock_logger
     ):
         sb_id = 789
-        mock_did_repository.get_dids_by_service_board = AsyncMock(
+        mock_did_repository.get_dids_by_workspace = AsyncMock(
             side_effect=Exception("DB fail")
         )
         with pytest.raises(Exception, match="DB fail"):
-            await did_management_service.get_dids_by_service_board(sb_id)
+            await did_management_service.get_dids_by_workspace(sb_id)
         mock_logger.error.assert_called_once()
         assert (
-            "Error fetching DIDs for service board {}".format(sb_id)
+            "Error fetching DIDs for workspace {}".format(sb_id)
             in mock_logger.error.call_args[0][0]
         )
 
@@ -962,7 +962,7 @@ class TestAssignDidsAvailableForAssignment:
             "vendor_id": self._vid,
             "vendor_config_id": str(ObjectId()),
             "enable_round_robin": rr,
-            "enable_service_board": sb,
+            "enable_workspace": sb,
             "enable_agent_mapping": am,
         }
 
@@ -983,15 +983,15 @@ class TestAssignDidsAvailableForAssignment:
             "Successfully grouped and assigned DIDs for partner_id: 1"
         )
 
-    async def test_service_board_success(self, did_management_service):
+    async def test_workspace_success(self, did_management_service):
         did_management_service._TalkoDidManagementService__partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value=self._config(sb=True)
         )
         did_management_service.update_did = AsyncMock()
         data = TalkoContract.AssignDIDToPartner(
-            dids_for_service_board=[
-                TalkoContract.ServiceBoardDIDMapping(
-                    service_board_id=100, did_numbers=["123", "456"]
+            dids_for_workspace=[
+                TalkoContract.WorkspaceDIDMapping(
+                    workspace_id=100, did_numbers=["123", "456"]
                 )
             ]
         )
@@ -1021,7 +1021,7 @@ class TestAssignDidsAvailableForAssignment:
             did_number="123",
             vendor_id=self._vid,
             partner_id=3,
-            service_board_id=None,
+            workspace_id=None,
             agent_id=1,
             vendor_config_id=ObjectId(vcid),
         )
@@ -1058,14 +1058,14 @@ class TestAssignDidsAvailableForAssignment:
                 5, TalkoContract.AssignDIDToPartner(dids_for_round_robin=[])
             )
 
-    async def test_service_board_empty_dids_raises(self, did_management_service):
+    async def test_workspace_empty_dids_raises(self, did_management_service):
         """Service-board empty list path."""
         did_management_service._TalkoDidManagementService__partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value=self._config(sb=True)
         )
         with pytest.raises(Exception):
             await did_management_service.assign_dids_available_for_assignment(
-                5, TalkoContract.AssignDIDToPartner(dids_for_service_board=[])
+                5, TalkoContract.AssignDIDToPartner(dids_for_workspace=[])
             )
 
     async def test_agent_mapping_empty_dids_raises(self, did_management_service):
@@ -1294,7 +1294,7 @@ class TestApplyDidStatusUpdate:
         assert "mark_cooling_period" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_with_service_board_id(
+    async def test_with_workspace_id(
         self, did_management_service, mock_did_repository, mock_logger
     ):
         doc = {
@@ -1302,13 +1302,13 @@ class TestApplyDidStatusUpdate:
             "status": TalkoDIDStatus.AVAILABLE.value,
             "partner_id": 1,
         }
-        updated_doc = {**doc, "status": TalkoDIDStatus.MAPPED.value, "service_board_id": 100}
+        updated_doc = {**doc, "status": TalkoDIDStatus.MAPPED.value, "workspace_id": 100}
 
         mock_did_repository.get_did_by_number = AsyncMock(return_value=doc)
         mock_did_repository.update_did_status = AsyncMock(return_value=updated_doc)
 
         payload = TalkoContract.AdminDIDAction(
-            action="set_mapped", did_numbers=["12345"], service_board_id=100
+            action="set_mapped", did_numbers=["12345"], workspace_id=100
         )
         result = await did_management_service.apply_did_status_update(1, payload)
 
@@ -1500,7 +1500,7 @@ class TestListDids:
             "status": status,
             "partner_id": partner_id,
             "vendor_id": ObjectId(),
-            "service_board_id": None,
+            "workspace_id": None,
             "agent_id": None,
             "spam_count": 0,
             "last_spam_detected_at": None,
@@ -1603,7 +1603,7 @@ class TestListDids:
         self, did_management_service, mock_did_repository
     ):
         docs = [
-            self._doc(service_board_id=42, agent_id=7, spam_count=3, assign_date=100)
+            self._doc(workspace_id=42, agent_id=7, spam_count=3, assign_date=100)
         ]
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=(docs, 50))
 
@@ -1612,29 +1612,29 @@ class TestListDids:
         assert result["page"] == 3
         assert result["limit"] == 10
         assert result["total"] == 50
-        assert result["dids"][0]["service_board_id"] == 42
+        assert result["dids"][0]["workspace_id"] == 42
         assert result["dids"][0]["agent_id"] == 7
         assert result["dids"][0]["spam_count"] == 3
         mock_did_repository.get_dids_by_partner.assert_awaited_once_with(
             partner_id=1,
-            service_board_id=None,
+            workspace_id=None,
             status=None,
             did_number=None,
             offset=3,
             limit=10,
         )
 
-    async def test_service_board_filter_forwarded(
+    async def test_workspace_filter_forwarded(
         self, did_management_service, mock_did_repository
     ):
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=([], 0))
         result = await did_management_service.list_dids(
-            partner_id=1, service_board_id=100
+            partner_id=1, workspace_id=100
         )
         assert result["total"] == 0
         mock_did_repository.get_dids_by_partner.assert_awaited_once_with(
             partner_id=1,
-            service_board_id=100,
+            workspace_id=100,
             status=None,
             did_number=None,
             offset=1,
@@ -1660,7 +1660,7 @@ class TestListDids:
     ):
         ts = 1_631_234_567_890
         doc = self._doc(
-            service_board_id=10,
+            workspace_id=10,
             agent_id=5,
             spam_count=2,
             last_spam_detected_at=ts,
@@ -1672,7 +1672,7 @@ class TestListDids:
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=([doc], 1))
         result = await did_management_service.list_dids(partner_id=1)
         d = result["dids"][0]
-        assert d["service_board_id"] == 10
+        assert d["workspace_id"] == 10
         assert d["agent_id"] == 5
         assert d["spam_count"] == 2
         assert d["last_spam_detected_at"] == ts

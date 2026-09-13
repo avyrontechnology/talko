@@ -108,8 +108,8 @@ class TalkoDidStatusUpdateHelper:
     ) -> Dict[str, Any]:
         """Build final update_data dict from handler output."""
         update_data = handler(current_status, payload, now)
-        if payload.service_board_id is not None:
-            update_data["service_board_id"] = payload.service_board_id
+        if payload.workspace_id is not None:
+            update_data["workspace_id"] = payload.workspace_id
         update_data["status_changed_at"] = now
         return update_data
 

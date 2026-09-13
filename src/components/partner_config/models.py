@@ -17,21 +17,21 @@ class TalkoPartnerConfigModel(TalkoTimestampedModel):
     )
     did_indices: Dict[str | int, int] = Field(
         default_factory=lambda: {"round_robin": 0}
-    )  # Indices for round-robin and service boards
+    )  # Indices for round-robin and workspaces
     enable_round_robin: bool = False  # Flag to enable round-robin DID assignment
     enable_agent_mapping: bool = False  # Flag to enable agent-specific DID mapping
-    enable_service_board: bool = False  # Flag to enable service board DID assignment
-    service_board_ids: Optional[List[int]] = (
-        None  # Service board IDs for DID assignment
+    enable_workspace: bool = False  # Flag to enable workspace DID assignment
+    workspace_ids: Optional[List[int]] = (
+        None  # Workspace IDs for DID assignment
     )
-    board_did_counts: Optional[Dict[str, int]] = None  # DID counts per service board
+    workspace_did_counts: Optional[Dict[str, int]] = None  # DID counts per workspace
     agent_mapping_ids: Optional[List[int]] = (
         None  # Agent IDs for mapping (one DID per ID)
     )
     round_robin_did_count: Optional[int] = None  # DID count for round-robin (deferred)
     service_default_attendance: Dict[int, List[Dict[str, Any]]] = Field(
         default_factory=dict
-    )  # Default attendance per service board
+    )  # Default attendance per workspace
     round_robin_default_attendance: Dict[str, List[Dict[str, Any]]] = Field(
         default_factory=lambda: {"default": []}
     )  # Default attendance for round-robin
@@ -51,7 +51,7 @@ class TalkoPartnerConfigModel(TalkoTimestampedModel):
         False,
         description=(
             "When True, an inbound call whose lead is assigned to an inactive "
-            "agent is rerouted to another active agent on the service board, "
+            "agent is rerouted to another active agent on the workspace, "
             "and Maglo is notified to reassign lead ownership"
         ),
     )
@@ -59,7 +59,7 @@ class TalkoPartnerConfigModel(TalkoTimestampedModel):
         False,
         description=(
             "When True, an inbound call with no single assigned agent rings "
-            "the service board's agents one rotation position at a time "
+            "the workspace's agents one rotation position at a time "
             "(ring_type=order_by) instead of ringing all of them at once"
         ),
     )
@@ -67,7 +67,7 @@ class TalkoPartnerConfigModel(TalkoTimestampedModel):
         0,
         description=(
             "Cursor for inbound round-robin agent ringing order, shared "
-            "across all of this partner's service boards"
+            "across all of this partner's workspaces"
         ),
     )
     enable_missed_call_callback: bool = Field(
@@ -86,26 +86,26 @@ class TalkoPartnerConfigModel(TalkoTimestampedModel):
 
     @model_validator(mode="after")
     def check_mutual_exclusivity_and_config(self) -> "TalkoPartnerConfigModel":
-        if self.enable_round_robin and self.enable_service_board:
+        if self.enable_round_robin and self.enable_workspace:
             raise ValueError(
-                "Round-robin and service board cannot be enabled simultaneously."
+                "Round-robin and workspace cannot be enabled simultaneously."
             )
-        if self.enable_service_board and not self.service_board_ids:
+        if self.enable_workspace and not self.workspace_ids:
             raise ValueError(
-                "Service board IDs are required when service board is enabled."
+                "Workspace IDs are required when workspace is enabled."
             )
         if self.enable_round_robin and self.round_robin_did_count is None:
             raise ValueError(
                 "round_robin_did_count is required when enable_round_robin is true."
             )
-        if self.enable_service_board:
-            for board_id in self.service_board_ids or []:
-                if board_id not in self.did_indices:
-                    self.did_indices[board_id] = 0
+        if self.enable_workspace:
+            for workspace_id in self.workspace_ids or []:
+                if workspace_id not in self.did_indices:
+                    self.did_indices[workspace_id] = 0
         elif self.enable_round_robin and "round_robin" not in self.did_indices:
             self.did_indices["round_robin"] = 0
         if (
-            self.enable_service_board
+            self.enable_workspace
             and any(
                 len(attendance) > 1
                 for attendance in self.service_default_attendance.values()

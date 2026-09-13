@@ -28,11 +28,12 @@ class TalkoLeadConnectionReportService:
         self.logger.debug("Maglo response received")
         self.logger.debug(f"Maglo response data: {data}")
 
-        boards = data.get("service_boards", [])
+        # Maglo is external: response still uses service_boards — accept both.
+        boards = data.get("workspaces", data.get("service_boards", []))
         self.logger.debug(f"Total boards received: {len(boards)}")
 
         if not boards:
-            self.logger.warning("No service boards found in Maglo response")
+            self.logger.warning("No workspaces found in Maglo response")
             return []
 
         agent_summary = self._build_agent_summary(boards)
@@ -63,29 +64,30 @@ class TalkoLeadConnectionReportService:
         agent_data: Dict[str, Dict] = {}
 
         for board in boards:
-            service_board_id = board.get("service_board_id")
+            # Accept Maglo's service_board_id / id as well as workspace_id.
+            workspace_id = board.get("workspace_id", board.get("service_board_id", board.get("id")))
             agents = board.get("agents", [])
 
             for agent_block in agents:
-                self._process_single_agent(agent_block, service_board_id, agent_data)
+                self._process_single_agent(agent_block, workspace_id, agent_data)
 
         return agent_data
 
     def _process_single_agent(
         self,
         agent_block: Dict,
-        service_board_id: int,
+        workspace_id: int,
         agent_data: Dict[str, Dict],
     ) -> None:
         agent_id = agent_block.get("agent_id")
         if agent_id is None:
             return
 
-        key = f"{service_board_id}_{agent_id}"
+        key = f"{workspace_id}_{agent_id}"
 
         if key not in agent_data:
             agent_data[key] = {
-                "service_board_id": service_board_id,
+                "workspace_id": workspace_id,
                 "agent_id": agent_id,
                 "agent_name": agent_block.get("agent_name", f"Agent_{agent_id}"),
                 "total_leads": 0,
@@ -179,7 +181,7 @@ class TalkoLeadConnectionReportService:
 
             rows.append(
                 {
-                    "service_board_id": entry["service_board_id"],
+                    "workspace_id": entry["workspace_id"],
                     "agent_id": entry["agent_id"],
                     "agent_name": entry["agent_name"],
                     "total_leads": total,

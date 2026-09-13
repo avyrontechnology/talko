@@ -37,7 +37,7 @@ def mock_maglo_client():
 def mock_agent_mapping_repo():
     """Mock TalkoAgentMappingRepository"""
     repo = MagicMock()
-    repo.get_agents_by_service_board_id_and_partner_id = AsyncMock()
+    repo.get_agents_by_workspace_id_and_partner_id = AsyncMock()
     return repo
 
 
@@ -122,7 +122,7 @@ class TestAgentDialPlanResolver:
 
         result = await resolver.resolve_for_single_agent(
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=33,
             fallback_agent_number="+919876543210",
         )
@@ -147,7 +147,7 @@ class TestAgentDialPlanResolver:
 
         result = await resolver.resolve_for_single_agent(
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=33,
             fallback_agent_number="+919876543210",
         )
@@ -170,7 +170,7 @@ class TestAgentDialPlanResolver:
 
         result = await resolver.resolve_for_single_agent(
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=33,
             fallback_agent_number="+919876543210",
         )
@@ -194,7 +194,7 @@ class TestAgentDialPlanResolver:
 
         result = await resolver.resolve_for_single_agent(
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=33,
             fallback_agent_number=None,
         )
@@ -220,7 +220,7 @@ class TestAgentDialPlanResolver:
 
         result = await resolver.resolve_for_single_agent(
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=33,
             # Stale number left over from a previous agent/TalkoCDR — must be
             # ignored in favor of the live Maglo number above.
@@ -255,7 +255,7 @@ class TestAgentDialPlanResolver:
             customer_number="+919999999999",
             call_to_number="+918888888888",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             create_lead=True,
         )
 
@@ -279,8 +279,8 @@ class TestAgentDialPlanResolver:
             "assigned_to": None,
         }
 
-        # Mock service board agents
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        # Mock workspace agents
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -307,7 +307,7 @@ class TestAgentDialPlanResolver:
             customer_number="+919999999999",
             call_to_number="+918888888888",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             create_lead=True,
         )
 
@@ -329,7 +329,7 @@ class TestAgentDialPlanResolver:
             "lead_request_id": 100,
             "assigned_to": None,
         }
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -342,7 +342,7 @@ class TestAgentDialPlanResolver:
             customer_number="+919999999999",
             call_to_number="+918888888888",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             create_lead=True,
             enable_inbound_round_robin=True,
             inbound_round_robin_index=1,
@@ -363,8 +363,8 @@ class TestAgentDialPlanResolver:
         # Mock lead creation failure
         mock_maglo_client.upsert_ivr_lead.side_effect = Exception("API Error")
 
-        # Mock service board agents (fallback path)
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        # Mock workspace agents (fallback path)
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"}
         ]
 
@@ -381,7 +381,7 @@ class TestAgentDialPlanResolver:
             customer_number="+919999999999",
             call_to_number="+918888888888",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             create_lead=True,
         )
 
@@ -404,7 +404,7 @@ class TestAgentDialPlanResolver:
         }
 
         target, agent_ids = await resolver._resolve_single_assigned_agent(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert target.type == "agent"
@@ -427,7 +427,7 @@ class TestAgentDialPlanResolver:
         }
 
         target, agent_ids = await resolver._resolve_single_assigned_agent(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert target.type == "number"
@@ -435,11 +435,11 @@ class TestAgentDialPlanResolver:
         assert agent_ids[0]["cloud_agent_number"] is None
 
     @pytest.mark.asyncio
-    async def test_resolve_all_service_board_agents_mixed_cloud(
+    async def test_resolve_all_workspace_agents_mixed_cloud(
         self, resolver, mock_maglo_client, mock_agent_mapping_repo
     ):
-        """Test _resolve_all_service_board_agents with mix of cloud and regular"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        """Test _resolve_all_workspace_agents with mix of cloud and regular"""
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -459,8 +459,8 @@ class TestAgentDialPlanResolver:
             },
         ]
 
-        target, agent_ids, _ = await resolver._resolve_all_service_board_agents(
-            partner_id=12, service_board_id=70
+        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(
+            partner_id=12, workspace_id=70
         )
 
         assert target.type == "agent"
@@ -470,16 +470,16 @@ class TestAgentDialPlanResolver:
         assert len(agent_ids) == 2
 
     @pytest.mark.asyncio
-    async def test_resolve_all_service_board_agents_no_agents(
+    async def test_resolve_all_workspace_agents_no_agents(
         self, resolver, mock_agent_mapping_repo, mock_logger
     ):
-        """Test _resolve_all_service_board_agents when no agents exist"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = (
+        """Test _resolve_all_workspace_agents when no agents exist"""
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = (
             []
         )
 
-        target, agent_ids, _ = await resolver._resolve_all_service_board_agents(
-            partner_id=12, service_board_id=70
+        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(
+            partner_id=12, workspace_id=70
         )
 
         assert target.type == "number"
@@ -488,11 +488,11 @@ class TestAgentDialPlanResolver:
         mock_logger.warning.assert_called()
 
     @pytest.mark.asyncio
-    async def test_resolve_all_service_board_agents_round_robin_disabled_by_default(
+    async def test_resolve_all_workspace_agents_round_robin_disabled_by_default(
         self, resolver, mock_maglo_client, mock_agent_mapping_repo
     ):
         """Without enable_inbound_round_robin, ring order and ring_type are unchanged"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -502,8 +502,8 @@ class TestAgentDialPlanResolver:
         ]
 
         target, agent_ids, next_index = (
-            await resolver._resolve_all_service_board_agents(
-                partner_id=12, service_board_id=70
+            await resolver._resolve_all_workspace_agents(
+                partner_id=12, workspace_id=70
             )
         )
 
@@ -512,11 +512,11 @@ class TestAgentDialPlanResolver:
         assert next_index is None
 
     @pytest.mark.asyncio
-    async def test_resolve_all_service_board_agents_round_robin_rotates_from_index(
+    async def test_resolve_all_workspace_agents_round_robin_rotates_from_index(
         self, resolver, mock_maglo_client, mock_agent_mapping_repo
     ):
         """With round robin enabled, only the cursor agent is rung and ring_type is order_by"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
             {"agent_id": 35, "agent_number": "+919876543212"},
@@ -528,9 +528,9 @@ class TestAgentDialPlanResolver:
         ]
 
         target, agent_ids, next_index = (
-            await resolver._resolve_all_service_board_agents(
+            await resolver._resolve_all_workspace_agents(
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 enable_inbound_round_robin=True,
                 inbound_round_robin_index=1,
             )
@@ -542,11 +542,11 @@ class TestAgentDialPlanResolver:
         assert next_index == 2
 
     @pytest.mark.asyncio
-    async def test_resolve_all_service_board_agents_round_robin_wraps_index(
+    async def test_resolve_all_workspace_agents_round_robin_wraps_index(
         self, resolver, mock_maglo_client, mock_agent_mapping_repo
     ):
         """The cursor wraps modulo the current agent count"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -556,9 +556,9 @@ class TestAgentDialPlanResolver:
         ]
 
         target, agent_ids, next_index = (
-            await resolver._resolve_all_service_board_agents(
+            await resolver._resolve_all_workspace_agents(
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 enable_inbound_round_robin=True,
                 inbound_round_robin_index=5,
             )
@@ -570,18 +570,18 @@ class TestAgentDialPlanResolver:
         assert next_index == 0
 
     @pytest.mark.asyncio
-    async def test_resolve_all_service_board_agents_round_robin_no_agents_returns_none_index(
+    async def test_resolve_all_workspace_agents_round_robin_no_agents_returns_none_index(
         self, resolver, mock_agent_mapping_repo
     ):
         """Round robin cursor stays unset when there's nobody to ring"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = (
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = (
             []
         )
 
         target, agent_ids, next_index = (
-            await resolver._resolve_all_service_board_agents(
+            await resolver._resolve_all_workspace_agents(
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 enable_inbound_round_robin=True,
                 inbound_round_robin_index=0,
             )
@@ -591,11 +591,11 @@ class TestAgentDialPlanResolver:
         assert next_index is None
 
     @pytest.mark.asyncio
-    async def test_resolve_all_service_board_agents_all_cloud(
+    async def test_resolve_all_workspace_agents_all_cloud(
         self, resolver, mock_maglo_client, mock_agent_mapping_repo
     ):
-        """Test _resolve_all_service_board_agents when all agents use cloud"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        """Test _resolve_all_workspace_agents when all agents use cloud"""
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -613,8 +613,8 @@ class TestAgentDialPlanResolver:
             },
         ]
 
-        target, agent_ids, _ = await resolver._resolve_all_service_board_agents(
-            partner_id=12, service_board_id=70
+        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(
+            partner_id=12, workspace_id=70
         )
 
         assert target.type == "agent"
@@ -625,7 +625,7 @@ class TestAgentDialPlanResolver:
         self, resolver, mock_maglo_client, mock_agent_mapping_repo
     ):
         """Without a user_service_client wired, no availability filtering happens"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -634,8 +634,8 @@ class TestAgentDialPlanResolver:
             {"id": 34, "extension": None, "internet_calling_enable": False},
         ]
 
-        target, agent_ids, _ = await resolver._resolve_all_service_board_agents(
-            partner_id=12, service_board_id=70
+        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(
+            partner_id=12, workspace_id=70
         )
 
         assert len(agent_ids) == 2
@@ -650,7 +650,7 @@ class TestAgentDialPlanResolver:
         mock_user_service_client,
     ):
         """Agents whose status isn't Active are excluded from the ring list"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -665,8 +665,8 @@ class TestAgentDialPlanResolver:
         }
 
         target, agent_ids, _ = (
-            await resolver_with_availability._resolve_all_service_board_agents(
-                partner_id=12, service_board_id=70
+            await resolver_with_availability._resolve_all_workspace_agents(
+                partner_id=12, workspace_id=70
             )
         )
 
@@ -686,7 +686,7 @@ class TestAgentDialPlanResolver:
         mock_user_service_client,
     ):
         """Agents absent from the availability map are treated as Active"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -700,8 +700,8 @@ class TestAgentDialPlanResolver:
         ]
 
         target, agent_ids, _ = (
-            await resolver_with_availability._resolve_all_service_board_agents(
-                partner_id=12, service_board_id=70
+            await resolver_with_availability._resolve_all_workspace_agents(
+                partner_id=12, workspace_id=70
             )
         )
 
@@ -718,7 +718,7 @@ class TestAgentDialPlanResolver:
         mock_logger,
     ):
         """If every agent on the board is unavailable, fail open and ring all of them"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -732,8 +732,8 @@ class TestAgentDialPlanResolver:
         ]
 
         target, agent_ids, _ = (
-            await resolver_with_availability._resolve_all_service_board_agents(
-                partner_id=12, service_board_id=70
+            await resolver_with_availability._resolve_all_workspace_agents(
+                partner_id=12, workspace_id=70
             )
         )
 
@@ -755,7 +755,7 @@ class TestAgentDialPlanResolver:
         mock_logger,
     ):
         """If the availability gRPC call raises, fail open and ring the full board"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -768,8 +768,8 @@ class TestAgentDialPlanResolver:
         ]
 
         target, agent_ids, _ = (
-            await resolver_with_availability._resolve_all_service_board_agents(
-                partner_id=12, service_board_id=70
+            await resolver_with_availability._resolve_all_workspace_agents(
+                partner_id=12, workspace_id=70
             )
         )
 
@@ -833,7 +833,7 @@ class TestAgentDialPlanResolver:
         lead_id, lead_name, assigned_agent_id = await resolver._get_or_create_lead(
             customer_number="+919999999999",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
         )
 
         assert lead_id == 100
@@ -850,7 +850,7 @@ class TestAgentDialPlanResolver:
         lead_id, lead_name, assigned_agent_id = await resolver._get_or_create_lead(
             customer_number="+919999999999",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
         )
 
         assert lead_id is None
@@ -876,7 +876,7 @@ class TestAgentDialPlanResolver:
             agent_name,
             agent_number,
         ) = await resolver._get_cloud_phonic_info(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert is_cloud is True
@@ -891,11 +891,11 @@ class TestAgentDialPlanResolver:
     ):
         """Test cloud phonic info with 404 error"""
         mock_maglo_client.get_agent_details.side_effect = ValueError(
-            "Maglo error 404: Service board with id not found"
+            "Maglo error 404: Workspace with id not found"
         )
 
         result = await resolver._get_cloud_phonic_info(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert result == (False, None, None, None, None)
@@ -909,7 +909,7 @@ class TestAgentDialPlanResolver:
         mock_maglo_client.get_agent_details.side_effect = Exception("Connection error")
 
         result = await resolver._get_cloud_phonic_info(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert result == (False, None, None, None, None)
@@ -931,7 +931,7 @@ class TestAgentDialPlanResolver:
             agent_name,
             agent_number,
         ) = await resolver._get_cloud_phonic_info(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert is_cloud is False
@@ -996,13 +996,13 @@ class TestReassignToActiveAgent:
     async def test_no_other_agents_on_board_keeps_original(
         self, resolver, mock_agent_mapping_repo, mock_logger
     ):
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"}
         ]
 
         new_agent_id, reassigned_lead_id = await resolver._reassign_to_active_agent(
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             current_agent_id=33,
             customer_number="+919999999999",
         )
@@ -1020,7 +1020,7 @@ class TestReassignToActiveAgent:
         mock_maglo_client,
         monkeypatch,
     ):
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
             {"agent_id": 35, "agent_number": "+919876543212"},
@@ -1041,7 +1041,7 @@ class TestReassignToActiveAgent:
         new_agent_id, reassigned_lead_id = (
             await resolver_with_availability._reassign_to_active_agent(
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 current_agent_id=33,
                 customer_number="+919999999999",
             )
@@ -1055,7 +1055,7 @@ class TestReassignToActiveAgent:
         mock_maglo_client.reassign_lead_by_phone.assert_awaited_once_with(
             phone_number="+919999999999",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=34,
         )
 
@@ -1067,7 +1067,7 @@ class TestReassignToActiveAgent:
         mock_user_service_client,
         mock_maglo_client,
     ):
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -1078,7 +1078,7 @@ class TestReassignToActiveAgent:
         new_agent_id, reassigned_lead_id = (
             await resolver_with_availability._reassign_to_active_agent(
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 current_agent_id=33,
                 customer_number=None,
             )
@@ -1098,7 +1098,7 @@ class TestReassignToActiveAgent:
         mock_logger,
     ):
         """A failed CRM update must never bubble up and affect the live call"""
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -1112,7 +1112,7 @@ class TestReassignToActiveAgent:
         new_agent_id, reassigned_lead_id = (
             await resolver_with_availability._reassign_to_active_agent(
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 current_agent_id=33,
                 customer_number="+919999999999",
             )
@@ -1140,7 +1140,7 @@ class TestResolveSingleAssignedAgentReassignment:
         target, agent_ids = (
             await resolver_with_availability._resolve_single_assigned_agent(
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 agent_id=33,
                 reassign_inactive_agent=False,
             )
@@ -1170,7 +1170,7 @@ class TestResolveSingleAssignedAgentReassignment:
         target, agent_ids = (
             await resolver_with_availability._resolve_single_assigned_agent(
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 agent_id=33,
                 reassign_inactive_agent=True,
                 customer_number="+919999999999",
@@ -1178,7 +1178,7 @@ class TestResolveSingleAssignedAgentReassignment:
         )
 
         assert agent_ids[0]["agent_id"] == 33
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.assert_not_awaited()
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_flag_on_inactive_agent_reassigned_to_peer(
@@ -1188,7 +1188,7 @@ class TestResolveSingleAssignedAgentReassignment:
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -1210,7 +1210,7 @@ class TestResolveSingleAssignedAgentReassignment:
         target, agent_ids = (
             await resolver_with_availability._resolve_single_assigned_agent(
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 agent_id=33,
                 reassign_inactive_agent=True,
                 customer_number="+919999999999",
@@ -1223,14 +1223,14 @@ class TestResolveSingleAssignedAgentReassignment:
         # Agent details should have been fetched for the *new* agent, not
         # the original inactive one.
         mock_maglo_client.get_agent_details.assert_awaited_once_with(
-            agent_id=34, service_board_id=70
+            agent_id=34, workspace_id=70
         )
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         mock_maglo_client.reassign_lead_by_phone.assert_awaited_once_with(
             phone_number="+919999999999",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=34,
         )
 
@@ -1242,7 +1242,7 @@ class TestResolveSingleAssignedAgentReassignment:
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"}
         ]
         mock_user_service_client.get_users_availability_status.return_value = {
@@ -1258,7 +1258,7 @@ class TestResolveSingleAssignedAgentReassignment:
         target, agent_ids = (
             await resolver_with_availability._resolve_single_assigned_agent(
                 partner_id=12,
-                service_board_id=70,
+                workspace_id=70,
                 agent_id=33,
                 reassign_inactive_agent=True,
                 customer_number="+919999999999",
@@ -1286,7 +1286,7 @@ class TestResolveForSingleAgentReassignment:
 
         result = await resolver_with_availability.resolve_for_single_agent(
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=33,
             fallback_agent_number="+919876543210",
             reassign_inactive_agent=False,
@@ -1316,7 +1316,7 @@ class TestResolveForSingleAgentReassignment:
 
         result = await resolver_with_availability.resolve_for_single_agent(
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=33,
             fallback_agent_number="+919876543210",
             reassign_inactive_agent=True,
@@ -1325,7 +1325,7 @@ class TestResolveForSingleAgentReassignment:
 
         assert result.data == ["+919876543210"]
         assert result.resolved_agent_id is None
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.assert_not_awaited()
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_flag_on_inactive_agent_reassigned_to_peer(
@@ -1335,7 +1335,7 @@ class TestResolveForSingleAgentReassignment:
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -1362,7 +1362,7 @@ class TestResolveForSingleAgentReassignment:
 
         result = await resolver_with_availability.resolve_for_single_agent(
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=33,
             # Stale fallback number belonging to the original (now inactive)
             # agent 33 — must NOT be used once reassignment happens.
@@ -1380,12 +1380,12 @@ class TestResolveForSingleAgentReassignment:
         # Agent details should have been fetched for the *new* agent, not
         # the original inactive one.
         mock_maglo_client.get_agent_details.assert_awaited_once_with(
-            agent_id=34, service_board_id=70
+            agent_id=34, workspace_id=70
         )
         mock_maglo_client.reassign_lead_by_phone.assert_awaited_once_with(
             phone_number="+919999999999",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=34,
         )
 
@@ -1397,7 +1397,7 @@ class TestResolveForSingleAgentReassignment:
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"}
         ]
         mock_user_service_client.get_users_availability_status.return_value = {
@@ -1412,7 +1412,7 @@ class TestResolveForSingleAgentReassignment:
 
         result = await resolver_with_availability.resolve_for_single_agent(
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             agent_id=33,
             fallback_agent_number="+919876543210",
             reassign_inactive_agent=True,
@@ -1441,7 +1441,7 @@ class TestResolveInboundNoCdrReassignment:
             "lead_request_id": 100,
             "assigned_to": 33,
         }
-        mock_agent_mapping_repo.get_agents_by_service_board_id_and_partner_id.return_value = [
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
@@ -1460,7 +1460,7 @@ class TestResolveInboundNoCdrReassignment:
             customer_number="+919999999999",
             call_to_number="+918888888888",
             partner_id=12,
-            service_board_id=70,
+            workspace_id=70,
             create_lead=True,
             reassign_inactive_agent=True,
         )
@@ -1582,7 +1582,7 @@ class TestDialplanResponseBuilder:
             agent_name,
             agent_number,
         ) = await resolver._get_cloud_phonic_info(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert is_cloud is True
@@ -1606,7 +1606,7 @@ class TestDialplanResponseBuilder:
             agent_name,
             agent_number,
         ) = await resolver._get_cloud_phonic_info(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert is_cloud is False
@@ -1630,7 +1630,7 @@ class TestDialplanResponseBuilder:
             agent_name,
             agent_number,
         ) = await resolver._get_cloud_phonic_info(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert is_cloud is False
@@ -1643,14 +1643,14 @@ class TestDialplanResponseBuilder:
     async def test_get_cloud_phonic_info_404_error_different_message(
         self, resolver, mock_maglo_client, mock_logger
     ):
-        """Test cloud phonic info with 404 error but different message (not service board)"""
+        """Test cloud phonic info with 404 error but different message (not workspace)"""
         # ValueError with 404 but different message
         mock_maglo_client.get_agent_details.side_effect = ValueError(
             "Maglo error 404: Agent not found"
         )
 
         result = await resolver._get_cloud_phonic_info(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert result == (False, None, None, None, None)
@@ -1671,7 +1671,7 @@ class TestDialplanResponseBuilder:
         )
 
         result = await resolver._get_cloud_phonic_info(
-            partner_id=12, service_board_id=70, agent_id=33
+            partner_id=12, workspace_id=70, agent_id=33
         )
 
         assert result == (False, None, None, None, None)

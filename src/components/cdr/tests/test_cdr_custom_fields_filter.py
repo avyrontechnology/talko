@@ -41,7 +41,7 @@ class TestBuildCallRecordHistoryQueryCustomFields:
 
         query = TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
             lead_id=None,
-            service_board_id=323,
+            workspace_id=323,
             partner_id=132,
             logger=logger,
             custom_fields={"lead_source": "Referral"},
@@ -49,14 +49,14 @@ class TestBuildCallRecordHistoryQueryCustomFields:
 
         assert query["custom_fields.lead_source"] == "Referral"
         assert query["partner_id"] == 132
-        assert query["service_board_id"] == 323
+        assert query["workspace_id"] == 323
 
     def test_omitting_custom_fields_adds_no_dotted_keys(self):
         logger = MagicMock()
 
         query = TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
             lead_id=None,
-            service_board_id=323,
+            workspace_id=323,
             partner_id=132,
             logger=logger,
         )

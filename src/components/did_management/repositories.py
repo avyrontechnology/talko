@@ -387,19 +387,19 @@ class TalkoDidRepository:
             )
             raise
 
-    async def get_dids_by_partner_service_board_and_vendor(
+    async def get_dids_by_partner_workspace_and_vendor(
         self,
         partner_id: int,
-        service_board_id: int,
+        workspace_id: int,
         vendor_id: ObjectId,
         vendor_config_id: Optional[ObjectId] = None,
     ) -> List[str]:
         """
-        Fetch all DIDs for a specific partner, service board, and vendor.
+        Fetch all DIDs for a specific partner, workspace, and vendor.
 
         Args:
             partner_id (int): The partner ID to filter by.
-            service_board_id (int): The service board ID to filter by.
+            workspace_id (int): The workspace ID to filter by.
             vendor_id (ObjectId): The vendor ID to filter by.
             vendor_config_id (Optional[ObjectId]): The vendor config ID to filter by (optional).
 
@@ -408,14 +408,14 @@ class TalkoDidRepository:
         """
         try:
             self.__logger.info(
-                "Fetching DIDs for partner {}, service_board {}, vendor {} and vendor_config {}".format(
-                    partner_id, service_board_id, vendor_id, vendor_config_id
+                "Fetching DIDs for partner {}, workspace {}, vendor {} and vendor_config {}".format(
+                    partner_id, workspace_id, vendor_id, vendor_config_id
                 )
             )
 
             query: Dict[str, Any] = {
                 "partner_id": partner_id,
-                "service_board_id": service_board_id,
+                "workspace_id": workspace_id,
                 "vendor_id": vendor_id,
                 "status": TalkoDIDStatus.MAPPED.value,
                 "did_type": TalkoDIDType.NORMAL.value,
@@ -434,27 +434,27 @@ class TalkoDidRepository:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(query)
                 dids: List[str] = [doc["did_number"] async for doc in cursor]
                 self.__logger.info(
-                    "Fetched DIDs for partner service board and vendor: {}".format(dids)
+                    "Fetched DIDs for partner workspace and vendor: {}".format(dids)
                 )
                 return dids
         except Exception as e:
             self.__logger.error(
-                "Failed to fetch DIDs for partner {}, service_board {}: {}".format(
-                    partner_id, service_board_id, str(e)
+                "Failed to fetch DIDs for partner {}, workspace {}: {}".format(
+                    partner_id, workspace_id, str(e)
                 )
             )
             raise
 
-    async def get_dids_by_partner_agent_service_board_and_vendor(
-        self, partner_id: int, user_id: int, service_board_id: int, vendor_id: ObjectId
+    async def get_dids_by_partner_agent_workspace_and_vendor(
+        self, partner_id: int, user_id: int, workspace_id: int, vendor_id: ObjectId
     ) -> List[str]:
         """
-        Fetch all DIDs for a specific partner, agent, service board, and vendor.
+        Fetch all DIDs for a specific partner, agent, workspace, and vendor.
 
         Args:
             partner_id (int): The partner ID to filter by.
             user_id (int): The agent ID to filter by.
-            service_board_id (int): The service board ID to filter by.
+            workspace_id (int): The workspace ID to filter by.
             vendor_id (ObjectId): The vendor ID to filter by.
 
         Returns:
@@ -465,8 +465,8 @@ class TalkoDidRepository:
         """
         try:
             self.__logger.info(
-                "Fetching DIDs for partner {}, agent {}, service_board {}, and vendor {}".format(
-                    partner_id, user_id, service_board_id, vendor_id
+                "Fetching DIDs for partner {}, agent {}, workspace {}, and vendor {}".format(
+                    partner_id, user_id, workspace_id, vendor_id
                 )
             )
             async with self.__db_manager.collection(
@@ -476,7 +476,7 @@ class TalkoDidRepository:
                     {
                         "partner_id": partner_id,
                         "agent_id": user_id,
-                        "service_board_id": service_board_id,
+                        "workspace_id": workspace_id,
                         "vendor_id": vendor_id,
                         "did_type": TalkoDIDType.NORMAL.value,
                         "is_active": True,
@@ -484,15 +484,15 @@ class TalkoDidRepository:
                 )
                 dids = [doc["did_number"] async for doc in cursor]
                 self.__logger.info(
-                    "Fetched DIDs get did by partner agent service board and vendor: {}".format(
+                    "Fetched DIDs get did by partner agent workspace and vendor: {}".format(
                         dids
                     )
                 )
                 return dids
         except Exception as e:
             self.__logger.error(
-                "Failed to fetch DIDs for partner {}, agent {}, service_board {}: {}".format(
-                    partner_id, user_id, service_board_id, str(e)
+                "Failed to fetch DIDs for partner {}, agent {}, workspace {}: {}".format(
+                    partner_id, user_id, workspace_id, str(e)
                 )
             )
             raise
@@ -538,22 +538,22 @@ class TalkoDidRepository:
             self.__logger.error("Error finding DID by number: {}".format(str(e)))
             raise
 
-    async def get_dids_by_service_board(
-        self, service_board_id: int
+    async def get_dids_by_workspace(
+        self, workspace_id: int
     ) -> List[Dict[str, Any]]:
         """
-        Fetch all DID records for a given service board ID.
+        Fetch all DID records for a given workspace ID.
         """
         try:
             self.__logger.info(
-                "Fetching DIDs for service_board_id={}".format(service_board_id)
+                "Fetching DIDs for workspace_id={}".format(workspace_id)
             )
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
                     {
-                        "service_board_id": service_board_id,
+                        "workspace_id": workspace_id,
                         "status": TalkoDIDStatus.MAPPED.value,
                         "did_type": TalkoDIDType.NORMAL.value,
                         "is_active": True,
@@ -563,8 +563,8 @@ class TalkoDidRepository:
                 return records
         except Exception as e:
             self.__logger.error(
-                "Failed to fetch DIDs for service_board_id={}: {}".format(
-                    service_board_id, str(e)
+                "Failed to fetch DIDs for workspace_id={}: {}".format(
+                    workspace_id, str(e)
                 )
             )
             raise
@@ -628,7 +628,7 @@ class TalkoDidRepository:
                         "$set": {
                             "partner_id": 0,
                             "agent_id": None,
-                            "service_board_id": None,
+                            "workspace_id": None,
                         }
                     },
                 )
@@ -778,7 +778,7 @@ class TalkoDidRepository:
         self,
         partner_id: int,
         user_id: Optional[int] = None,
-        service_board_id: Optional[int] = None,
+        workspace_id: Optional[int] = None,
         vendor_id: Optional[ObjectId] = None,
         vendor_config_id: Optional[ObjectId] = None,
         status: Optional[str] = None,
@@ -787,15 +787,15 @@ class TalkoDidRepository:
         limit: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Fetch all DIDs for a specific partner, agent, service board, vendor, and status.
+        Fetch all DIDs for a specific partner, agent, workspace, vendor, and status.
         """
 
         try:
             self.__logger.info(
-                "Fetching DIDs for partner {}, agent {}, service_board {}, vendor {}, vendor_config_id {}, status {}, did_number={}, offset {}, limit {}".format(
+                "Fetching DIDs for partner {}, agent {}, workspace {}, vendor {}, vendor_config_id {}, status {}, did_number={}, offset {}, limit {}".format(
                     partner_id,
                     user_id,
-                    service_board_id,
+                    workspace_id,
                     vendor_id,
                     vendor_config_id,
                     status,
@@ -815,7 +815,7 @@ class TalkoDidRepository:
             # Optional filters mapping
             optional_filters: Dict[str, Any] = {
                 "agent_id": user_id,
-                "service_board_id": service_board_id,
+                "workspace_id": workspace_id,
                 "vendor_id": vendor_id,
                 "vendor_config_id": vendor_config_id,
                 "status": status,
@@ -851,18 +851,18 @@ class TalkoDidRepository:
                 docs: List[Dict[str, Any]] = [doc async for doc in cursor]
 
             self.__logger.info(
-                "Fetched DIDs count={} for partner={} agent={} service_board={}".format(
-                    len(docs), partner_id, user_id, service_board_id
+                "Fetched DIDs count={} for partner={} agent={} workspace={}".format(
+                    len(docs), partner_id, user_id, workspace_id
                 )
             )
 
             return docs, total
         except Exception as e:
             self.__logger.error(
-                "Failed to fetch DIDs partner={} agent={} service_board={} error={}".format(
+                "Failed to fetch DIDs partner={} agent={} workspace={} error={}".format(
                     partner_id,
                     user_id,
-                    service_board_id,
+                    workspace_id,
                     str(e),
                 )
             )

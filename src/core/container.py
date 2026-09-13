@@ -356,7 +356,7 @@ class TalkoContainer(containers.DeclarativeContainer):
         logger=logger,
     )
 
-    # INBOUND CALL EVENTS (websocket: partner_id, service_board_id, dedicated_did, agent_id)
+    # INBOUND CALL EVENTS (websocket: partner_id, workspace_id, dedicated_did, agent_id)
     # Redis-backed fanout — see TalkoInboundCallEventBroker's docstring for why this pod
     # needs to hear about events published from other pods.
     inbound_call_event_broker = providers.Singleton(

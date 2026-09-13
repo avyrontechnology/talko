@@ -21,7 +21,7 @@ class TestQueryBuilder:
             start_date_ms=1000,
             end_date_ms=2000,
             agents=None,
-            service_board_id=None,
+            workspace_id=None,
             user_role=3,
         )
         expected_query = {
@@ -34,14 +34,14 @@ class TestQueryBuilder:
         assert query == expected_query
         self.mock_logger.debug.assert_called_with(f"Built query: {expected_query}")
 
-    def test_build_query_with_agents_and_service_board(self):
-        """Test build_query with agents and service_board_id."""
+    def test_build_query_with_agents_and_workspace(self):
+        """Test build_query with agents and workspace_id."""
         query = self.query_builder.build_query(
             partner_id=42,
             start_date_ms=1000,
             end_date_ms=2000,
             agents=[123, 456],
-            service_board_id=[99, 100],
+            workspace_id=[99, 100],
             user_role=2,
         )
         expected_query = {
@@ -51,7 +51,7 @@ class TestQueryBuilder:
                 analytics_constants.LTE_CONDITION: 2000,
             },
             "agent": {analytics_constants.IN_CONDITION: [123, 456]},
-            "service_board_id": {analytics_constants.IN_CONDITION: [99, 100]},
+            "workspace_id": {analytics_constants.IN_CONDITION: [99, 100]},
         }
         assert query == expected_query
         self.mock_logger.debug.assert_called_with(f"Built query: {expected_query}")
@@ -63,7 +63,7 @@ class TestQueryBuilder:
             start_date_ms=None,
             end_date_ms=None,
             agents=[123],
-            service_board_id=None,
+            workspace_id=None,
             user_role=3,
         )
         expected_query = {analytics_constants.PARTNER_ID: 42}
@@ -77,7 +77,7 @@ class TestQueryBuilder:
             start_date_ms=1000,
             end_date_ms=2000,
             agents=[123, 456],
-            service_board_id=[99, 100],
+            workspace_id=[99, 100],
             user_role=2,
         )
         expected_query = {
@@ -87,7 +87,7 @@ class TestQueryBuilder:
                 analytics_constants.LTE_CONDITION: 2000,
             },
             "agent_id": {analytics_constants.IN_CONDITION: [123, 456]},
-            "service_board_id": {analytics_constants.IN_CONDITION: [99, 100]},
+            "workspace_id": {analytics_constants.IN_CONDITION: [99, 100]},
         }
 
     def test_build_trend_query_no_agents(self):
@@ -97,7 +97,7 @@ class TestQueryBuilder:
             start_date_ms=1000,
             end_date_ms=2000,
             agents=[],
-            service_board_id=None,
+            workspace_id=None,
             user_role=3,
         )
         expected_query = {

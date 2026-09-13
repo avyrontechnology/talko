@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class TalkoContract:
     class DidDefaultAttendanceCreate(BaseModel):
-        service_board_id: int
+        workspace_id: int
         did_number: str
         partner_id: int
         vendor_id: str
@@ -20,10 +20,10 @@ class TalkoContract:
         agent_id: Optional[int] = None
         assign_date: int
         unassign_date: Optional[int] = None
-        service_board_id: Optional[int] = None
+        workspace_id: Optional[int] = None
 
     class DIDResponse(BaseModel):
-        service_board_id: int
+        workspace_id: int
         did_number: str
         partner_id: int
         vendor_id: str
@@ -41,12 +41,12 @@ class TalkoContract:
         dids: List["TalkoContract.DIDDetail"]
         count: int
 
-    class ServiceBoardDIDMapping(BaseModel):
-        service_board_id: int
+    class WorkspaceDIDMapping(BaseModel):
+        workspace_id: int
         did_numbers: List[str]
 
     class AssignDIDToPartner(BaseModel):
-        dids_for_service_board: Optional[List["TalkoContract.ServiceBoardDIDMapping"]] = None
+        dids_for_workspace: Optional[List["TalkoContract.WorkspaceDIDMapping"]] = None
         dids_for_agent_mapping: Optional[List[Dict[str, str]]] = None
         dids_for_round_robin: Optional[List[str]] = None
 
@@ -56,7 +56,7 @@ class TalkoContract:
     class AdminDIDAction(BaseModel):
         did_numbers: List[str]
         action: Literal["set_available", "set_mapped", "mark_cooling_period"]
-        service_board_id: Optional[int] = None
+        workspace_id: Optional[int] = None
         agent_id: Optional[int] = None
 
     class AdminDIDActionResponse(BaseModel):
@@ -67,7 +67,7 @@ class TalkoContract:
         did_number: str
         status: str
         partner_id: int
-        service_board_id: Optional[int] = None
+        workspace_id: Optional[int] = None
         agent_id: Optional[int] = None
         vendor_id: str  # as string for response
         spam_count: int = 0

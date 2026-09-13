@@ -271,7 +271,7 @@ class TalkoCallService:
                 raise TalkoResourceNotFound("No vendor_config_id assigned to partner.")
             if call_data.dedicated_did and not call_data.enable_ai_bridge:
                 await self.__helper.validate_given_did(
-                    call_data.dedicated_did, partner_id, call_data.service_board_id
+                    call_data.dedicated_did, partner_id, call_data.workspace_id
                 )
                 from_number = call_data.dedicated_did
                 self.__logger.info(
@@ -281,7 +281,7 @@ class TalkoCallService:
                 )
             elif not call_data.enable_ai_bridge:
                 from_number: str = await self.__helper.select_did(
-                    partner_config, partner_id, user_id, call_data.service_board_id
+                    partner_config, partner_id, user_id, call_data.workspace_id
                 )
                 self.__logger.info(
                     "Selected DID: {} for call initiation using round-robin".format(
@@ -290,7 +290,7 @@ class TalkoCallService:
                 )
             else:
                 await self.__helper.validate_given_did(
-                    call_data.dedicated_did, partner_id, call_data.service_board_id
+                    call_data.dedicated_did, partner_id, call_data.workspace_id
                 )
                 from_number = call_data.dedicated_did
                 self.__logger.info(
@@ -511,7 +511,7 @@ class TalkoCallService:
                     )
                     await self.__inbound_call_event_publisher.publish_outbound_call(
                         partner_id=partner_id,
-                        service_board_id=call_data.service_board_id,
+                        workspace_id=call_data.workspace_id,
                         dedicated_did=from_number,
                         agent_id=user_id,
                         display_name=(did_record or {}).get("display_name"),
@@ -550,16 +550,16 @@ class TalkoCallService:
         """
         call_uuid = cdr.get("call_uuid")
         partner_id = cdr.get("partner_id")
-        service_board_id = cdr.get("service_board_id")
+        workspace_id = cdr.get("workspace_id")
         customer_number = cdr.get("customer")
         did_number = cdr.get("did_number")
         agent_id = cdr.get("agent")
 
         try:
-            if not (partner_id and service_board_id and customer_number and did_number):
+            if not (partner_id and workspace_id and customer_number and did_number):
                 self.__logger.warning(
                     "Missed-call callback skipped for call_uuid={}: missing "
-                    "partner_id/service_board_id/customer/did_number on TalkoCDR".format(
+                    "partner_id/workspace_id/customer/did_number on TalkoCDR".format(
                         call_uuid
                     )
                 )
@@ -615,7 +615,7 @@ class TalkoCallService:
 
             target = await self.__dialplan_resolver.resolve_for_single_agent(
                 partner_id=partner_id,
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
                 agent_id=agent_id,
                 fallback_agent_number=cdr.get("agent_number"),
                 reassign_inactive_agent=True,
@@ -647,7 +647,7 @@ class TalkoCallService:
                 entity_type=cdr.get("entity_type"),
                 entity_id=cdr.get("entity_id"),
                 entity_name=cdr.get("entity_name"),
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
                 partner_id=partner_id,
                 agent_number=agent_number,
                 cloud_agent_number=cloud_agent_number,
@@ -1199,7 +1199,7 @@ class TalkoCallService:
 
         target = await self.__dialplan_resolver.resolve_for_single_agent(
             partner_id=cdr["partner_id"],
-            service_board_id=cdr["service_board_id"],
+            workspace_id=cdr["workspace_id"],
             agent_id=current_agent_id,
             fallback_agent_number=cdr.get("agent_number"),
             reassign_inactive_agent=reassign_inactive_agent,
@@ -1215,7 +1215,7 @@ class TalkoCallService:
 
         event_metadata = {
             "partner_id": cdr.get("partner_id"),
-            "service_board_id": cdr.get("service_board_id"),
+            "workspace_id": cdr.get("workspace_id"),
             "dedicated_did": dedicated_did,
             "agent_id": current_agent_id,
             "display_name": (did_record or {}).get("display_name"),
@@ -1254,7 +1254,7 @@ class TalkoCallService:
             request_data=request_data,
             partner_id=cdr.get("partner_id", 0),
             agent_id=current_agent_id or 0,
-            service_board_id=cdr.get("service_board_id"),
+            workspace_id=cdr.get("workspace_id"),
             agent_number=cdr.get("agent_number"),
             agent_ids=None,
             lead_id=lead_id,
@@ -1280,9 +1280,9 @@ class TalkoCallService:
             call_to_number
         )
 
-        if not did_record or not did_record.get("service_board_id"):
+        if not did_record or not did_record.get("workspace_id"):
             self.__logger.warning(
-                "No DID record or service_board_id found for number: {}".format(
+                "No DID record or workspace_id found for number: {}".format(
                     call_to_number
                 )
             )
@@ -1326,7 +1326,7 @@ class TalkoCallService:
             customer_number=caller_id_number,
             call_to_number=call_to_number,
             partner_id=did_record["partner_id"],
-            service_board_id=did_record["service_board_id"],
+            workspace_id=did_record["workspace_id"],
             vendor_id=did_record.get("vendor_id"),
             vendor_config_id=did_record.get("vendor_config_id"),
             create_lead=create_lead,
@@ -1349,7 +1349,7 @@ class TalkoCallService:
 
         event_metadata = {
             "partner_id": result.get("partner_id"),
-            "service_board_id": result.get("service_board_id"),
+            "workspace_id": result.get("workspace_id"),
             "dedicated_did": call_to_number,
             "agent_id": result.get("agent_id"),
             "agent_ids": [
@@ -1378,7 +1378,7 @@ class TalkoCallService:
             request_data=request_data,
             partner_id=result["partner_id"],
             agent_id=result.get("agent_id"),
-            service_board_id=result["service_board_id"],
+            workspace_id=result["workspace_id"],
             agent_number=result.get("agent_number"),
             agent_ids=result["agent_ids"],
             lead_id=result.get("lead_id"),
@@ -1422,7 +1422,7 @@ class TalkoCallService:
         request_data,
         partner_id,
         agent_id,
-        service_board_id,
+        workspace_id,
         agent_number,
         agent_ids,
         lead_id,
@@ -1448,7 +1448,7 @@ class TalkoCallService:
                 request_data=request_data,
                 partner_id=partner_id,
                 agent_id=agent_id,
-                service_board_id=service_board_id,
+                workspace_id=workspace_id,
                 agent_number=agent_number,
                 agent_ids=agent_ids,
                 lead_id=lead_id,

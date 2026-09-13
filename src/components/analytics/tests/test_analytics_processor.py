@@ -7,7 +7,7 @@ from src.components.analytics.dto import (
     TalkoAgentCallAnalyticsRequest,
     TalkoAgentTalkTimeDistributionRequest,
     TalkoDashboardFollowupTrendsRequest,
-    TalkoPartnerServiceBoardRequest,
+    TalkoPartnerWorkspaceRequest,
     TalkoTotalAgentTalkTimeRequest,
 )
 from src.components.analytics.processor import TalkoAnalyticsProcessor
@@ -39,7 +39,7 @@ class TestAnalyticsProcessor:
         request = TalkoAgentCallAnalyticsRequest(
             time_range="1735689600000-1738272000000",  # 2025-01-01 to 2025-01-31
             agents=[1, 2],
-            service_board_id=[1, 3],
+            workspace_id=[1, 3],
         )
 
         expected_result = {"analytics": "agent_calls", "total_count": 10}
@@ -59,7 +59,7 @@ class TestAnalyticsProcessor:
             start_date=1735689600,  # Converted from ms to s
             end_date=1738272000,
             agents=[1, 2, 3],  # From mocked user_hierarchy_data
-            service_board_id=[1, 3],
+            workspace_id=[1, 3],
             limit=10,
             offset=1,
             user_role=3,  # From mocked get_user_roles
@@ -117,7 +117,7 @@ class TestAnalyticsProcessor:
             start_date=1738368000,
             end_date=1740787200,
             agents=[1, 2, 3],
-            service_board_id=None,
+            workspace_id=None,
             limit=10,
             offset=1,
             user_role=3,
@@ -148,23 +148,23 @@ class TestAnalyticsProcessor:
             start_date=1740787200,
             end_date=1743379200,
             agents=[1, 2, 3],
-            service_board_id=None,
+            workspace_id=None,
             limit=10,
             offset=1,
             user_role=3,
         )
 
-    async def test_get_partner_service_board_success(self, setup_processor):
+    async def test_get_partner_workspace_success(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = TalkoPartnerServiceBoardRequest(
+        request = TalkoPartnerWorkspaceRequest(
             time_range="1743465600000-1746057600000",  # 2025-04-01 to 2025-04-30
         )
 
-        expected_result = {"service_board": "data", "total_count": 1}
-        mock_repo.get_partner_service_board.return_value = expected_result
+        expected_result = {"workspace": "data", "total_count": 1}
+        mock_repo.get_partner_workspace.return_value = expected_result
 
-        result = await processor._get_partner_service_board(
+        result = await processor._get_partner_workspace(
             current_user_id=77,
             partner_id=88,
             request_data=request,
@@ -173,11 +173,11 @@ class TestAnalyticsProcessor:
         )
 
         assert result == expected_result
-        mock_repo.get_partner_service_board.assert_awaited_once_with(
+        mock_repo.get_partner_workspace.assert_awaited_once_with(
             partner_id=88,
             start_date=1743465600,
             end_date=1746057600,
-            service_board_id=None,
+            workspace_id=None,
             limit=10,
             offset=1,
         )
@@ -234,19 +234,19 @@ class TestAnalyticsProcessor:
             "Error in agent talk time distribution for user_id=333, partner_id=444, error=Distribution error"
         )
 
-    async def test_get_partner_service_board_failure(self, setup_processor):
+    async def test_get_partner_workspace_failure(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
 
-        request = TalkoPartnerServiceBoardRequest(
+        request = TalkoPartnerWorkspaceRequest(
             time_range="1743465600000-1746057600000",
         )
 
-        mock_repo.get_partner_service_board.side_effect = Exception(
-            "Service board failure"
+        mock_repo.get_partner_workspace.side_effect = Exception(
+            "Workspace failure"
         )
 
         with pytest.raises(Exception) as exc_info:
-            await processor._get_partner_service_board(
+            await processor._get_partner_workspace(
                 current_user_id=555,
                 partner_id=666,
                 request_data=request,
@@ -254,9 +254,9 @@ class TestAnalyticsProcessor:
                 offset=1,
             )
 
-        assert str(exc_info.value) == "Service board failure"
+        assert str(exc_info.value) == "Workspace failure"
         mock_logger.error.assert_any_call(
-            "Error in partner service board for user_id=555, partner_id=666, error=Service board failure"
+            "Error in partner workspace for user_id=555, partner_id=666, error=Workspace failure"
         )
 
     async def test_get_dashboard_call_trends_success(self, setup_processor):
@@ -264,7 +264,7 @@ class TestAnalyticsProcessor:
 
         request = TalkoDashboardFollowupTrendsRequest(
             time_range="1722470400000-1726444800000",  # 2025-08-01 to 2025-09-15
-            service_board_id=[40, 41],
+            workspace_id=[40, 41],
             metric_filter="agent_missed_calls",
             trend_basis="Weekly",
         )
@@ -294,7 +294,7 @@ class TestAnalyticsProcessor:
             start_date=1722470400,
             end_date=1726444800,
             agents=[1, 2, 3],
-            service_board_id=[40, 41],
+            workspace_id=[40, 41],
             metric="agent_missed_calls",
             trend_basis="Weekly",
             limit=10,
@@ -310,7 +310,7 @@ class TestAnalyticsProcessor:
 
         request = TalkoDashboardFollowupTrendsRequest(
             time_range="1722470400000-1726444800000",
-            service_board_id=[40],
+            workspace_id=[40],
             metric_filter="agent_missed_calls",
             trend_basis="Weekly",
         )
@@ -350,7 +350,7 @@ class TestAnalyticsProcessor:
         request = TalkoAgentCallAnalyticsRequest(
             time_range="invalid_time_range",  # Malformed time_range
             agents=[1, 2],
-            service_board_id=[1, 3],
+            workspace_id=[1, 3],
         )
 
         with pytest.raises(ValueError) as exc_info:

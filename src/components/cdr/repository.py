@@ -231,7 +231,7 @@ class TalkoCDRRepository:
                 "partner_id": 1,
                 "agent": 1,
                 "lead_id": 1,
-                "service_board_id": 1,
+                "workspace_id": 1,
                 "calling_mode": 1,
                 "call_status": 1,
                 "call_recording": 1,
