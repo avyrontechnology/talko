@@ -8,6 +8,11 @@ API_KEY_CACHE_TTL_SECONDS = 60
 STREAM_CONTEXT_TTL_SECONDS = 14400
 PENDING_CALL_CONTEXT_TTL_SECONDS = 900
 
+# voiceai DID -> agent resolve cache (engine is source of truth).
+# Positive hits live 60s so Numbers-UI changes re-route within ~60s;
+# 404 misses live 10s so unassigned DIDs fail fast without hammering.
+VOICEAI_DID_CACHE_KEY = "voiceai:did:{digits}"
+
 MAX_PENDING_MARKS = 8
 ACK_WAIT_SECONDS = 2.0
 CHUNK_SIZE = 160

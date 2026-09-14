@@ -1094,10 +1094,20 @@ class TalkoDidManagementService:
     async def assign_ai_agent_did(
         self,
         partner_id: int,
-        agent_bot_id: int,
+        agent_bot_id: Optional[int] = 0,
         did_number: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Assign an available ai_agent DID to an AI bot."""
+        """Assign an available ai_agent DID.
+
+        Two modes (same row, no migration):
+        - makun-ai: agent_bot_id=<real bot> (existing behavior).
+        - VoiceAI/engine-routed (partner-only): agent_bot_id=0/None. Talko
+          stores did_number -> partner_id only; the agent lives in the engine
+          Numbers UI and is resolved per call.
+        """
+        # Normalize None -> 0 (partner-only VoiceAI path).
+        if agent_bot_id is None:
+            agent_bot_id = 0
         try:
             self.__logger.info(
                 "Assigning AI agent DID. partner_id={}, agent_bot_id={}".format(

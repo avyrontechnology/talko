@@ -34,6 +34,7 @@ from src.core.redis_constants import (
     MAX_PENDING_MARKS,
     STREAM_CONTEXT_KEY,
     STREAM_CONTEXT_TTL_SECONDS,
+    VOICEAI_DID_CACHE_KEY,
 )
 from src.grpc_client.constants import TalkoGrpcServices
 from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
@@ -277,11 +278,12 @@ class TalkoPSTNBridgeService:
 
         if did_type == TalkoDIDType.AI_AGENT.value:
             if not agent_bot_id:
-                # voiceai-routed inbound DIDs are bound via
-                # VOICEAI_INBOUND_AGENT_MAP (DID -> voiceai agent id), not via
-                # agent_bot_id. Let them through — Step 4b resolves the agent
-                # from the map. Anything else is still a hard error.
-                if self._resolve_voiceai_agent_id_for_did(ctx.did_number) is None:
+                # VoiceAI-routed inbound DIDs store only did_number -> partner_id
+                # (agent_bot_id stays 0). The agent lives in the voiceai engine's
+                # Numbers UI and is looked up per call (Redis-cached). Env map
+                # stays as emergency override and wins when set.
+                # Fail only if the engine also has no mapping (fail-closed).
+                if await self._aresolve_voiceai_agent_id_for_did(ctx.did_number) is None:
                     raise ValueError(
                         "DID {} is ai_agent but agent_bot_id is missing".format(
                             ctx.did_number
@@ -316,23 +318,54 @@ class TalkoPSTNBridgeService:
         """True when the voiceai trunk env (WS + ticket API) is provisioned."""
         return bool(TalkoENV.VOICEAI_WS_BASE_URL and TalkoENV.VOICEAI_API_KEY)
 
-    def _resolve_voiceai_agent_id(self, ctx: TalkoCallContext) -> Optional[str]:
+    @staticmethod
+    def _voiceai_resolve_configured() -> bool:
+        """True when the engine DID-resolve API can be called."""
+        return bool(TalkoENV.VOICEAI_API_BASE_URL and TalkoENV.VOICEAI_API_KEY)
+
+    @staticmethod
+    def _normalize_voiceai_did_digits(did_number: str) -> str:
+        """Normalize a DID to engine-lookup digits (no '+', spaces, dashes).
+
+        Same normalization as Talko's DID store: ``normalize_phone_number(...,
+        with_plus=False)`` gives ``91XXXXXXXXXX`` for Indian numbers, so
+        ``+9179…``, ``9179…``, ``91 79-…`` and 10-digit variants all map to
+        the same key. Falls back to digits-only on unexpected input.
+        """
+        try:
+            normalized = normalize_phone_number(did_number or "", with_plus=False)
+            if normalized:
+                return normalized
+        except Exception:
+            pass
+        return "".join(ch for ch in (did_number or "") if ch.isdigit())
+
+    async def _resolve_voiceai_agent_id(self, ctx: TalkoCallContext) -> Optional[str]:
         """Resolve the voiceai agent for this call, if it is voiceai-routed.
 
         Outbound: ``context_data.voiceai_agent_id`` (set by voiceai's
         talko_api_server via POST /call context_data).
-        Inbound: ``VOICEAI_INBOUND_AGENT_MAP`` DID -> agent_id mapping.
+        Inbound: env override -> Redis -> engine ``/phone-numbers/resolve``.
         Returns None for makun-ai / human calls (normal path unchanged).
         """
+        agent_id = (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY)
+        if agent_id:
+            return str(agent_id)
+        return await self._aresolve_voiceai_agent_id_for_did(ctx.did_number)
+
+    def _resolve_voiceai_agent_id_sync(self, ctx: TalkoCallContext) -> Optional[str]:
+        """Sync env-only fast check (kept for backward compat / tests)."""
         agent_id = (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY)
         if agent_id:
             return str(agent_id)
         return self._resolve_voiceai_agent_id_for_did(ctx.did_number)
 
     def _resolve_voiceai_agent_id_for_did(self, did_number: str) -> Optional[str]:
-        """Inbound lookup only: DID -> voiceai agent id.
+        """Inbound lookup only, env override: DID -> voiceai agent id.
 
-        Tolerant of leading '+' (Tata sends +9179…, maps may store 9179…).
+        Tolerant of leading '+' (Tata sends +9179…, maps may store 9179…),
+        spaces/dashes and 10-vs-12-digit variants via normalized digits.
+        This is the emergency override — it always wins when set.
         """
         try:
             mapping = json.loads(TalkoENV.VOICEAI_INBOUND_AGENT_MAP or "{}")
@@ -343,11 +376,138 @@ class TalkoPSTNBridgeService:
             return None
         if not isinstance(mapping, dict):
             return None
-        for candidate in (did_number, (did_number or "").lstrip("+")):
+        candidates = [did_number, (did_number or "").lstrip("+")]
+        try:
+            normalized = self._normalize_voiceai_did_digits(did_number or "")
+            if normalized and normalized not in candidates:
+                candidates.append(normalized)
+        except Exception:
+            pass
+        for candidate in candidates:
             agent_id = mapping.get(candidate)
             if agent_id:
                 return str(agent_id)
         return None
+
+    async def _get_cached_voiceai_agent(self, digits: str) -> Tuple[bool, Optional[str]]:
+        """Redis lookup for engine DID mapping.
+
+        Returns (found, agent_id): found=False means cache miss (or Redis
+        down — treated as a miss so calls still route via direct engine
+        call). found=True with agent_id=None means cached 404 (negative hit).
+        """
+        key = VOICEAI_DID_CACHE_KEY.format(digits=digits)
+        try:
+            redis = await self._get_redis()
+            raw = await redis.get(key)
+            if raw is None:
+                return False, None
+            if isinstance(raw, bytes):
+                raw = raw.decode()
+            if not raw:
+                self.__logger.debug(
+                    "[PSTN][VOICEAI][CACHE] NEGATIVE HIT digits={}".format(digits)
+                )
+                return True, None
+            self.__logger.debug(
+                "[PSTN][VOICEAI][CACHE] HIT digits={}".format(digits)
+            )
+            return True, str(raw)
+        except Exception as exc:
+            self.__logger.warning(
+                "[PSTN][VOICEAI][CACHE] GET ERROR digits={} error={} — treating as miss".format(
+                    digits, exc
+                )
+            )
+            return False, None
+
+    async def _set_cached_voiceai_agent(self, digits: str, agent_id: Optional[str]) -> None:
+        """Cache engine answer: positives 60s, 404 misses 10s (self-heals)."""
+        key = VOICEAI_DID_CACHE_KEY.format(digits=digits)
+        try:
+            redis = await self._get_redis()
+            if agent_id:
+                ttl = int(getattr(TalkoENV, "VOICEAI_DID_CACHE_TTL_SECONDS", 60) or 60)
+                await redis.set(key, str(agent_id), ex=ttl)
+            else:
+                ttl = int(getattr(TalkoENV, "VOICEAI_DID_NEGATIVE_CACHE_TTL_SECONDS", 10) or 10)
+                await redis.set(key, "", ex=ttl)
+        except Exception as exc:
+            self.__logger.warning(
+                "[PSTN][VOICEAI][CACHE] SET ERROR digits={} error={}".format(digits, exc)
+            )
+
+    async def _fetch_voiceai_agent_from_engine(self, did_number: str, digits: str) -> Tuple[bool, Optional[str]]:
+        """Direct engine call. Returns (completed, agent_id).
+
+        completed=False means transport error/timeout — caller must NOT cache
+        it (fail-closed reject, retry next call). completed=True with
+        agent_id=None means engine 404 (cache as negative hit).
+        """
+        base = (TalkoENV.VOICEAI_API_BASE_URL or "").rstrip("/")
+        if not base or not TalkoENV.VOICEAI_API_KEY:
+            return True, None
+        url = "{}/phone-numbers/resolve".format(base)
+        timeout = float(getattr(TalkoENV, "VOICEAI_DID_RESOLVE_TIMEOUT_SECONDS", 0.3) or 0.3)
+        try:
+            resp = await self.__http_client.get(
+                url,
+                params={"number": did_number},
+                headers={"Authorization": "Bearer {}".format(TalkoENV.VOICEAI_API_KEY)},
+                timeout=timeout,
+            )
+            if resp.status_code == 200:
+                try:
+                    data = resp.json()
+                except Exception:
+                    data = {}
+                agent_id = (data or {}).get("agent_id")
+                return True, str(agent_id) if agent_id else None
+            if resp.status_code == 404:
+                return True, None
+            self.__logger.warning(
+                "[PSTN][VOICEAI][ENGINE] Unexpected status={} digits={}".format(
+                    resp.status_code, digits
+                )
+            )
+            return False, None
+        except Exception as exc:
+            self.__logger.warning(
+                "[PSTN][VOICEAI][ENGINE] Lookup failed digits={} error={} — fail-closed".format(
+                    digits, exc
+                )
+            )
+            return False, None
+
+    async def _aresolve_voiceai_agent_id_for_did(self, did_number: str) -> Optional[str]:
+        """Full inbound lookup: env override -> Redis -> engine HTTP.
+
+        Env always wins (break-glass). Redis holds positives 60s and 404
+        misses 10s. Redis down/flushed is treated as a miss and falls back
+        to a direct engine call (~300ms timeout, pooled client) — truth
+        lives in Mongo + engine, never Redis, so it self-heals in one call
+        per DID. Engine timeout -> None (caller rejects, fail-closed).
+        """
+        # 1. Emergency override first — zero I/O, behavior unchanged on cutover.
+        env_hit = self._resolve_voiceai_agent_id_for_did(did_number)
+        if env_hit:
+            return env_hit
+        # 2. No engine configured (local dev / tests) — env-only mode.
+        if not self._voiceai_resolve_configured():
+            return None
+        digits = self._normalize_voiceai_did_digits(did_number or "")
+        if not digits:
+            return None
+        # 3. Redis cache.
+        found, cached = await self._get_cached_voiceai_agent(digits)
+        if found:
+            return cached
+        # 4. Direct engine call.
+        completed, agent_id = await self._fetch_voiceai_agent_from_engine(did_number, digits)
+        if not completed:
+            return None
+        await self._set_cached_voiceai_agent(digits, agent_id)
+        return agent_id
 
     async def _run_voiceai_relay(
         self, ws, provider, ctx, event, raw_events, voiceai_agent_id: str
@@ -490,9 +650,10 @@ class TalkoPSTNBridgeService:
                 )
             )
             return ctx
-        if self._resolve_voiceai_agent_id_for_did(ctx.did_number) is not None:
+        if (await self._aresolve_voiceai_agent_id_for_did(ctx.did_number)) is not None:
             # Inbound voiceai call: no pending context exists, so the marker
-            # above can't fire — skip on the DID map instead. Without this,
+            # above can't fire — skip on the DID mapping instead (env override
+            # first, then cached engine lookup). Without this,
             # _create_session would attempt the makun-ai path (incl. a gRPC
             # API-key fetch that is unreachable from some networks) and kill
             # the call before Step 4b ever runs.
@@ -918,11 +1079,12 @@ class TalkoPSTNBridgeService:
                         start_dir = (event.get("start", {}) or {}).get(
                             "direction", "inbound"
                         )
-                        fast_voiceai_agent = (
-                            self._resolve_voiceai_agent_id_for_did(ctx.did_number)
-                            if start_dir != "outbound"
-                            else None
-                        )
+                        if start_dir != "outbound":
+                            fast_voiceai_agent = await self._aresolve_voiceai_agent_id_for_did(
+                                ctx.did_number
+                            )
+                        else:
+                            fast_voiceai_agent = None
                         if fast_voiceai_agent and self._voiceai_configured():
                             self.__logger.info(
                                 "[PSTN][CALL] Fast path: inbound voiceai sid={} "
@@ -1108,12 +1270,12 @@ class TalkoPSTNBridgeService:
                         #
                         # Calls carrying context_data.voiceai_agent_id (outbound
                         # calls placed via voiceai's talko_api_server) or whose
-                        # DID is mapped in VOICEAI_INBOUND_AGENT_MAP bypass the
-                        # makun-ai LiveKit path entirely: relay Tata media to
-                        # the voiceai agent socket instead, then break out to
-                        # the normal cleanup below (room is None there).
+                        # DID is mapped (env override or cached engine lookup)
+                        # bypass the makun-ai LiveKit path entirely: relay Tata
+                        # media to the voiceai agent socket instead, then break
+                        # out to the normal cleanup below (room is None there).
                         # ─────────────────────────────────────────────────────
-                        voiceai_agent_id = self._resolve_voiceai_agent_id(ctx)
+                        voiceai_agent_id = await self._resolve_voiceai_agent_id(ctx)
                         if voiceai_agent_id and self._voiceai_configured():
                             self.__logger.info(
                                 "[PSTN][CALL] Step 4b: voiceai relay sid={} agent={}".format(

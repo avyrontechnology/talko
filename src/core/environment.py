@@ -75,6 +75,16 @@ class TalkoENV:
     # e.g. '{"918045678901": "agent_abc123"}'. DIDs listed here bypass the
     # makun-ai path even without per-call context_data.
     VOICEAI_INBOUND_AGENT_MAP = os.getenv("VOICEAI_INBOUND_AGENT_MAP", "")
+    # DID -> agent engine lookup (cached). Talko asks the voiceai engine's
+    # GET {VOICEAI_API_BASE_URL}/phone-numbers/resolve per DID, Redis-cached.
+    # Env map above stays as emergency override and wins when set.
+    VOICEAI_DID_RESOLVE_TIMEOUT_SECONDS = float(
+        os.getenv("VOICEAI_DID_RESOLVE_TIMEOUT_SECONDS", "0.3")
+    )
+    VOICEAI_DID_CACHE_TTL_SECONDS = int(os.getenv("VOICEAI_DID_CACHE_TTL_SECONDS", "60"))
+    VOICEAI_DID_NEGATIVE_CACHE_TTL_SECONDS = int(
+        os.getenv("VOICEAI_DID_NEGATIVE_CACHE_TTL_SECONDS", "10")
+    )
 
     # Relays Tata Tele's dialer webhook (already-persisted TalkoCDR) onward to
     # makun-ai's campaign webhook — see TalkoDialerWebhookHandler._relay_to_makunai.

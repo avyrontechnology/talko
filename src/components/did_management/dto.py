@@ -111,7 +111,11 @@ class TalkoContract:
 
     class AssignAIAgentDIDRequest(BaseModel):
         partner_id: int
-        agent_bot_id: int
+        # Optional: 0 / omitted means VoiceAI/engine-routed (partner-only).
+        # Talko stores did_number -> partner_id with agent_bot_id=0; the agent
+        # lives in the engine Numbers UI and is resolved per call. makun-ai
+        # campaign flows still pass a real agent_bot_id here.
+        agent_bot_id: Optional[int] = 0
         did_number: Optional[str] = None  # auto-pick first available
 
     class ReleaseAIAgentDIDRequest(BaseModel):
