@@ -135,7 +135,7 @@ class TalkoPSTNBridgeService:
             )
         return None
 
-    async def _set_cached_did(self, did_number: str, record: Dict[str, Any]) -> None:
+    async def _set_cached_did(self, did_number: str, record: Dict[str, Any], ttl: Optional[int] = None) -> None:
         key = DID_CACHE_KEY.format(did_number=did_number)
         try:
             redis = await self._get_redis()
@@ -143,7 +143,7 @@ class TalkoPSTNBridgeService:
                 k: str(v) if isinstance(v, ObjectId) else v for k, v in record.items()
             }
             await redis.set(
-                key, json.dumps(serializable_record), ex=DID_CACHE_TTL_SECONDS
+                key, json.dumps(serializable_record), ex=ttl or DID_CACHE_TTL_SECONDS
             )
             self.__logger.debug(
                 "[PSTN][DID_CACHE][SET] OK did_number={}".format(did_number)
@@ -251,10 +251,50 @@ class TalkoPSTNBridgeService:
                 )
                 raise
             if not did_record or not did_record.get("is_active", True):
-                raise ValueError(
-                    "No active DID record found for {}".format(ctx.did_number)
+                if did_record and not did_record.get("is_active", True):
+                    raise ValueError(
+                        "No active DID record found for {}".format(ctx.did_number)
+                    )
+                # DB-miss: single-entry dynamic inbound. Otoba is source of
+                # truth — if the engine has DID -> (agent, talko_partner_id),
+                # auto-use it without a Talko DID row. Inactive rows still
+                # reject above (explicit disable wins over engine).
+                dynamic = await self._aresolve_voiceai_resolution_for_did(
+                    ctx.did_number
                 )
-            await self._set_cached_did(ctx.did_number, did_record)
+                if dynamic is None or not dynamic.get("agent_id") or not dynamic.get(
+                    "partner_id"
+                ):
+                    raise ValueError(
+                        "No active DID record found for {}".format(ctx.did_number)
+                    )
+                did_record = {
+                    "did_type": TalkoDIDType.AI_AGENT.value,
+                    "partner_id": dynamic["partner_id"],
+                    "vendor_config_id": dynamic.get("vendor_config_id") or "",
+                    "agent_id": 0,
+                    "agent_bot_id": 0,
+                    "is_active": True,
+                    "_synthetic": True,
+                    "did_number": ctx.did_number,
+                }
+                self.__logger.info(
+                    "[PSTN][DID] dynamic engine-owned DID {} partner_id={} — no Talko row needed".format(
+                        ctx.did_number, dynamic["partner_id"]
+                    )
+                )
+                # Short TTL so a later real Talko row / engine unassign
+                # re-resolves quickly; agent truth still re-checked per call
+                # via the voiceai agent cache (60s) + Step 4b.
+                try:
+                    ttl = int(
+                        getattr(TalkoENV, "VOICEAI_DID_CACHE_TTL_SECONDS", 60) or 60
+                    )
+                except Exception:
+                    ttl = 60
+                await self._set_cached_did(ctx.did_number, did_record, ttl=ttl)
+            else:
+                await self._set_cached_did(ctx.did_number, did_record)
         else:
             self.__logger.info(
                 "[PSTN][DID] Cache HIT did_number={}".format(ctx.did_number)
@@ -437,16 +477,20 @@ class TalkoPSTNBridgeService:
                 "[PSTN][VOICEAI][CACHE] SET ERROR digits={} error={}".format(digits, exc)
             )
 
-    async def _fetch_voiceai_agent_from_engine(self, did_number: str, digits: str) -> Tuple[bool, Optional[str]]:
-        """Direct engine call. Returns (completed, agent_id).
+    async def _fetch_voiceai_resolution_from_engine(
+        self, did_number: str, digits: str
+    ) -> Tuple[bool, Optional[str], Optional[int], Optional[str]]:
+        """Direct engine call. Returns (completed, agent_id, partner_id, vendor_config_id).
 
         completed=False means transport error/timeout — caller must NOT cache
         it (fail-closed reject, retry next call). completed=True with
-        agent_id=None means engine 404 (cache as negative hit).
+        agent_id=None means engine 404 (cache as negative hit). partner_id /
+        vendor_config_id come from the engine Numbers UI (single-entry
+        dynamic inbound); legacy rows without them return None there.
         """
         base = (TalkoENV.VOICEAI_API_BASE_URL or "").rstrip("/")
         if not base or not TalkoENV.VOICEAI_API_KEY:
-            return True, None
+            return True, None, None, None
         url = "{}/phone-numbers/resolve".format(base)
         timeout = float(getattr(TalkoENV, "VOICEAI_DID_RESOLVE_TIMEOUT_SECONDS", 0.3) or 0.3)
         try:
@@ -461,23 +505,83 @@ class TalkoPSTNBridgeService:
                     data = resp.json()
                 except Exception:
                     data = {}
-                agent_id = (data or {}).get("agent_id")
-                return True, str(agent_id) if agent_id else None
+                data = data or {}
+                agent_id = data.get("agent_id")
+                partner_id: Optional[int] = None
+                try:
+                    raw_partner = data.get("talko_partner_id")
+                    if raw_partner is not None and str(raw_partner).strip() != "":
+                        partner_id = int(raw_partner)
+                except (TypeError, ValueError):
+                    partner_id = None
+                vendor_config_id = data.get("talko_vendor_config_id")
+                vendor_config_id = str(vendor_config_id) if vendor_config_id else None
+                return (
+                    True,
+                    str(agent_id) if agent_id else None,
+                    partner_id,
+                    vendor_config_id,
+                )
             if resp.status_code == 404:
-                return True, None
+                return True, None, None, None
             self.__logger.warning(
                 "[PSTN][VOICEAI][ENGINE] Unexpected status={} digits={}".format(
                     resp.status_code, digits
                 )
             )
-            return False, None
+            return False, None, None, None
         except Exception as exc:
             self.__logger.warning(
                 "[PSTN][VOICEAI][ENGINE] Lookup failed digits={} error={} — fail-closed".format(
                     digits, exc
                 )
             )
-            return False, None
+            return False, None, None, None
+
+    async def _fetch_voiceai_agent_from_engine(self, did_number: str, digits: str) -> Tuple[bool, Optional[str]]:
+        """Backward-compat wrapper: agent only (partner ignored)."""
+        completed, agent_id, _, _ = await self._fetch_voiceai_resolution_from_engine(
+            did_number, digits
+        )
+        return completed, agent_id
+
+    async def _aresolve_voiceai_resolution_for_did(
+        self, did_number: str
+    ) -> Optional[Dict[str, Any]]:
+        """Full inbound resolution: env override -> Redis -> engine HTTP.
+
+        Returns {"agent_id", "partner_id", "vendor_config_id"} or None.
+        Env always wins for agent (break-glass) but partner still comes
+        from the engine — DB-miss dynamic inbound needs both, so it must
+        hit the engine even when env provides the agent.
+        """
+        digits = self._normalize_voiceai_did_digits(did_number or "")
+        if not digits:
+            return None
+        env_hit = self._resolve_voiceai_agent_id_for_did(did_number)
+        if not self._voiceai_resolve_configured():
+            # Env-only mode (local dev / tests): partner unknown here —
+            # callers with a Talko DID row use env_hit via the agent-only
+            # helper; DB-miss dynamic needs engine, so return None.
+            return None
+        # Direct engine call (source of truth for partner). Agent cache is
+        # intentionally not used here — partner isn't cached there, and this
+        # runs only on Talko DB-miss (then synthetic DID cache covers the
+        # next 60s; steady-state calls use the agent-only helper, no HTTP).
+        completed, agent_id, partner_id, vendor_config_id = (
+            await self._fetch_voiceai_resolution_from_engine(did_number, digits)
+        )
+        if not completed:
+            return None
+        await self._set_cached_voiceai_agent(digits, agent_id)
+        if not agent_id:
+            return None
+        # Env wins for agent selection; partner always from engine.
+        return {
+            "agent_id": env_hit or agent_id,
+            "partner_id": partner_id,
+            "vendor_config_id": vendor_config_id,
+        }
 
     async def _aresolve_voiceai_agent_id_for_did(self, did_number: str) -> Optional[str]:
         """Full inbound lookup: env override -> Redis -> engine HTTP.
