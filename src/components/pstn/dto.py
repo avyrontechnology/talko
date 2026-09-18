@@ -22,6 +22,10 @@ class TalkoCallContext:
     makunai_agent_id: Optional[int] = None
     partner_id: Optional[int] = None
     vendor_config_id: Optional[str] = None
+    # VoiceAI DID agent resolved in Step 2 (Redis-cached engine lookup).
+    # Cached here so the fast-path / outbound fast-path / Step 4b / session
+    # skip don't each pay another Redis round trip for the same DID.
+    voiceai_agent_id: Optional[str] = None
     # Filled after Session API call
     livekit_url: Optional[str] = None
     caller_token: Optional[str] = None

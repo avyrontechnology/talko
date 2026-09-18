@@ -227,6 +227,9 @@ class TalkoPSTNBridgeService:
     async def _resolve_did(self, ctx: TalkoCallContext) -> TalkoCallContext:
         self.__logger.info("[PSTN][DID] Resolving did_number={}".format(ctx.did_number))
         did_record = await self._get_cached_did(ctx.did_number)
+        # Prefetched by the dynamic DB-miss branch below — reuse it in the
+        # ai_agent branch so one inbound call pays one engine HTTP max.
+        prefetched_voiceai_agent: Optional[str] = None
 
         if did_record is None:
             self.__logger.info(
@@ -278,6 +281,7 @@ class TalkoPSTNBridgeService:
                     "_synthetic": True,
                     "did_number": ctx.did_number,
                 }
+                prefetched_voiceai_agent = dynamic.get("agent_id")
                 self.__logger.info(
                     "[PSTN][DID] dynamic engine-owned DID {} partner_id={} — no Talko row needed".format(
                         ctx.did_number, dynamic["partner_id"]
@@ -323,15 +327,20 @@ class TalkoPSTNBridgeService:
                 # Numbers UI and is looked up per call (Redis-cached). Env map
                 # stays as emergency override and wins when set.
                 # Fail only if the engine also has no mapping (fail-closed).
-                if await self._aresolve_voiceai_agent_id_for_did(ctx.did_number) is None:
+                # Cache the agent on ctx so fast-path / outbound fast-path /
+                # Step 4b / session reuse it without extra Redis round trips.
+                # Dynamic DB-miss already fetched it above — reuse, don't refetch.
+                voiceai_agent = prefetched_voiceai_agent or await self._aresolve_voiceai_agent_id_for_did(ctx.did_number)
+                if voiceai_agent is None:
                     raise ValueError(
                         "DID {} is ai_agent but agent_bot_id is missing".format(
                             ctx.did_number
                         )
                     )
+                ctx.voiceai_agent_id = voiceai_agent
                 self.__logger.info(
-                    "[PSTN][DID] voiceai-mapped DID {} — agent resolved in Step 4b".format(
-                        ctx.did_number
+                    "[PSTN][DID] voiceai-mapped DID {} agent={} — cached on ctx".format(
+                        ctx.did_number, voiceai_agent
                     )
                 )
             else:
@@ -387,10 +396,15 @@ class TalkoPSTNBridgeService:
         talko_api_server via POST /call context_data).
         Inbound: env override -> Redis -> engine ``/phone-numbers/resolve``.
         Returns None for makun-ai / human calls (normal path unchanged).
+
+        Prefers the Step-2 cached ``ctx.voiceai_agent_id`` so one call pays
+        one Redis lookup max — critical when Redis p99 is high.
         """
         agent_id = (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY)
         if agent_id:
             return str(agent_id)
+        if getattr(ctx, "voiceai_agent_id", None):
+            return str(ctx.voiceai_agent_id)
         return await self._aresolve_voiceai_agent_id_for_did(ctx.did_number)
 
     def _resolve_voiceai_agent_id_sync(self, ctx: TalkoCallContext) -> Optional[str]:
@@ -754,13 +768,12 @@ class TalkoPSTNBridgeService:
                 )
             )
             return ctx
-        if (await self._aresolve_voiceai_agent_id_for_did(ctx.did_number)) is not None:
-            # Inbound voiceai call: no pending context exists, so the marker
-            # above can't fire — skip on the DID mapping instead (env override
-            # first, then cached engine lookup). Without this,
-            # _create_session would attempt the makun-ai path (incl. a gRPC
-            # API-key fetch that is unreachable from some networks) and kill
-            # the call before Step 4b ever runs.
+        if (await self._resolve_voiceai_agent_id(ctx)) is not None:
+            # VoiceAI call (context marker or DID mapping, Step-2 cached) —
+            # skip on the cached value first so this costs zero Redis trips
+            # on the hot path. Without this, _create_session would attempt
+            # the makun-ai path (incl. a gRPC API-key fetch) and kill the
+            # call before Step 4b ever runs.
             self.__logger.info(
                 "[PSTN][SESSION] voiceai-mapped DID sid={} — "
                 "skipping makun-ai session".format(ctx.call_sid)
@@ -1169,46 +1182,103 @@ class TalkoPSTNBridgeService:
                             )
                         )
 
-                        # ── Fast path: inbound voiceai DIDs skip Steps 3-4 ──
+                        # ── Fast path: voiceai DIDs skip room/session ──
                         #
-                        # Everything Steps 3-4 do (room selection, pending
-                        # context attach, makun-ai session) is for the LiveKit
-                        # path. An inbound call to a voiceai-mapped DID needs
-                        # none of it: agent resolves from the DID map and the
-                        # relay needs only ws/provider/ctx/event. Outbound
-                        # AI-bridge calls still go through Steps 3-4 (their
-                        # agent id arrives via pending context attach) and hit
-                        # the shared relay at Step 4b below.
+                        # Inbound: everything Steps 3-4 do (room selection,
+                        # pending context attach, makun-ai session) is for the
+                        # LiveKit path — agent resolves from the DID map and
+                        # the relay needs only ws/provider/ctx/event.
+                        # Outbound voiceai: same — voiceai never pre-warms a
+                        # room (call_management skips makun-ai pre-session for
+                        # voiceai), so the outbound_room retry loop below is a
+                        # guaranteed ~400ms miss, and _create_session would
+                        # just re-check the same DID agent and return. Attach
+                        # pending context (per-call agent/variables) then relay
+                        # directly. Context timeout still bounds slow Redis —
+                        # relay falls back to the DID agent.
                         # ─────────────────────────────────────────────────────
                         start_dir = (event.get("start", {}) or {}).get(
                             "direction", "inbound"
                         )
-                        if start_dir != "outbound":
+                        # Step-2 cached — zero Redis trips on the hot path.
+                        fast_voiceai_agent = getattr(ctx, "voiceai_agent_id", None)
+                        if fast_voiceai_agent is None:
                             fast_voiceai_agent = await self._aresolve_voiceai_agent_id_for_did(
                                 ctx.did_number
                             )
-                        else:
-                            fast_voiceai_agent = None
+                            if fast_voiceai_agent:
+                                ctx.voiceai_agent_id = fast_voiceai_agent
                         if fast_voiceai_agent and self._voiceai_configured():
+                            if start_dir != "outbound":
+                                self.__logger.info(
+                                    "[PSTN][CALL] Fast path: inbound voiceai sid={} "
+                                    "agent={} — skipping Steps 3-4".format(
+                                        ctx.call_sid, fast_voiceai_agent
+                                    )
+                                )
+                                # Preserve what _attach_pending_context would have
+                                # set and cleanup/observability may read (the call
+                                # has no pending context on the inbound leg).
+                                start_obj = event.get("start", {}) or {}
+                                ctx.vendor_call_id = (
+                                    start_obj.get("callSid")
+                                    or start_obj.get("callId")
+                                    or start_obj.get("callid")
+                                    or ctx.call_sid
+                                )
+                                await self._run_voiceai_relay(
+                                    ws, provider, ctx, event,
+                                    raw_events, fast_voiceai_agent,
+                                )
+                                break
+                            # Outbound voiceai: attach per-call context, skip
+                            # room selection + session entirely.
                             self.__logger.info(
-                                "[PSTN][CALL] Fast path: inbound voiceai sid={} "
-                                "agent={} — skipping Steps 3-4".format(
+                                "[PSTN][CALL] Fast path: outbound voiceai sid={} "
+                                "did_agent={} — attaching ctx, skipping room/session".format(
                                     ctx.call_sid, fast_voiceai_agent
                                 )
                             )
-                            # Preserve what _attach_pending_context would have
-                            # set and cleanup/observability may read (the call
-                            # has no pending context on the inbound leg).
-                            start_obj = event.get("start", {}) or {}
-                            ctx.vendor_call_id = (
-                                start_obj.get("callSid")
-                                or start_obj.get("callId")
-                                or start_obj.get("callid")
-                                or ctx.call_sid
+                            t_ctx = time.perf_counter()
+                            try:
+                                ctx = await asyncio.wait_for(
+                                    asyncio.shield(
+                                        asyncio.create_task(
+                                            self._attach_pending_context(ctx, event),
+                                            name="ctx_attach_{}".format(ctx.call_sid),
+                                        )
+                                    ),
+                                    timeout=0.4,
+                                )
+                            except asyncio.TimeoutError:
+                                self.__logger.warning(
+                                    "[PSTN][CALL] Fast path ctx timeout (400ms) — "
+                                    "relaying with DID agent call_sid={}".format(
+                                        ctx.call_sid
+                                    )
+                                )
+                            self.__logger.info(
+                                "[PSTN][CALL] Fast path ctx done: pending_found={} "
+                                "elapsed={:.0f}ms".format(
+                                    getattr(ctx, "pending_context_found", False),
+                                    (time.perf_counter() - t_ctx) * 1000,
+                                )
                             )
+                            voiceai_agent_id = (
+                                (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY)
+                                or fast_voiceai_agent
+                            )
+                            if not ctx.vendor_call_id:
+                                start_obj = event.get("start", {}) or {}
+                                ctx.vendor_call_id = (
+                                    start_obj.get("callSid")
+                                    or start_obj.get("callId")
+                                    or start_obj.get("callid")
+                                    or ctx.call_sid
+                                )
                             await self._run_voiceai_relay(
                                 ws, provider, ctx, event,
-                                raw_events, fast_voiceai_agent,
+                                raw_events, str(voiceai_agent_id),
                             )
                             break
 
