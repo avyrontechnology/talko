@@ -102,6 +102,9 @@ class TalkoVendorConfigRepository:
                     {
                         self.__project: {
                             "_id": 1,
+                            "vendor_id": 1,
+                            "name": 1,
+                            "generic_url_handler": 1,
                             "vendor_name": "$vendor.name",
                         }
                     },

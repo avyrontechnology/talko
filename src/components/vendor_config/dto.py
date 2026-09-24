@@ -20,7 +20,11 @@ class TalkoContract:
 
     class GetAllVendorConfigData(BaseModel):
         id: str
+        vendor_id: str | None = None
+        name: str | None = None
         vendor_name: str
+        generic_url_handler: dict[str, Any] | None = None
+        available_did: list[str] | None = None
 
     class VendorConfigUpdate(BaseModel):
         generic_url_handler: dict[str, Any] | None = None

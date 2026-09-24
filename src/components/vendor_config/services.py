@@ -120,6 +120,8 @@ class TalkoVendorConfigService:
             for config in configs:
                 config["id"] = str(config["_id"])
                 del config["_id"]
+                if config.get("vendor_id") is not None:
+                    config["vendor_id"] = str(config["vendor_id"])
                 config_responses.append(TalkoContract.GetAllVendorConfigData(**config))
 
             self.__logger.debug(f"Converted vendor configs to response format. data: {config_responses}")
