@@ -1,11 +1,9 @@
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.components.analytics import constants as analytics_constants
-from src.components.analytics.builder import TalkoQueryBuilder
-from src.components.analytics.enums import TalkoDateRangePeriod, TalkoTimeInterval
+from src.components.analytics.enums import TalkoDateRangePeriod
 from src.components.analytics.repositories import TalkoAnalyticsRepository
 
 
@@ -15,9 +13,7 @@ class TestAnalyticsRepository:
         self.mock_logger = MagicMock()
         self.mock_collection = MagicMock()
         self.mock_query_builder = MagicMock()
-        self.mock_db_manager.collection.return_value.__aenter__.return_value = (
-            self.mock_collection
-        )
+        self.mock_db_manager.collection.return_value.__aenter__.return_value = self.mock_collection
 
         self.repo = TalkoAnalyticsRepository(
             db_manager=self.mock_db_manager,
@@ -44,9 +40,7 @@ class TestAnalyticsRepository:
             }
         ]
         fake_count_result = [{"total_count": 5}]
-        self.mock_collection.aggregate.return_value.to_list = AsyncMock(
-            side_effect=[fake_count_result, fake_result]
-        )
+        self.mock_collection.aggregate.return_value.to_list = AsyncMock(side_effect=[fake_count_result, fake_result])
         mock_adjust.return_value = (1000, 2000, TalkoDateRangePeriod.CUSTOM.value)
         self.mock_query_builder.build_query.return_value = {
             analytics_constants.PARTNER_ID: 42,
@@ -71,9 +65,7 @@ class TestAnalyticsRepository:
         assert result["agents"][0]["agent_name"] == "Agent 123"
         assert result["agents"][0]["total_calls"] == 10
         assert result["total_count"] == 5
-        self.mock_logger.info.assert_any_call(
-            "Successfully retrieved agent call analytics for partner_id: 42"
-        )
+        self.mock_logger.info.assert_any_call("Successfully retrieved agent call analytics for partner_id: 42")
         self.mock_collection.aggregate.assert_called()
         self.mock_logger.debug.assert_any_call(
             f"Retrieving agent call analytics for partner_id: 42, "
@@ -94,9 +86,7 @@ class TestAnalyticsRepository:
             }
         ]
         fake_count_result = [{"total_count": 3}]
-        self.mock_collection.aggregate.return_value.to_list = AsyncMock(
-            side_effect=[fake_count_result, fake_result]
-        )
+        self.mock_collection.aggregate.return_value.to_list = AsyncMock(side_effect=[fake_count_result, fake_result])
         mock_adjust.return_value = (1000, 2000, TalkoDateRangePeriod.CUSTOM.value)
         self.mock_query_builder.build_query.return_value = {
             analytics_constants.PARTNER_ID: 42,
@@ -121,9 +111,7 @@ class TestAnalyticsRepository:
         assert result["agents"][0]["agent_name"] == "Agent 123"
         assert result["agents"][0]["total_talk_time"] == 300
         assert result["total_count"] == 3
-        self.mock_logger.info.assert_any_call(
-            "Successfully retrieved total agent talk time for partner_id: 42"
-        )
+        self.mock_logger.info.assert_any_call("Successfully retrieved total agent talk time for partner_id: 42")
         self.mock_collection.aggregate.assert_called()
         self.mock_logger.debug.assert_any_call(
             f"Retrieving total agent talk time for partner_id: 42, "
@@ -143,9 +131,7 @@ class TestAnalyticsRepository:
             }
         ]
         fake_count_result = [{"total_count": 4}]
-        self.mock_collection.aggregate.return_value.to_list = AsyncMock(
-            side_effect=[fake_count_result, fake_result]
-        )
+        self.mock_collection.aggregate.return_value.to_list = AsyncMock(side_effect=[fake_count_result, fake_result])
         mock_adjust.return_value = (1000, 2000, TalkoDateRangePeriod.CUSTOM.value)
         self.mock_query_builder.build_query.return_value = {
             analytics_constants.PARTNER_ID: 42,
@@ -170,9 +156,7 @@ class TestAnalyticsRepository:
         assert result["agents"][0]["agent_name"] == "Agent 123"
         assert result["agents"][0]["buckets"]["0-1 minutes"] == 2
         assert result["total_count"] == 4
-        self.mock_logger.info.assert_any_call(
-            "Successfully retrieved agent talk time distribution for partner_id: 42"
-        )
+        self.mock_logger.info.assert_any_call("Successfully retrieved agent talk time distribution for partner_id: 42")
         self.mock_collection.aggregate.assert_called()
         self.mock_logger.debug.assert_any_call(
             f"Retrieving agent talk time distribution for partner_id: 42, "
@@ -194,9 +178,7 @@ class TestAnalyticsRepository:
                 "total_talk_time": 1000,
             }
         ]
-        self.mock_collection.aggregate.return_value.to_list = AsyncMock(
-            return_value=fake_result
-        )
+        self.mock_collection.aggregate.return_value.to_list = AsyncMock(return_value=fake_result)
         mock_adjust.return_value = (1000, 2000, TalkoDateRangePeriod.CUSTOM.value)
         self.mock_query_builder.build_query.return_value = {
             analytics_constants.PARTNER_ID: 42,
@@ -215,9 +197,7 @@ class TestAnalyticsRepository:
             limit=10,
             offset=1,
         )
-        self.mock_logger.info.assert_any_call(
-            "Successfully retrieved partner workspace analytics for partner_id: 42"
-        )
+        self.mock_logger.info.assert_any_call("Successfully retrieved partner workspace analytics for partner_id: 42")
         self.mock_collection.aggregate.assert_called()
         self.mock_logger.debug.assert_any_call(
             f"Retrieving partner workspace analytics for partner_id: 42, "
@@ -245,12 +225,8 @@ class TestAnalyticsRepository:
 
         # Create mock helper and attach async mocks
         mock_helper = MagicMock()
-        mock_helper.prepare_query_params = AsyncMock(
-            return_value=(fake_query, 1000, 2000, None)
-        )
-        mock_helper.get_projection_and_sort_for_trends = AsyncMock(
-            return_value=(fake_projection, fake_sort_order)
-        )
+        mock_helper.prepare_query_params = AsyncMock(return_value=(fake_query, 1000, 2000, None))
+        mock_helper.get_projection_and_sort_for_trends = AsyncMock(return_value=(fake_projection, fake_sort_order))
         mock_helper.filter_and_format_data = AsyncMock(
             return_value=(
                 fake_filtered_docs,
@@ -265,9 +241,7 @@ class TestAnalyticsRepository:
         self.repo._TalkoAnalyticsRepository__call_trends_helper = mock_helper
 
         # Mock DB collection
-        self.mock_collection.find.return_value.to_list = AsyncMock(
-            return_value=fake_cdrs
-        )
+        self.mock_collection.find.return_value.to_list = AsyncMock(return_value=fake_cdrs)
 
         # --- Act ---
         result = await self.repo.get_dashboard_call_trends(
@@ -276,6 +250,7 @@ class TestAnalyticsRepository:
             end_date=2000,
             agents=[123],
             workspace_id=[11],
+            entity_type="Lead",
             metric="total_calls",
             trend_basis="daily",
             limit=10,
@@ -290,9 +265,7 @@ class TestAnalyticsRepository:
         assert len(result["data"]) == 2
         assert result["data"][0]["date"] == "2025-10-01"
 
-        self.mock_logger.info.assert_any_call(
-            "Retrieving call trends for partner 42 — metric=total_calls, trend=daily"
-        )
+        self.mock_logger.info.assert_any_call("Retrieving call trends for partner 42 — metric=total_calls, trend=daily")
         self.mock_collection.find.assert_called_once()
         mock_helper.prepare_query_params.assert_awaited_once()
         mock_helper.get_projection_and_sort_for_trends.assert_awaited_once()

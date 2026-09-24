@@ -1,12 +1,14 @@
 import json
 import time
+
+from dependency_injector.wiring import Provide, inject
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import StreamingResponse
+
 from src.components.common.responses import TalkoInternalServerErrorResponse
 from src.core.container import TalkoContainer
 from src.loggers.talko_service_logger import TalkoServiceLogger
-from dependency_injector.wiring import Provide, inject
-from fastapi import Depends, Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import StreamingResponse
 
 
 class TalkoRequestResponseLoggingMiddleware(BaseHTTPMiddleware):
@@ -20,17 +22,13 @@ class TalkoRequestResponseLoggingMiddleware(BaseHTTPMiddleware):
         excluded_paths = ("/docs", "/openapi.json", "/robots.txt")
 
         temp_excluded_paths = (
-            "/talko-service/v1/upload_digital_asset",
             "/talko-service/v1/update_constant",
             "/talko-service/v1/reports/daily-lead-connection-csv",
             "/reports/daily-lead-connection-csv",
         )
 
         # Check if the current request path is in the excluded paths
-        if any(
-            request.url.path.startswith(path)
-            for path in excluded_paths + temp_excluded_paths
-        ):
+        if any(request.url.path.startswith(path) for path in excluded_paths + temp_excluded_paths):
             return await call_next(request)
         # Log request details
         start_time: time = time.time()
@@ -41,11 +39,7 @@ class TalkoRequestResponseLoggingMiddleware(BaseHTTPMiddleware):
                     "request_method": request.method,
                     "request_url": str(request.url),
                     "request_headers": dict(request.headers),
-                    "request_body": (
-                        json.loads(request_body.decode("utf-8"))
-                        if request_body
-                        else "No body"
-                    ),
+                    "request_body": (json.loads(request_body.decode("utf-8")) if request_body else "No body"),
                 }
             )
         )
@@ -69,12 +63,8 @@ class TalkoRequestResponseLoggingMiddleware(BaseHTTPMiddleware):
                 json.dumps(
                     {
                         "response_status_code": response.status_code,
-                        "response_body": (
-                            json.loads(response_body_str)
-                            if response_body_str
-                            else "No body"
-                        ),
-                        "response_time": "{: .4f} seconds".format(response_time),
+                        "response_body": (json.loads(response_body_str) if response_body_str else "No body"),
+                        "response_time": f"{response_time: .4f} seconds",
                     }
                 )
             )
@@ -91,9 +81,5 @@ class TalkoRequestResponseLoggingMiddleware(BaseHTTPMiddleware):
             )
 
         except Exception as exec:
-            logger.error(
-                "Error processing request in the logging request and response middleware: {}".format(
-                    exec
-                )
-            )
+            logger.error(f"Error processing request in the logging request and response middleware: {exec}")
             return TalkoInternalServerErrorResponse()

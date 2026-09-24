@@ -1,9 +1,14 @@
-from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from bson import ObjectId
 from pymongo.results import DeleteResult, InsertOneResult, UpdateResult
 
-from src.components.did_management.constants import TalkoDIDStatus, TalkoDIDType
+from src.components.did_management.constants import (
+    TalkoDIDLayer,
+    TalkoDIDStatus,
+    TalkoDIDType,
+)
 from src.components.did_management.models import TalkoDidHistoryModel, TalkoPhoneNumberManagement
 from src.core.doc_db import TalkoDocDatabaseSessionManager
 from src.loggers.talko_service_logger import TalkoServiceLogger
@@ -16,15 +21,11 @@ class TalkoDidRepository:
     Repository class for handling DID-related database operations.
     """
 
-    def __init__(
-        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
-    ) -> None:
+    def __init__(self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger) -> None:
         self.__db_manager: TalkoDocDatabaseSessionManager = db_manager
         self.__logger: TalkoServiceLogger = logger
 
-    async def insert_did_default_attendance(
-        self, did_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def insert_did_default_attendance(self, did_data: dict[str, Any]) -> dict[str, Any]:
         """
         Insert a new DID default attendance record.
 
@@ -44,10 +45,10 @@ class TalkoDidRepository:
                 result: InsertOneResult = await collection.insert_one(did_data)
                 return {**did_data, "_id": result.inserted_id}
         except Exception as e:
-            self.__logger.error("Failed to insert DID attendance: {}".format(str(e)))
+            self.__logger.error(f"Failed to insert DID attendance: {str(e)}")
             raise
 
-    async def insert_did_history(self, history_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def insert_did_history(self, history_data: dict[str, Any]) -> dict[str, Any]:
         """
         Insert a new DID history record.
 
@@ -61,18 +62,14 @@ class TalkoDidRepository:
             Exception: For unexpected errors during insertion.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoDidHistoryModel.CollectionName.DID_HISTORY
-            ) as collection:
+            async with self.__db_manager.collection(TalkoDidHistoryModel.CollectionName.DID_HISTORY) as collection:
                 result: InsertOneResult = await collection.insert_one(history_data)
                 return {**history_data, "_id": result.inserted_id}
         except Exception as e:
-            self.__logger.error("Failed to insert DID history: {}".format(str(e)))
+            self.__logger.error(f"Failed to insert DID history: {str(e)}")
             raise
 
-    async def find_did_attendance(
-        self, did_number: str, partner_id: int
-    ) -> Optional[Dict[str, Any]]:
+    async def find_did_attendance(self, did_number: str, partner_id: int) -> dict[str, Any] | None:
         """
         Find a DID attendance record by DID number and parlast_10tner ID.
 
@@ -90,16 +87,12 @@ class TalkoDidRepository:
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                return await collection.find_one(
-                    {"did_number": did_number, "partner_id": partner_id}
-                )
+                return await collection.find_one({"did_number": did_number, "partner_id": partner_id})
         except Exception as e:
-            self.__logger.error("Failed to find DID attendance: {}".format(str(e)))
+            self.__logger.error(f"Failed to find DID attendance: {str(e)}")
             raise
 
-    async def delete_did_default_attendance(
-        self, did_number: str, partner_id: int
-    ) -> bool:
+    async def delete_did_default_attendance(self, did_number: str, partner_id: int) -> bool:
         """
         Delete a DID default attendance record by DID number and partner ID.
 
@@ -117,17 +110,15 @@ class TalkoDidRepository:
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                result: DeleteResult = await collection.delete_one(
-                    {"did_number": did_number, "partner_id": partner_id}
-                )
+                result: DeleteResult = await collection.delete_one({"did_number": did_number, "partner_id": partner_id})
                 return result.deleted_count > 0
         except Exception as e:
-            self.__logger.error("Failed to delete DID attendance: {}".format(str(e)))
+            self.__logger.error(f"Failed to delete DID attendance: {str(e)}")
             raise
 
     async def update_did_history(
-        self, did_number: str, partner_id: int, update_dict: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        self, did_number: str, partner_id: int, update_dict: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """
         Update a DID history record by DID number and partner ID.
 
@@ -143,9 +134,7 @@ class TalkoDidRepository:
             Exception: For unexpected errors during update.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoDidHistoryModel.CollectionName.DID_HISTORY
-            ) as collection:
+            async with self.__db_manager.collection(TalkoDidHistoryModel.CollectionName.DID_HISTORY) as collection:
                 result: UpdateResult = await collection.find_one_and_update(
                     {"did_number": did_number, "partner_id": partner_id},
                     {"$set": update_dict},
@@ -153,10 +142,10 @@ class TalkoDidRepository:
                 )
                 return result
         except Exception as e:
-            self.__logger.error("Failed to update DID history: {}".format(str(e)))
+            self.__logger.error(f"Failed to update DID history: {str(e)}")
             raise
 
-    async def get_assigned_dids(self, vendor_id: ObjectId) -> List[str]:
+    async def get_assigned_dids(self, vendor_id: ObjectId) -> list[str]:
         """
         Fetch all assigned DIDs for a specific vendor.
 
@@ -170,11 +159,11 @@ class TalkoDidRepository:
             Exception: For unexpected errors during retrieval.
         """
         try:
-            self.__logger.info("Fetching assigned DIDs for vendor {}".format(vendor_id))
+            self.__logger.info(f"Fetching assigned DIDs for vendor {vendor_id}")
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(
                     {
                         "vendor_id": vendor_id,
                         "partner_id": {"$ne": 0},
@@ -182,16 +171,14 @@ class TalkoDidRepository:
                         "is_active": True,
                     }
                 )
-                assigned_dids: List[str] = [doc["did_number"] async for doc in cursor]
-                self.__logger.info("Fetched assigned DIDs: {}".format(assigned_dids))
+                assigned_dids: list[str] = [doc["did_number"] async for doc in cursor]
+                self.__logger.info(f"Fetched assigned DIDs: {assigned_dids}")
                 return assigned_dids
         except Exception as e:
-            self.__logger.error("Failed to fetch assigned DIDs: {}".format(str(e)))
+            self.__logger.error(f"Failed to fetch assigned DIDs: {str(e)}")
             raise
 
-    async def get_available_dids(
-        self, vendor_id: ObjectId, vendor_config_id: Optional[ObjectId] = None
-    ) -> List[str]:
+    async def get_available_dids(self, vendor_id: ObjectId, vendor_config_id: ObjectId | None = None) -> list[str]:
         """
         Fetch all available DIDs for a specific vendor.
 
@@ -205,13 +192,11 @@ class TalkoDidRepository:
             Exception: For unexpected errors during retrieval.
         """
         try:
-            self.__logger.info(
-                "Fetching available DIDs for vendor {}".format(vendor_id)
-            )
+            self.__logger.info(f"Fetching available DIDs for vendor {vendor_id}")
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(
                     {
                         "vendor_id": vendor_id,
                         "partner_id": 0,
@@ -221,16 +206,14 @@ class TalkoDidRepository:
                         "is_active": True,
                     }
                 )
-                available_dids: List[str] = [doc["did_number"] async for doc in cursor]
-                self.__logger.info("Fetched available DIDs: {}".format(available_dids))
+                available_dids: list[str] = [doc["did_number"] async for doc in cursor]
+                self.__logger.info(f"Fetched available DIDs: {available_dids}")
                 return available_dids
         except Exception as e:
-            self.__logger.error("Failed to fetch available DIDs: {}".format(str(e)))
+            self.__logger.error(f"Failed to fetch available DIDs: {str(e)}")
             raise
 
-    async def find_did_by_did_number_and_vendor_id(
-        self, did_number: str, vendor_id: ObjectId
-    ) -> Optional[Dict[str, Any]]:
+    async def find_did_by_did_number_and_vendor_id(self, did_number: str, vendor_id: ObjectId) -> dict[str, Any] | None:
         """
         Find a DID record by DID number and vendor ID.
 
@@ -245,35 +228,25 @@ class TalkoDidRepository:
             Exception: For unexpected errors during retrieval.
         """
         try:
-            self.__logger.debug(
-                "Searching for DID {} with vendor_id {}".format(did_number, vendor_id)
-            )
+            self.__logger.debug(f"Searching for DID {did_number} with vendor_id {vendor_id}")
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 query = {"did_number": did_number, "vendor_id": vendor_id}
-                self.__logger.debug("Executing query: {}".format(query))
-                result: Optional[Dict[str, Any]] = await collection.find_one(query)
+                self.__logger.debug(f"Executing query: {query}")
+                result: dict[str, Any] | None = await collection.find_one(query)
                 if result:
-                    self.__logger.debug(
-                        "Found DID {} for vendor {}".format(did_number, vendor_id)
-                    )
+                    self.__logger.debug(f"Found DID {did_number} for vendor {vendor_id}")
                     return result
-                self.__logger.warning(
-                    "DID {} not found for vendor {} with query {}".format(
-                        did_number, vendor_id, query
-                    )
-                )
+                self.__logger.warning(f"DID {did_number} not found for vendor {vendor_id} with query {query}")
                 return None
         except Exception as e:
-            self.__logger.error(
-                "Unexpected error finding DID {}: {}".format(did_number, str(e))
-            )
+            self.__logger.error(f"Unexpected error finding DID {did_number}: {str(e)}")
             raise
 
     async def update_did_attendance(
-        self, did_number: str, partner_id: int, update_data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        self, did_number: str, partner_id: int, update_data: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """
         Update a DID attendance record by DID number and assign to a partner.
 
@@ -289,63 +262,37 @@ class TalkoDidRepository:
             Exception: For unexpected errors during update.
         """
         try:
-            self.__logger.debug(
-                "Updating DID {} for partner {} with data {}".format(
-                    did_number, partner_id, update_data
-                )
-            )
+            self.__logger.debug(f"Updating DID {did_number} for partner {partner_id} with data {update_data}")
             # Read-check-then-write: needs the transaction connect() provides
             # (unlike the plain collection() helper) so the availability
             # check and the reassignment stay atomic against concurrent
             # callers racing for the same DID.
             async with self.__db_manager.connect() as db:
-                collection = db[
-                    TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
-                ]
+                collection = db[TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT]
                 query = {"did_number": did_number, "partner_id": 0}
-                self.__logger.debug("Executing initial query: {}".format(query))
-                existing_did: Optional[Dict[str, Any]] = await collection.find_one(
-                    query
-                )
+                self.__logger.debug(f"Executing initial query: {query}")
+                existing_did: dict[str, Any] | None = await collection.find_one(query)
                 if not existing_did:
-                    self.__logger.warning(
-                        "DID {} not available (partner_id != 0)".format(did_number)
-                    )
+                    self.__logger.warning(f"DID {did_number} not available (partner_id != 0)")
                     return None
 
-                update_query: Dict[str, Any] = {"did_number": did_number}
+                update_query: dict[str, Any] = {"did_number": did_number}
                 update_data["partner_id"] = partner_id
                 update_data["status_changed_at"] = TalkoDateTimeUtil().get_current_time()
-                self.__logger.debug(
-                    "Executing update query: {} with data {}".format(
-                        update_query, update_data
-                    )
-                )
+                self.__logger.debug(f"Executing update query: {update_query} with data {update_data}")
                 result: UpdateResult = await collection.find_one_and_update(
                     update_query, {"$set": update_data}, return_document=True
                 )
                 if result:
-                    self.__logger.info(
-                        "Successfully updated DID {} to partner {}".format(
-                            did_number, partner_id
-                        )
-                    )
+                    self.__logger.info(f"Successfully updated DID {did_number} to partner {partner_id}")
                     return result
-                self.__logger.warning(
-                    "Failed to update DID {} to partner {}".format(
-                        did_number, partner_id
-                    )
-                )
+                self.__logger.warning(f"Failed to update DID {did_number} to partner {partner_id}")
                 return None
         except Exception as e:
-            self.__logger.error(
-                "Unexpected error updating DID {}: {}".format(did_number, str(e))
-            )
+            self.__logger.error(f"Unexpected error updating DID {did_number}: {str(e)}")
             raise
 
-    async def get_dids_by_partner_and_vendor(
-        self, partner_id: int, vendor_id: ObjectId
-    ) -> List[str]:
+    async def get_dids_by_partner_and_vendor(self, partner_id: int, vendor_id: ObjectId) -> list[str]:
         """
         Fetch all DIDs assigned to a specific partner and vendor.
 
@@ -360,15 +307,11 @@ class TalkoDidRepository:
             Exception: For unexpected errors during retrieval.
         """
         try:
-            self.__logger.info(
-                "Fetching DIDs for partner {} and vendor {}".format(
-                    partner_id, vendor_id
-                )
-            )
+            self.__logger.info(f"Fetching DIDs for partner {partner_id} and vendor {vendor_id}")
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(
                     {
                         "partner_id": partner_id,
                         "vendor_id": vendor_id,
@@ -376,15 +319,11 @@ class TalkoDidRepository:
                         "is_active": True,
                     }
                 )
-                dids: List[str] = [doc["did_number"] async for doc in cursor]
-                self.__logger.info(
-                    "Fetched DIDs get partner and vendor: {}".format(dids)
-                )
+                dids: list[str] = [doc["did_number"] async for doc in cursor]
+                self.__logger.info(f"Fetched DIDs get partner and vendor: {dids}")
                 return dids
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch DIDs for partner {}: {}".format(partner_id, str(e))
-            )
+            self.__logger.error(f"Failed to fetch DIDs for partner {partner_id}: {str(e)}")
             raise
 
     async def get_dids_by_partner_workspace_and_vendor(
@@ -392,8 +331,8 @@ class TalkoDidRepository:
         partner_id: int,
         workspace_id: int,
         vendor_id: ObjectId,
-        vendor_config_id: Optional[ObjectId] = None,
-    ) -> List[str]:
+        vendor_config_id: ObjectId | None = None,
+    ) -> list[str]:
         """
         Fetch all DIDs for a specific partner, workspace, and vendor.
 
@@ -408,12 +347,10 @@ class TalkoDidRepository:
         """
         try:
             self.__logger.info(
-                "Fetching DIDs for partner {}, workspace {}, vendor {} and vendor_config {}".format(
-                    partner_id, workspace_id, vendor_id, vendor_config_id
-                )
+                f"Fetching DIDs for partner {partner_id}, workspace {workspace_id}, vendor {vendor_id} and vendor_config {vendor_config_id}"
             )
 
-            query: Dict[str, Any] = {
+            query: dict[str, Any] = {
                 "partner_id": partner_id,
                 "workspace_id": workspace_id,
                 "vendor_id": vendor_id,
@@ -426,28 +363,22 @@ class TalkoDidRepository:
             if vendor_config_id:
                 query["vendor_config_id"] = vendor_config_id
 
-            self.__logger.info("Executing query: {}".format(query))
+            self.__logger.info(f"Executing query: {query}")
 
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(query)
-                dids: List[str] = [doc["did_number"] async for doc in cursor]
-                self.__logger.info(
-                    "Fetched DIDs for partner workspace and vendor: {}".format(dids)
-                )
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(query)
+                dids: list[str] = [doc["did_number"] async for doc in cursor]
+                self.__logger.info(f"Fetched DIDs for partner workspace and vendor: {dids}")
                 return dids
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch DIDs for partner {}, workspace {}: {}".format(
-                    partner_id, workspace_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to fetch DIDs for partner {partner_id}, workspace {workspace_id}: {str(e)}")
             raise
 
     async def get_dids_by_partner_agent_workspace_and_vendor(
         self, partner_id: int, user_id: int, workspace_id: int, vendor_id: ObjectId
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Fetch all DIDs for a specific partner, agent, workspace, and vendor.
 
@@ -465,14 +396,12 @@ class TalkoDidRepository:
         """
         try:
             self.__logger.info(
-                "Fetching DIDs for partner {}, agent {}, workspace {}, and vendor {}".format(
-                    partner_id, user_id, workspace_id, vendor_id
-                )
+                f"Fetching DIDs for partner {partner_id}, agent {user_id}, workspace {workspace_id}, and vendor {vendor_id}"
             )
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(
                     {
                         "partner_id": partner_id,
                         "agent_id": user_id,
@@ -483,23 +412,15 @@ class TalkoDidRepository:
                     }
                 )
                 dids = [doc["did_number"] async for doc in cursor]
-                self.__logger.info(
-                    "Fetched DIDs get did by partner agent workspace and vendor: {}".format(
-                        dids
-                    )
-                )
+                self.__logger.info(f"Fetched DIDs get did by partner agent workspace and vendor: {dids}")
                 return dids
         except Exception as e:
             self.__logger.error(
-                "Failed to fetch DIDs for partner {}, agent {}, workspace {}: {}".format(
-                    partner_id, user_id, workspace_id, str(e)
-                )
+                f"Failed to fetch DIDs for partner {partner_id}, agent {user_id}, workspace {workspace_id}: {str(e)}"
             )
             raise
 
-    async def get_did_by_number(
-        self, call_to_number: str, partner_id: Optional[int] = None
-    ) -> Optional[Dict]:
+    async def get_did_by_number(self, call_to_number: str, partner_id: int | None = None) -> dict | None:
         """
         Retrieve a DID record by the last 10 digits of the phone number.
 
@@ -513,13 +434,11 @@ class TalkoDidRepository:
             Exception: For unexpected database errors.
         """
         try:
-            self.__logger.debug("Searching DID for number: {}".format(call_to_number))
+            self.__logger.debug(f"Searching DID for number: {call_to_number}")
             # Normalize: try last 10 digits and with 91 prefix
             candidates: str = normalize_phone_number(call_to_number, with_plus=False)
 
-            self.__logger.info(
-                "Normalized candidates for DID search: {}".format(candidates)
-            )
+            self.__logger.info(f"Normalized candidates for DID search: {candidates}")
 
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
@@ -527,31 +446,27 @@ class TalkoDidRepository:
                 query: dict = {"did_number": candidates, "is_active": True}
                 if partner_id is not None:
                     query["partner_id"] = partner_id
-                did_record: Optional[Dict[str, Any]] = await collection.find_one(query)
+                did_record: dict[str, Any] | None = await collection.find_one(query)
 
             if did_record:
-                self.__logger.debug("Found DID record: {}".format(did_record))
+                self.__logger.debug(f"Found DID record: {did_record}")
                 return did_record
             self.__logger.info("No DID record found for given number")
             return None
         except Exception as e:
-            self.__logger.error("Error finding DID by number: {}".format(str(e)))
+            self.__logger.error(f"Error finding DID by number: {str(e)}")
             raise
 
-    async def get_dids_by_workspace(
-        self, workspace_id: int
-    ) -> List[Dict[str, Any]]:
+    async def get_dids_by_workspace(self, workspace_id: int) -> list[dict[str, Any]]:
         """
         Fetch all DID records for a given workspace ID.
         """
         try:
-            self.__logger.info(
-                "Fetching DIDs for workspace_id={}".format(workspace_id)
-            )
+            self.__logger.info(f"Fetching DIDs for workspace_id={workspace_id}")
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(
                     {
                         "workspace_id": workspace_id,
                         "status": TalkoDIDStatus.MAPPED.value,
@@ -559,17 +474,13 @@ class TalkoDidRepository:
                         "is_active": True,
                     }
                 )
-                records: List[Dict[str, Any]] = await cursor.to_list(length=None)
+                records: list[dict[str, Any]] = await cursor.to_list(length=None)
                 return records
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch DIDs for workspace_id={}: {}".format(
-                    workspace_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to fetch DIDs for workspace_id={workspace_id}: {str(e)}")
             raise
 
-    async def get_details_by_dids(self, did_numbers: List[str]) -> List[Dict[str, Any]]:
+    async def get_details_by_dids(self, did_numbers: list[str]) -> list[dict[str, Any]]:
         """
         Fetch the _id (to be treated as instance_id) and did_number for a list of DID numbers.
 
@@ -585,10 +496,10 @@ class TalkoDidRepository:
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(
                     {"did_number": {"$in": did_numbers}}, {"did_number": 1}
                 )
-                records: List[Dict[str, Any]] = []
+                records: list[dict[str, Any]] = []
                 async for doc in cursor:
                     records.append(
                         {
@@ -597,15 +508,11 @@ class TalkoDidRepository:
                         }
                     )
 
-            self.__logger.info("Fetched DID instance details: {}".format(records))
+            self.__logger.info(f"Fetched DID instance details: {records}")
             return records
 
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch instance_id for statusDIDs {}: {}".format(
-                    did_numbers, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to fetch instance_id for DIDs {did_numbers}: {str(e)}")
             raise
 
     async def unassign_did_to_partner(self, did_number: str, partner_id: int) -> int:
@@ -615,9 +522,7 @@ class TalkoDidRepository:
         :param did_number: The DID number to unassign.
         """
         try:
-            self.__logger.info(
-                "Unassigning DiD {} to partner_id: {}".format(did_number, partner_id)
-            )
+            self.__logger.info(f"Unassigning DiD {did_number} to partner_id: {partner_id}")
 
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
@@ -634,23 +539,19 @@ class TalkoDidRepository:
                 )
 
             if result.modified_count > 0:
-                self.__logger.info("Successfully unassigned DID {}".format(did_number))
+                self.__logger.info(f"Successfully unassigned DID {did_number}")
             else:
-                self.__logger.warning(
-                    "No records updated for DID {}".format(did_number)
-                )
+                self.__logger.warning(f"No records updated for DID {did_number}")
 
             return result.modified_count > 0
 
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch instance_id for DIDs {}: {}".format(did_number, str(e))
-            )
+            self.__logger.error(f"Failed to fetch instance_id for DIDs {did_number}: {str(e)}")
             raise
 
     async def update_did_status(
-        self, did_number: str, partner_id: int, update_data: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        self, did_number: str, partner_id: int, update_data: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """
         Update a DID attendance record by DID number and assign to a partner.
 
@@ -666,66 +567,38 @@ class TalkoDidRepository:
             Exception: For unexpected errors during update.
         """
         try:
-            self.__logger.debug(
-                "Updating DID {} for partner {} with data {}".format(
-                    did_number, partner_id, update_data
-                )
-            )
+            self.__logger.debug(f"Updating DID {did_number} for partner {partner_id} with data {update_data}")
             # Read-check-then-write — see update_did_attendance's comment on
             # why this needs connect()'s transaction rather than collection().
             async with self.__db_manager.connect() as db:
-                collection = db[
-                    TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
-                ]
-                candidates: List[str] = normalize_phone_number(
-                    did_number, with_plus=False
-                )
+                collection = db[TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT]
+                candidates: list[str] = normalize_phone_number(did_number, with_plus=False)
 
-                self.__logger.info(
-                    "Normalized candidates for DID search: {}".format(candidates)
-                )
-                query: Dict[str, Any] = {
+                self.__logger.info(f"Normalized candidates for DID search: {candidates}")
+                query: dict[str, Any] = {
                     "did_number": candidates,
                     "partner_id": partner_id,
                 }
-                self.__logger.debug("Executing initial query: {}".format(query))
-                existing_did: Optional[Dict[str, Any]] = await collection.find_one(
-                    query
-                )
+                self.__logger.debug(f"Executing initial query: {query}")
+                existing_did: dict[str, Any] | None = await collection.find_one(query)
                 if not existing_did:
-                    self.__logger.warning(
-                        "DID {} not available (partner_id != 0)".format(did_number)
-                    )
+                    self.__logger.warning(f"DID {did_number} not available (partner_id != 0)")
                     return None
 
                 update_query = {"did_number": did_number}
                 update_data["partner_id"] = partner_id
                 update_data["status_changed_at"] = TalkoDateTimeUtil().get_current_time()
-                self.__logger.debug(
-                    "Executing update query: {} with data {}".format(
-                        update_query, update_data
-                    )
-                )
-                result: Optional[Dict[str, Any]] = await collection.find_one_and_update(
+                self.__logger.debug(f"Executing update query: {update_query} with data {update_data}")
+                result: dict[str, Any] | None = await collection.find_one_and_update(
                     update_query, {"$set": update_data}, return_document=True
                 )
                 if result:
-                    self.__logger.info(
-                        "Successfully updated DID {} to partner {}".format(
-                            did_number, partner_id
-                        )
-                    )
+                    self.__logger.info(f"Successfully updated DID {did_number} to partner {partner_id}")
                     return result
-                self.__logger.warning(
-                    "Failed to update DID {} to partner {}".format(
-                        did_number, partner_id
-                    )
-                )
+                self.__logger.warning(f"Failed to update DID {did_number} to partner {partner_id}")
                 return None
         except Exception as e:
-            self.__logger.error(
-                "Unexpected error updating DID {}: {}".format(did_number, str(e))
-            )
+            self.__logger.error(f"Unexpected error updating DID {did_number}: {str(e)}")
             raise
 
     async def increment_spam_count(self, did_number: str) -> bool:
@@ -742,9 +615,7 @@ class TalkoDidRepository:
             Exception: For unexpected database errors.
         """
         try:
-            self.__logger.debug(
-                "Incrementing spam_count for DID: {}".format(did_number)
-            )
+            self.__logger.debug(f"Incrementing spam_count for DID: {did_number}")
 
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
@@ -754,66 +625,46 @@ class TalkoDidRepository:
                 )
 
             if result.modified_count > 0:
-                self.__logger.info(
-                    "Successfully incremented spam_count for DID {}".format(did_number)
-                )
+                self.__logger.info(f"Successfully incremented spam_count for DID {did_number}")
                 return True
             else:
-                self.__logger.warning(
-                    "No document found to increment spam_count for DID {}".format(
-                        did_number
-                    )
-                )
+                self.__logger.warning(f"No document found to increment spam_count for DID {did_number}")
                 return False
 
         except Exception as e:
-            self.__logger.error(
-                "Failed to increment spam_count for DID {}: {}".format(
-                    did_number, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to increment spam_count for DID {did_number}: {str(e)}")
             raise
 
     async def get_dids_by_partner(
         self,
         partner_id: int,
-        user_id: Optional[int] = None,
-        workspace_id: Optional[int] = None,
-        vendor_id: Optional[ObjectId] = None,
-        vendor_config_id: Optional[ObjectId] = None,
-        status: Optional[str] = None,
-        did_number: Optional[str] = None,
-        offset: Optional[int] = None,
-        limit: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        user_id: int | None = None,
+        workspace_id: int | None = None,
+        vendor_id: ObjectId | None = None,
+        vendor_config_id: ObjectId | None = None,
+        status: str | None = None,
+        did_number: str | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Fetch all DIDs for a specific partner, agent, workspace, vendor, and status.
         """
 
         try:
             self.__logger.info(
-                "Fetching DIDs for partner {}, agent {}, workspace {}, vendor {}, vendor_config_id {}, status {}, did_number={}, offset {}, limit {}".format(
-                    partner_id,
-                    user_id,
-                    workspace_id,
-                    vendor_id,
-                    vendor_config_id,
-                    status,
-                    did_number,
-                    offset,
-                    limit,
-                )
+                f"Fetching DIDs for partner {partner_id}, agent {user_id}, workspace {workspace_id}, vendor {vendor_id}, vendor_config_id {vendor_config_id}, status {status}, did_number={did_number}, offset {offset}, limit {limit}"
             )
 
             # Base query
-            query: Dict[str, Any] = {
+            query: dict[str, Any] = {
                 "partner_id": partner_id,
                 "is_active": True,
                 "did_type": TalkoDIDType.NORMAL.value,
             }
 
             # Optional filters mapping
-            optional_filters: Dict[str, Any] = {
+            optional_filters: dict[str, Any] = {
                 "agent_id": user_id,
                 "workspace_id": workspace_id,
                 "vendor_id": vendor_id,
@@ -831,58 +682,43 @@ class TalkoDidRepository:
                 if cleaned:
                     query["did_number"] = {"$regex": cleaned, "$options": "i"}
 
-            self.__logger.debug("Executing query: {}".format(query))
+            self.__logger.debug(f"Executing query: {query}")
 
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
                 total: int = await collection.count_documents(query)
 
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
-                    query
-                ).sort("status_changed_at", -1)
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(query).sort("status_changed_at", -1)
 
                 if offset is not None and limit is not None:
                     skip: int = (offset - 1) * limit
-                    cursor: AsyncGenerator[Dict[str, Any], None] = cursor.skip(
-                        skip
-                    ).limit(limit)
+                    cursor: AsyncGenerator[dict[str, Any], None] = cursor.skip(skip).limit(limit)
 
-                docs: List[Dict[str, Any]] = [doc async for doc in cursor]
+                docs: list[dict[str, Any]] = [doc async for doc in cursor]
 
             self.__logger.info(
-                "Fetched DIDs count={} for partner={} agent={} workspace={}".format(
-                    len(docs), partner_id, user_id, workspace_id
-                )
+                f"Fetched DIDs count={len(docs)} for partner={partner_id} agent={user_id} workspace={workspace_id}"
             )
 
             return docs, total
         except Exception as e:
             self.__logger.error(
-                "Failed to fetch DIDs partner={} agent={} workspace={} error={}".format(
-                    partner_id,
-                    user_id,
-                    workspace_id,
-                    str(e),
-                )
+                f"Failed to fetch DIDs partner={partner_id} agent={user_id} workspace={workspace_id} error={str(e)}"
             )
             raise
 
     async def get_ai_agent_dids(
         self,
         partner_id: int,
-        agent_bot_id: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        agent_bot_id: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Fetch all ai_agent DIDs assigned to a given agent_bot_id.
         """
         try:
-            self.__logger.info(
-                "Fetching ai_agent DIDs for partner_id={} agent_bot_id={}".format(
-                    partner_id, agent_bot_id
-                )
-            )
-            query: Dict[str, Any] = {
+            self.__logger.info(f"Fetching ai_agent DIDs for partner_id={partner_id} agent_bot_id={agent_bot_id}")
+            query: dict[str, Any] = {
                 "partner_id": partner_id,
                 "did_type": TalkoDIDType.AI_AGENT.value,
                 "is_active": True,
@@ -893,34 +729,26 @@ class TalkoDidRepository:
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(query)
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(query)
                 return [doc async for doc in cursor]
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch ai_agent DIDs for agent_bot_id={}: {}".format(
-                    agent_bot_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to fetch ai_agent DIDs for agent_bot_id={agent_bot_id}: {str(e)}")
             raise
 
     async def get_mapped_ai_agent_dids(
         self,
         partner_id: int,
         agent_bot_id: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Fetch ai_agent DIDs with status=MAPPED for a given agent_bot_id.
         """
         try:
-            self.__logger.info(
-                "Fetching mapped ai_agent DIDs for partner_id={} agent_bot_id={}".format(
-                    partner_id, agent_bot_id
-                )
-            )
+            self.__logger.info(f"Fetching mapped ai_agent DIDs for partner_id={partner_id} agent_bot_id={agent_bot_id}")
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(
                     {
                         "partner_id": partner_id,
                         "did_type": TalkoDIDType.AI_AGENT.value,
@@ -931,51 +759,43 @@ class TalkoDidRepository:
                 )
                 return [doc async for doc in cursor]
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch mapped ai_agent DIDs for agent_bot_id={}: {}".format(
-                    agent_bot_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to fetch mapped ai_agent DIDs for agent_bot_id={agent_bot_id}: {str(e)}")
             raise
 
     async def get_available_ai_agent_dids(
         self,
         partner_id: int,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Fetch all available ai_agent DIDs for a specific partner.
         A DID is considered free if partner_id == 0 and status == AVAILABLE.
         """
         try:
-            self.__logger.info(
-                "Fetching available ai_agent DIDs for partner_id={}".format(partner_id)
-            )
+            self.__logger.info(f"Fetching available ai_agent DIDs for partner_id={partner_id}")
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                query: Dict[str, Any] = {
+                query: dict[str, Any] = {
                     "partner_id": partner_id,
                     "status": TalkoDIDStatus.AVAILABLE.value,
                     "did_type": TalkoDIDType.AI_AGENT.value,
                     "is_active": True,
                 }
 
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(query)
-                dids: List[str] = [doc["did_number"] async for doc in cursor]
-                self.__logger.info("Fetched available ai_agent DIDs: {}".format(dids))
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(query)
+                dids: list[str] = [doc["did_number"] async for doc in cursor]
+                self.__logger.info(f"Fetched available ai_agent DIDs: {dids}")
                 return dids
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch available ai_agent DIDs: {}".format(str(e))
-            )
+            self.__logger.error(f"Failed to fetch available ai_agent DIDs: {str(e)}")
             raise
 
     async def update_did_values(
         self,
         did_number: str,
-        partner_id: Optional[int] = None,
-        update_data: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        partner_id: int | None = None,
+        update_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """
         Flexible DID update method.
 
@@ -994,12 +814,10 @@ class TalkoDidRepository:
             # Read-check-then-write — see update_did_attendance's comment on
             # why this needs connect()'s transaction rather than collection().
             async with self.__db_manager.connect() as db:
-                collection = db[
-                    TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
-                ]
+                collection = db[TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT]
 
                 # === Build Find Query ===
-                find_query: Dict[str, Any] = {"did_number": did_number}
+                find_query: dict[str, Any] = {"did_number": did_number}
 
                 # Priority 1: Use partner_id passed as parameter
                 if partner_id is not None:
@@ -1013,9 +831,7 @@ class TalkoDidRepository:
 
                 existing_did = await collection.find_one(find_query)
                 if not existing_did:
-                    self.__logger.warning(
-                        f"DID {did_number} not found or not available with query: {find_query}"
-                    )
+                    self.__logger.warning(f"DID {did_number} not found or not available with query: {find_query}")
                     return None
 
                 # === Prepare Update Payload ===
@@ -1043,9 +859,7 @@ class TalkoDidRepository:
             self.__logger.error(f"Error updating DID {did_number}: {str(e)}")
             raise
 
-    async def get_display_names_by_dids(
-        self, did_numbers: List[str]
-    ) -> Dict[str, str]:
+    async def get_display_names_by_dids(self, did_numbers: list[str]) -> dict[str, str]:
         """
         Fetch display_name for a list of DID numbers, keyed by the *normalized*
         did_number (no leading '+'), since phone_number_management stores
@@ -1055,33 +869,92 @@ class TalkoDidRepository:
         if not did_numbers:
             return {}
         try:
-            normalized_numbers = [
-                normalize_phone_number(d, with_plus=False) for d in did_numbers
-            ]
-            self.__logger.info(
-                "Fetching display names for normalized DIDs: {}".format(
-                    normalized_numbers
+            normalized_numbers = [normalize_phone_number(d, with_plus=False) for d in did_numbers]
+            self.__logger.info(f"Fetching display names for normalized DIDs: {normalized_numbers}")
+            async with self.__db_manager.collection(
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+            ) as collection:
+                cursor: AsyncGenerator[dict[str, Any], None] = collection.find(
+                    {"did_number": {"$in": normalized_numbers}},
+                    {"did_number": 1, "display_name": 1},
                 )
+                display_name_map: dict[str, str] = {}
+                async for doc in cursor:
+                    display_name_map[doc["did_number"]] = doc.get("display_name") or ""
+
+            self.__logger.info(f"Fetched display name map for {len(display_name_map)} DIDs")
+            return display_name_map
+        except Exception as e:
+            self.__logger.error(f"Failed to fetch display names for DIDs {did_numbers}: {str(e)}")
+            raise
+
+    async def find_external_did(self, did_number: str, vendor_id: ObjectId | None = None) -> dict[str, Any] | None:
+        """Find an EXTERNAL layer DID by number (optionally scoped to vendor)."""
+        try:
+            query: dict[str, Any] = {
+                "did_number": did_number,
+                "did_layer": TalkoDIDLayer.EXTERNAL.value,
+            }
+            if vendor_id is not None:
+                query["vendor_id"] = vendor_id
+            async with self.__db_manager.collection(
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+            ) as collection:
+                return await collection.find_one(query)
+        except Exception as e:
+            self.__logger.error(f"Failed to find external DID {did_number}: {str(e)}")
+            raise
+
+    async def find_internal_by_parent(
+        self, parent_did_number: str, partner_id: int | None = None
+    ) -> list[dict[str, Any]]:
+        """List INTERNAL DIDs provisioned from a given EXTERNAL parent."""
+        try:
+            query: dict[str, Any] = {
+                "did_layer": TalkoDIDLayer.INTERNAL.value,
+                "parent_did_number": parent_did_number,
+            }
+            if partner_id is not None:
+                query["partner_id"] = partner_id
+            async with self.__db_manager.collection(
+                TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
+            ) as collection:
+                cursor = collection.find(query)
+                return [doc async for doc in cursor]
+        except Exception as e:
+            self.__logger.error(f"Failed to find internal DIDs for parent {parent_did_number}: {str(e)}")
+            raise
+
+    async def get_pool_utilization(self, vendor_id: ObjectId | None = None) -> list[dict[str, Any]]:
+        """Aggregate counts by (did_layer, status) for pool dashboard."""
+        try:
+            pipeline: list[dict[str, Any]] = []
+            if vendor_id is not None:
+                pipeline.append({"$match": {"vendor_id": vendor_id}})
+            pipeline.append(
+                {
+                    "$group": {
+                        "_id": {
+                            "did_layer": {"$ifNull": ["$did_layer", TalkoDIDLayer.EXTERNAL.value]},
+                            "status": "$status",
+                        },
+                        "count": {"$sum": 1},
+                    }
+                }
             )
             async with self.__db_manager.collection(
                 TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
             ) as collection:
-                cursor: AsyncGenerator[Dict[str, Any], None] = collection.find(
-                    {"did_number": {"$in": normalized_numbers}},
-                    {"did_number": 1, "display_name": 1},
-                )
-                display_name_map: Dict[str, str] = {}
-                async for doc in cursor:
-                    display_name_map[doc["did_number"]] = doc.get("display_name") or ""
-
-            self.__logger.info(
-                "Fetched display name map for {} DIDs".format(len(display_name_map))
-            )
-            return display_name_map
+                cursor = collection.aggregate(pipeline)
+                rows = [doc async for doc in cursor]
+                return [
+                    {
+                        "did_layer": doc["_id"].get("did_layer", TalkoDIDLayer.EXTERNAL.value),
+                        "status": doc["_id"].get("status"),
+                        "count": doc.get("count", 0),
+                    }
+                    for doc in rows
+                ]
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch display names for DIDs {}: {}".format(
-                    did_numbers, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to get pool utilization: {str(e)}")
             raise

@@ -7,7 +7,6 @@ from src.utils.phone_number_utils import (
 
 
 class TestCleanNumber:
-
     def test_strips_whitespace(self):
         assert _clean_number("  9876543210  ") == "9876543210"
 
@@ -37,7 +36,6 @@ class TestCleanNumber:
 
 
 class TestNormalizeWithPlus:
-
     def test_12_digit_with_91_prefix(self):
         assert _normalize_with_plus("+919876543210") == "+919876543210"
 
@@ -57,7 +55,6 @@ class TestNormalizeWithPlus:
 
 
 class TestNormalizeIndianNumber:
-
     def test_10_digit_with_plus(self):
         assert _normalize_indian_number("9876543210", with_plus=True) == "+919876543210"
 
@@ -65,24 +62,16 @@ class TestNormalizeIndianNumber:
         assert _normalize_indian_number("9876543210", with_plus=False) == "919876543210"
 
     def test_12_digit_91_prefix_with_plus(self):
-        assert (
-            _normalize_indian_number("919876543210", with_plus=True) == "+919876543210"
-        )
+        assert _normalize_indian_number("919876543210", with_plus=True) == "+919876543210"
 
     def test_12_digit_91_prefix_without_plus(self):
-        assert (
-            _normalize_indian_number("919876543210", with_plus=False) == "919876543210"
-        )
+        assert _normalize_indian_number("919876543210", with_plus=False) == "919876543210"
 
     def test_11_digit_leading_zero_with_plus(self):
-        assert (
-            _normalize_indian_number("09876543210", with_plus=True) == "+919876543210"
-        )
+        assert _normalize_indian_number("09876543210", with_plus=True) == "+919876543210"
 
     def test_11_digit_leading_zero_without_plus(self):
-        assert (
-            _normalize_indian_number("09876543210", with_plus=False) == "919876543210"
-        )
+        assert _normalize_indian_number("09876543210", with_plus=False) == "919876543210"
 
     def test_empty_digits(self):
         assert _normalize_indian_number("", with_plus=True) == ""
@@ -95,7 +84,6 @@ class TestNormalizeIndianNumber:
 
 
 class TestNormalizePhoneNumber:
-
     def test_empty_string_returns_empty(self):
         assert normalize_phone_number("") == ""
 
@@ -121,9 +109,7 @@ class TestNormalizePhoneNumber:
         assert normalize_phone_number("+919876543210") == "+919876543210"
 
     def test_plus_91_10digit_without_plus(self):
-        assert (
-            normalize_phone_number("+919876543210", with_plus=False) == "919876543210"
-        )
+        assert normalize_phone_number("+919876543210", with_plus=False) == "919876543210"
 
     def test_11_digit_leading_zero_with_plus(self):
         assert normalize_phone_number("09876543210") == "+919876543210"
@@ -135,9 +121,7 @@ class TestNormalizePhoneNumber:
         assert normalize_phone_number("+91-9876543210") == "+919876543210"
 
     def test_hyphenated_plus_without_plus(self):
-        assert (
-            normalize_phone_number("+91-9876543210", with_plus=False) == "919876543210"
-        )
+        assert normalize_phone_number("+91-9876543210", with_plus=False) == "919876543210"
 
     def test_spaced_number(self):
         assert normalize_phone_number("98765 43210") == "+919876543210"

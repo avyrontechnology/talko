@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from bson import ObjectId
@@ -23,9 +23,7 @@ class TestVendorRepository:
         self.mock_db_manager.collection.return_value = collection_context
 
     async def test_insert_vendor_success(self):
-        self.collection_mock.insert_one.return_value.inserted_id = ObjectId(
-            "60d5ec49f1c2ee7a3c56a5e2"
-        )
+        self.collection_mock.insert_one.return_value.inserted_id = ObjectId("60d5ec49f1c2ee7a3c56a5e2")
         result = await self.repository.insert_vendor({"name": "Test Vendor"})
         assert isinstance(result, str)
         self.collection_mock.insert_one.assert_called_once()
@@ -50,9 +48,7 @@ class TestVendorRepository:
         self.collection_mock.find_one.return_value = {"vendor_type": "airtel"}
         result = await self.repository.find_vendor_by_type("airtel", "Airtel Vendor")
         assert result["vendor_type"] == "airtel"
-        self.collection_mock.find_one.assert_called_with(
-            {"vendor_type": "airtel", "name": "Airtel Vendor"}
-        )
+        self.collection_mock.find_one.assert_called_with({"vendor_type": "airtel", "name": "Airtel Vendor"})
 
     async def test_find_vendor_by_type_exception(self):
         self.collection_mock.find_one.side_effect = Exception("Find by type failed")
@@ -63,9 +59,7 @@ class TestVendorRepository:
         obj_id = ObjectId("60d5ec49f1c2ee7a3c56a5e2")
         self.collection_mock.find_one.return_value = {"_id": obj_id, "is_active": True}
         result = await self.repository.find_vendor_by_id(obj_id)
-        self.collection_mock.find_one.assert_called_with(
-            {"_id": obj_id, "is_active": True}
-        )
+        self.collection_mock.find_one.assert_called_with({"_id": obj_id, "is_active": True})
         assert result["_id"] == obj_id
 
     async def test_find_vendor_by_id_exception(self):
@@ -110,9 +104,7 @@ class TestVendorRepository:
 
     async def test_update_vendor_status_exception(self):
         obj_id = ObjectId()
-        self.collection_mock.find_one_and_update.side_effect = Exception(
-            "Update failed"
-        )
+        self.collection_mock.find_one_and_update.side_effect = Exception("Update failed")
 
         with pytest.raises(Exception, match="Update failed"):
             await self.repository.update_vendor_status(obj_id, True, 1234567890)
@@ -126,9 +118,7 @@ class TestVendorRepo:
         self.repository = TalkoVendorRepository(self.db_manager, self.logger)
 
         self.collection_mock = MagicMock()
-        self.db_manager.collection.return_value.__aenter__ = AsyncMock(
-            return_value=self.collection_mock
-        )
+        self.db_manager.collection.return_value.__aenter__ = AsyncMock(return_value=self.collection_mock)
         self.db_manager.collection.return_value.__aexit__ = AsyncMock(return_value=None)
 
     async def test_find_all_vendors_active_only(self):

@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from pydantic import BaseModel
 
 from src.components.custom_field.constants import (
@@ -12,18 +10,18 @@ class TalkoContract:
     class CustomFieldCreate(BaseModel):
         entity_type: TalkoCustomFieldEntityType
         field_name: str
-        field_slug: Optional[str] = None
+        field_slug: str | None = None
         data_type: TalkoCustomFieldDataType
-        choice_options: Optional[List[str]] = None
+        choice_options: list[str] | None = None
         is_required: bool = False
-        sequence: Optional[int] = None
+        sequence: int | None = None
 
     class CustomFieldUpdate(BaseModel):
-        field_name: Optional[str] = None
-        choice_options: Optional[List[str]] = None
-        is_required: Optional[bool] = None
-        sequence: Optional[int] = None
-        is_active: Optional[bool] = None
+        field_name: str | None = None
+        choice_options: list[str] | None = None
+        is_required: bool | None = None
+        sequence: int | None = None
+        is_active: bool | None = None
 
     class CustomFieldResponse(BaseModel):
         id: str
@@ -32,12 +30,12 @@ class TalkoContract:
         field_name: str
         field_slug: str
         data_type: TalkoCustomFieldDataType
-        choice_options: Optional[List[str]] = None
+        choice_options: list[str] | None = None
         is_required: bool = False
-        sequence: Optional[int] = None
+        sequence: int | None = None
         is_active: bool = True
-        created_at: Optional[int] = None
-        updated_at: Optional[int] = None
+        created_at: int | None = None
+        updated_at: int | None = None
 
     class CustomFieldCreationUpdationResponse(BaseModel):
         id: str

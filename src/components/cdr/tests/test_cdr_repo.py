@@ -44,7 +44,6 @@ class TalkoFakeCursor:
 
 @pytest.mark.asyncio
 class TestCDRRepository:
-
     @pytest.fixture
     def setup(self):
         mock_db_manager = MagicMock()
@@ -55,9 +54,7 @@ class TestCDRRepository:
     async def test_insert_cdr_success(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.insert_one = AsyncMock(
-            return_value=MagicMock(inserted_id="12345")
-        )
+        mock_collection.insert_one = AsyncMock(return_value=MagicMock(inserted_id="12345"))
         mock_cm = AsyncMock()
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
@@ -81,16 +78,12 @@ class TestCDRRepository:
     async def test_find_all_cdrs_success(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.find.return_value = TalkoFakeCursor(
-            [{"call_id": "1"}, {"call_id": "2"}]
-        )
+        mock_collection.find.return_value = TalkoFakeCursor([{"call_id": "1"}, {"call_id": "2"}])
         mock_cm = AsyncMock()
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
 
-        results = await repo.find_all_cdrs_on_the_basis_of_partner_id(
-            123, 0, 20, 23442545
-        )
+        results = await repo.find_all_cdrs_on_the_basis_of_partner_id(123, 0, 20, 23442545)
         assert results == [{"call_id": "1"}, {"call_id": "2"}]
 
     async def test_find_all_cdrs_exception(self, setup):
@@ -108,9 +101,7 @@ class TestCDRRepository:
     async def test_get_cdrs_by_criteria_success(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.find.return_value = TalkoFakeCursor(
-            [{"call_id": "1"}, {"call_id": "2"}]
-        )
+        mock_collection.find.return_value = TalkoFakeCursor([{"call_id": "1"}, {"call_id": "2"}])
         mock_cm = AsyncMock()
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
@@ -121,9 +112,7 @@ class TestCDRRepository:
     async def test_get_cdrs_by_criteria_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.find.return_value = TalkoFakeCursor(
-            raise_exc=Exception("DB failure")
-        )
+        mock_collection.find.return_value = TalkoFakeCursor(raise_exc=Exception("DB failure"))
         mock_cm = AsyncMock()
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
@@ -150,18 +139,14 @@ class TestCDRRepository:
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
 
-        results, total = await repo.find_all_call_logs_on_the_basis_of_user_id(
-            123, 2, 1, {}
-        )
+        results, total = await repo.find_all_call_logs_on_the_basis_of_user_id(123, 2, 1, {})
         assert total == 2
         assert results == [{"call_id": "1"}, {"call_id": "2"}]
 
     async def test_find_agent_call_logs_exception_branch(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.aggregate.return_value = TalkoFakeCursor(
-            raise_exc=Exception("Aggregate failed")
-        )
+        mock_collection.aggregate.return_value = TalkoFakeCursor(raise_exc=Exception("Aggregate failed"))
         mock_cm = AsyncMock()
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
@@ -239,9 +224,7 @@ class TestCDRRepositoryCustomFields:
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
 
-        result = await repo.set_custom_field_values(
-            "call-1", {"lead_source": "Web"}, 1735689600000
-        )
+        result = await repo.set_custom_field_values("call-1", {"lead_source": "Web"}, 1735689600000)
         assert result["custom_fields"] == {"lead_source": "Web"}
 
         call_args = mock_collection.find_one_and_update.call_args
@@ -253,9 +236,7 @@ class TestCDRRepositoryCustomFields:
     async def test_set_custom_field_values_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.find_one_and_update = AsyncMock(
-            side_effect=Exception("update failed")
-        )
+        mock_collection.find_one_and_update = AsyncMock(side_effect=Exception("update failed"))
         mock_cm = AsyncMock()
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm

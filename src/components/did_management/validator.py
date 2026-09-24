@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from bson import ObjectId
 
@@ -26,12 +26,10 @@ class TalkoDidValidator:
         :param logger: Logger instance for logging validation actions.
         """
         self.vendor_config_repository: TalkoVendorConfigRepository = vendor_config_repository
-        self.partner_config_repository: TalkoPartnerConfigRepository = (
-            partner_config_repository
-        )
+        self.partner_config_repository: TalkoPartnerConfigRepository = partner_config_repository
         self.logger: TalkoServiceLogger = logger
 
-    async def validate_did_assignment(self, did_data: Dict[str, Any]) -> None:
+    async def validate_did_assignment(self, did_data: dict[str, Any]) -> None:
         """
         Validate the data for assigning a DID.
 
@@ -40,11 +38,7 @@ class TalkoDidValidator:
         :raises ValueError: If validation fails.
         """
         try:
-            self.logger.info(
-                "Validating DID assignment for DID: {}".format(
-                    did_data.get("did_number")
-                )
-            )
+            self.logger.info("Validating DID assignment for DID: {}".format(did_data.get("did_number")))
 
             # Validate vendor_id
             try:
@@ -53,34 +47,22 @@ class TalkoDidValidator:
                 raise ValueError("Invalid vendor_id format.")
 
             # Check if vendor config exists
-            vendor_configs: List[Dict[str, Any]] = (
-                await self.vendor_config_repository.find_configs_by_vendor_id(vendor_id)
+            vendor_configs: list[dict[str, Any]] = await self.vendor_config_repository.find_configs_by_vendor_id(
+                vendor_id
             )
             if not vendor_configs:
-                raise ValueError(
-                    "Vendor config not found for vendor_id: {}".format(
-                        did_data["vendor_id"]
-                    )
-                )
+                raise ValueError("Vendor config not found for vendor_id: {}".format(did_data["vendor_id"]))
 
             # Check if partner config exists (optional for default assignment)
             partner_id: int = did_data.get("partner_id", 0)
             if partner_id != 0:  # Allow placeholder partner_id=0 for default
-                partner_config: Optional[Dict[str, Any]] = (
-                    await self.partner_config_repository.find_partner_config_by_id(
-                        partner_id
-                    )
+                partner_config: dict[str, Any] | None = await self.partner_config_repository.find_partner_config_by_id(
+                    partner_id
                 )
                 if not partner_config:
-                    raise ValueError(
-                        "Partner config not found for partner_id: {}".format(partner_id)
-                    )
+                    raise ValueError(f"Partner config not found for partner_id: {partner_id}")
 
-            self.logger.info(
-                "DID assignment validation successful for DID: {}".format(
-                    did_data.get("did_number")
-                )
-            )
+            self.logger.info("DID assignment validation successful for DID: {}".format(did_data.get("did_number")))
         except Exception as e:
-            self.logger.error("Failed to validate DID assignment: {}".format(str(e)))
+            self.logger.error(f"Failed to validate DID assignment: {str(e)}")
             raise

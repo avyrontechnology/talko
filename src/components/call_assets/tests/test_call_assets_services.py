@@ -1,14 +1,12 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from fastapi import HTTPException
+
+import pytest
 
 from src.components.call_assets.services import TalkoAssetService
 from src.components.digital_assets.constants import TalkoDigitalAssetEnum
-from src.components.digital_assets.schema import TalkoDigitalAssetResponse
-from src.components.call_assets.models import TalkoAssetsModel
-from src.components.digital_assets.utils import TalkoDigitalAssetUtils
 from src.components.digital_assets.storage.helper import TalkoStorageHelper
-from src.exceptions import TalkoResourceNotFound, TalkoInvalidAssetTypeError
+from src.components.digital_assets.utils import TalkoDigitalAssetUtils
+from src.exceptions import TalkoInvalidAssetTypeError, TalkoResourceNotFound
 
 
 @pytest.mark.asyncio
@@ -33,8 +31,10 @@ class TestAssetService:
         }
 
         self.mock_repo.get_digital_asset_by_partner_id.return_value = asset_doc
-        with patch.object(TalkoStorageHelper, "get_presigned_url", return_value="https://presigned.url/sample.mp3"), \
-             patch.object(TalkoDigitalAssetUtils, "is_valid_asset_type", return_value=True):
+        with (
+            patch.object(TalkoStorageHelper, "get_presigned_url", return_value="https://presigned.url/sample.mp3"),
+            patch.object(TalkoDigitalAssetUtils, "is_valid_asset_type", return_value=True),
+        ):
             result = await self.service.get_digital_asset_details(partner_id, asset_type)
 
         assert result["id"] == "abc123"
@@ -59,5 +59,5 @@ class TestAssetService:
                 await self.service.get_digital_asset_details(partner_id, asset_type)
         self.mock_logger.error.assert_called_once()
         self.mock_logger.error.assert_called_with(
-            "An unexpected error occurred while fetching digital asset details for partner_id {}: Invalid asset provided".format(partner_id)
+            f"An unexpected error occurred while fetching digital asset details for partner_id {partner_id}: Invalid asset provided"
         )

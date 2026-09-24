@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from src.components.call_operation.cdr_update import TalkoCDRUpdateTask
 from src.exceptions import TalkoBadRequestError
@@ -25,17 +25,15 @@ class TalkoVendorCDRGateway:
         # Registry for different vendors
         self._handlers = {
             "tata_tele": self._handle_tata_tele,
-            # Future vendors can be added here:
-            # "acefone": self._handle_acefone,
-            # "new_vendor": self._handle_new_vendor,
+            "otoba": self._handle_otoba,
         }
 
     async def fetch_call_details(
         self,
-        call_id: Optional[str],
-        call_uuid: Optional[str],
-        vendor_config: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        call_id: str | None,
+        call_uuid: str | None = None,
+        vendor_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Main entry point for the API.
 
@@ -47,47 +45,61 @@ class TalkoVendorCDRGateway:
             Standardized response with raw_payload and processed_result
         """
         try:
+            vendor_config = vendor_config or {}
             vendor_type: str = vendor_config.get("vendor_type")
             if not vendor_type:
                 self.__logger.error("vendor_type missing in vendor_config")
                 raise TalkoBadRequestError("vendor_type missing in vendor configuration")
 
-            cdr_config: Dict[str, Any] = vendor_config.get("cdr_url_handler", {})
+            cdr_config: dict[str, Any] = vendor_config.get("cdr_url_handler", {})
             if not cdr_config:
-                self.__logger.error(
-                    "cdr_url_handler missing for vendor_type: {}".format(vendor_type)
-                )
+                self.__logger.error(f"cdr_url_handler missing for vendor_type: {vendor_type}")
                 raise TalkoBadRequestError("TalkoCDR configuration missing")
 
             self.__logger.info(
-                "Routing call details request for call_id={}, call_uuid={} to vendor_type={}".format(
-                    call_id, call_uuid, vendor_type
-                )
+                f"Routing call details request for call_id={call_id}, call_uuid={call_uuid} to vendor_type={vendor_type}"
             )
 
             # Route to appropriate handler
             handler = self._handlers.get(vendor_type)
             if not handler:
-                self.__logger.error("Unsupported vendor_type: {}".format(vendor_type))
-                raise TalkoBadRequestError("Unsupported vendor: {}".format(vendor_type))
+                self.__logger.error(f"Unsupported vendor_type: {vendor_type}")
+                raise TalkoBadRequestError(f"Unsupported vendor: {vendor_type}")
 
             return await handler(call_id, call_uuid, cdr_config, vendor_type)
 
         except Exception as e:
-            self.__logger.error("Error in TalkoVendorCDRGateway: {}".format(str(e)))
+            self.__logger.error(f"Error in TalkoVendorCDRGateway: {str(e)}")
             raise
 
     # Vendor Specific Handlers
 
     async def _handle_tata_tele(
         self,
-        call_id: Optional[str],
-        call_uuid: Optional[str],
-        cdr_config: Dict[str, Any],
+        call_id: str | None,
+        call_uuid: str | None,
+        cdr_config: dict[str, Any],
         vendor_type: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Handle Tata Tele using existing TalkoCDRUpdateTask"""
         self.__logger.debug("Using TataTele handler via TalkoCDRUpdateTask")
+
+        return await self.__cdr_update_task.fetch_single_cdr(
+            call_id=call_id,
+            call_uuid=call_uuid,
+            cdr_config=cdr_config,
+            vendor_type=vendor_type,
+        )
+
+    async def _handle_otoba(
+        self,
+        call_id: str | None,
+        call_uuid: str | None,
+        cdr_config: dict[str, Any],
+        vendor_type: str,
+    ) -> dict[str, Any]:
+        """Handle OTOBA via TalkoCDRUpdateTask (OTOBA-normalized handler)."""
+        self.__logger.debug("Using OTOBA handler via TalkoCDRUpdateTask")
 
         return await self.__cdr_update_task.fetch_single_cdr(
             call_id=call_id,

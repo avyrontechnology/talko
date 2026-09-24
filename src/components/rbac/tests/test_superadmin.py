@@ -79,10 +79,7 @@ class TestResolveEffectivePartnerId:
     @pytest.mark.asyncio
     async def test_superadmin_may_act_on_other_partner(self):
         req = make_request({"user_id": 7, "partner_id": 2})
-        assert (
-            await resolve_effective_partner_id(req, make_grpc(hierarchy=1), make_logger(), 9)
-            == 9
-        )
+        assert await resolve_effective_partner_id(req, make_grpc(hierarchy=1), make_logger(), 9) == 9
 
     @pytest.mark.asyncio
     async def test_non_admin_cross_partner_denied(self):
@@ -111,9 +108,7 @@ class TestResolveEffectivePartnerId:
     @pytest.mark.asyncio
     async def test_scopeless_superadmin_with_override(self):
         req = make_request({"user_id": "abc", "is_superadmin": True})
-        assert (
-            await resolve_effective_partner_id(req, make_grpc(), make_logger(), 9) == 9
-        )
+        assert await resolve_effective_partner_id(req, make_grpc(), make_logger(), 9) == 9
 
 
 class TestResolveTalkoPermission:

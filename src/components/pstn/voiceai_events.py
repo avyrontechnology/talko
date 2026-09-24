@@ -23,13 +23,13 @@ verbatim so voiceai's playout-ack tracking keeps working.
 import base64
 import copy
 import json
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 # 20 ms of mulaw @ 8kHz per chunk — matches Tata's chunk counter semantics.
 CHUNK_DURATION_MS = 20
 
 
-def forward_to_voiceai(event: Dict[str, Any], chunk_hint: int = 0) -> Optional[str]:
+def forward_to_voiceai(event: dict[str, Any], chunk_hint: int = 0) -> str | None:
     """Translate one Tata-side event into a voiceai WS text frame.
 
     Returns the JSON string to send, or None when the event has no
@@ -73,7 +73,7 @@ def forward_to_voiceai(event: Dict[str, Any], chunk_hint: int = 0) -> Optional[s
     return None
 
 
-def parse_from_voiceai(raw: str) -> Tuple[Optional[str], Any]:
+def parse_from_voiceai(raw: str) -> tuple[str | None, Any]:
     """Parse one voiceai WS text frame into a (kind, payload) action.
 
     Returns:

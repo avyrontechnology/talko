@@ -40,9 +40,7 @@ class TestPartnerWebhookRepository:
         result = await repository.find_config_by_partner_id(1)
         assert result["partner_id"] == 1
 
-    async def test_update_config_not_found_raises(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_update_config_not_found_raises(self, repository, mock_db_manager, mock_logger):
         mock_collection = AsyncMock()
         mock_collection.find_one_and_update.return_value = None
         mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection

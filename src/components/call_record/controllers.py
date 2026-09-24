@@ -1,23 +1,23 @@
-from fastapi import APIRouter, Request, Depends
+from dependency_injector.wiring import Provide, inject
+from fastapi import APIRouter, Depends, Request
+
 from src.components.call_record.dto import TalkoContract
 from src.components.call_record.services import TalkoCallRecordService
-from src.core.container import TalkoContainer
-from dependency_injector.wiring import Provide, inject
 from src.components.common.constants import TalkoCurrentUserMap
+from src.components.common.responses import (
+    TalkoBadRequestResponse,
+    TalkoInternalServerErrorResponse,
+    TalkoNotFoundResponse,
+    TalkoResourceCreatedResponse,
+    TalkoSuccessResponse,
+)
 from src.components.rbac.permission_dependency import TalkoPermissionDependency
 from src.components.rbac.permission_injector import permission_check
+from src.core.container import TalkoContainer
 from src.loggers.talko_service_logger import TalkoServiceLogger
-from src.components.common.responses import (
-    TalkoSuccessResponse,
-    TalkoInternalServerErrorResponse,
-    TalkoResourceCreatedResponse,
-    TalkoNotFoundResponse,
-    TalkoBadRequestResponse,
-)
 
 
 class TalkoCallRecordController:
-
     call_record_router = APIRouter()
 
     @call_record_router.post("/call-record")
@@ -93,7 +93,7 @@ class TalkoCallRecordController:
             resp = await service.update_call_record(record_id, partner_id, record_data)
             return TalkoSuccessResponse(data=resp)
         except ValueError as er:
-            logger.error("Validation error: {}".format(er))
+            logger.error(f"Validation error: {er}")
             return TalkoBadRequestResponse(detail=str(er))
         except Exception as e:
             logger.error(f"Error updating call record: {e}")
@@ -114,7 +114,7 @@ class TalkoCallRecordController:
             await service.delete_call_record(record_id, partner_id)
             return TalkoSuccessResponse(data={"message": "Call record deleted successfully"})
         except ValueError as er:
-            logger.error("Validation error: {}".format(er))
+            logger.error(f"Validation error: {er}")
             return TalkoBadRequestResponse(detail=str(er))
         except Exception as e:
             logger.error(f"Error deleting call record: {e}")

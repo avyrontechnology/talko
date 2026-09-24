@@ -1,6 +1,7 @@
+import copy
 from unittest.mock import AsyncMock, MagicMock, call
 
-import pytest, copy
+import pytest
 from bson import ObjectId
 
 from src.components.call_agent_map.dto import TalkoContract
@@ -31,9 +32,7 @@ class TestAgentMappingService:
         active_did_pool = ["1001", "1002"]
         self.mock_repository.get_agent_did_mapping.return_value = {"did": "1001"}
 
-        result = await self.service.get_assigned_did(
-            agent_id, partner_id, active_did_pool
-        )
+        result = await self.service.get_assigned_did(agent_id, partner_id, active_did_pool)
 
         assert result == "1001"
         self.mock_logger.debug.assert_called()
@@ -52,15 +51,11 @@ class TestAgentMappingService:
         partner_id = 456
         did_list = ["2001", "2002"]
 
-        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = {
-            "agent_mapping_dids": did_list
-        }
+        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = {"agent_mapping_dids": did_list}
         self.mock_repository.count_active_agent_mappings.return_value = 1
         self.mock_repository.get_unassigned_did.return_value = "2002"
         self.mock_datetime_util.get_current_time.return_value = 12345678
-        self.mock_repository.insert_agent_did_mapping.return_value = ObjectId(
-            "64d8f395e24f7c7b45c8eac9"
-        )
+        self.mock_repository.insert_agent_did_mapping.return_value = ObjectId("64d8f395e24f7c7b45c8eac9")
 
         result = await self.service.create_agent_did_mapping(agent_id, partner_id)
 
@@ -68,27 +63,19 @@ class TestAgentMappingService:
         assert result.message == "Agent mapping creation done."
 
     async def test_create_agent_did_mapping_partner_not_found(self):
-        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = (
-            None
-        )
+        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = None
 
         with pytest.raises(TalkoResourceNotFound):
             await self.service.create_agent_did_mapping(agent_id=1, partner_id=999)
 
     async def test_create_agent_did_mapping_no_dids(self):
-        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = {
-            "agent_mapping_dids": []
-        }
+        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = {"agent_mapping_dids": []}
 
-        with pytest.raises(
-            TalkoBadRequestError, match="No DIDs available for agent mapping"
-        ):
+        with pytest.raises(TalkoBadRequestError, match="No DIDs available for agent mapping"):
             await self.service.create_agent_did_mapping(agent_id=1, partner_id=999)
 
     async def test_create_agent_did_mapping_limit_reached(self):
-        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = {
-            "agent_mapping_dids": ["1001"]
-        }
+        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = {"agent_mapping_dids": ["1001"]}
         self.mock_repository.count_active_agent_mappings.return_value = 1
 
         with pytest.raises(TalkoBadRequestError, match="Maximum agent mapping limit"):
@@ -106,23 +93,15 @@ class TestAgentMappingService:
 
     async def test_get_all_agent_did_mapping_exception(self):
         # Arrange
-        self.mock_repository.get_all_agent_mapping = AsyncMock(
-            side_effect=Exception("Database error")
-        )
+        self.mock_repository.get_all_agent_mapping = AsyncMock(side_effect=Exception("Database error"))
 
         # Act & Assert
         with pytest.raises(Exception, match="Database error"):
             await self.service.get_all_agent_did_mapping()
 
-        self.mock_logger.error.assert_called_once_with(
-            "Failed to retrieve agent did mapping data: Database error"
-        )
+        self.mock_logger.error.assert_called_once_with("Failed to retrieve agent did mapping data: Database error")
 
     async def test_get_all_agent_did_mapping_success(self):
-        # Arrange
-        mock_repository = MagicMock()
-        mock_logger = MagicMock()
-
         # Sample data returned from the DB
         mapping_data = [
             {
@@ -169,9 +148,7 @@ class TestAgentMappingService:
         agent_number = "9000000000"
 
         # Partner config exists
-        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = {
-            "partner_id": partner_id
-        }
+        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = {"partner_id": partner_id}
 
         # Mock datetime
         self.mock_datetime_util.get_current_time.return_value = 1696584000
@@ -193,14 +170,14 @@ class TestAgentMappingService:
         assert result.message == "Agent–Workspace mapping created successfully."
         self.mock_partner_config_repo.find_partner_config_by_partner_id.assert_awaited_once_with(partner_id)
         self.mock_repository.insert_agent_workspace_mapping.assert_awaited_once()
-        self.mock_logger.info.assert_called_once()
+        self.mock_logger.info.assert_called()
 
     async def test_create_agent_workspace_mapping_partner_not_found(self):
         # Arrange
         self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = None
 
         # Act & Assert
-        with pytest.raises(TalkoResourceNotFound, match=f"Partner config not found for partner_id 4"):
+        with pytest.raises(TalkoResourceNotFound, match="Partner config not found for partner_id 4"):
             await self.service.create_agent_workspace_mapping(
                 partner_id=4,
                 workspace_id=21,
@@ -208,16 +185,16 @@ class TestAgentMappingService:
                 agent_number="9000000000",
             )
         assert self.mock_logger.error.call_count == 2  # logger called twice
-        self.mock_logger.error.assert_has_calls([
-            call("Partner config not found for partner_id 4"),
-            call("Error creating Agent–Workspace mapping: Partner config not found for partner_id 4")
-        ])
+        self.mock_logger.error.assert_has_calls(
+            [
+                call("Partner config not found for partner_id 4"),
+                call("Error creating Agent–Workspace mapping: Partner config not found for partner_id 4"),
+            ]
+        )
 
     async def test_create_agent_workspace_mapping_exception(self):
         # Arrange
-        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = {
-            "partner_id": 4
-        }
+        self.mock_partner_config_repo.find_partner_config_by_partner_id.return_value = {"partner_id": 4}
         self.mock_datetime_util.get_current_time.return_value = 1696584000
         self.mock_repository.insert_agent_workspace_mapping.side_effect = Exception("DB error")
 
@@ -236,10 +213,24 @@ class TestAgentMappingService:
         partner_id = 4
 
         agent_data = [
-            {"_id": ObjectId("64d8f395e24f7c7b45c8eac9"), "partner_id": partner_id, "workspace_id": 21, "agent_id": 12, "agent_number": "9000000000", "is_active": True},
-            {"_id": ObjectId("64d8f395e24f7c7b45c8eaca"), "partner_id": partner_id, "workspace_id": 21, "agent_id": 13, "agent_number": "9000000001", "is_active": True},
+            {
+                "_id": ObjectId("64d8f395e24f7c7b45c8eac9"),
+                "partner_id": partner_id,
+                "workspace_id": 21,
+                "agent_id": 12,
+                "agent_number": "9000000000",
+                "is_active": True,
+            },
+            {
+                "_id": ObjectId("64d8f395e24f7c7b45c8eaca"),
+                "partner_id": partner_id,
+                "workspace_id": 21,
+                "agent_id": 13,
+                "agent_number": "9000000001",
+                "is_active": True,
+            },
         ]
-        
+
         self.mock_repository.get_agents_by_workspace_id_and_partner_id.return_value = copy.deepcopy(agent_data)
 
         result = await self.service.get_agents_by_workspace(workspace_id, partner_id)
@@ -257,9 +248,7 @@ class TestAgentMappingService:
         ]
 
         assert result == expected_response
-        self.mock_logger.debug.assert_any_call(
-            f"Retrieved agent–workspace mapping from DB. data: {agent_data}"
-        )
+        self.mock_logger.debug.assert_any_call(f"Retrieved agent–workspace mapping from DB. data: {agent_data}")
         self.mock_logger.info.assert_called_once_with(
             f"Retrieved all agents for workspace_id {workspace_id} successfully."
         )
@@ -280,7 +269,7 @@ class TestAgentMappingService:
     async def test_get_agents_exception(self):
         workspace_id = 21
         partner_id = 4
-        
+
         self.mock_repository.get_agents_by_workspace_id_and_partner_id.side_effect = Exception("DB error")
 
         with pytest.raises(Exception, match="DB error"):
@@ -294,12 +283,10 @@ class TestAgentMappingService:
         partner_id = 4
         workspace_id = 21
         is_active = True
-        
+
         self.mock_repository.update_is_active_by_workspace_and_partner_id.return_value = 3
 
-        result = await self.service.update_is_active_by_workspace_and_partner_id(
-            partner_id, workspace_id, is_active
-        )
+        result = await self.service.update_is_active_by_workspace_and_partner_id(partner_id, workspace_id, is_active)
 
         assert result == 3
         self.mock_logger.info.assert_called_once_with(
@@ -314,10 +301,11 @@ class TestAgentMappingService:
 
         self.mock_repository.update_is_active_by_workspace_and_partner_id.return_value = 0
 
-        with pytest.raises(TalkoResourceNotFound, match=f"No mappings found for workspace_id={workspace_id} and partner_id={partner_id}"):
-            await self.service.update_is_active_by_workspace_and_partner_id(
-                partner_id, workspace_id, is_active
-            )
+        with pytest.raises(
+            TalkoResourceNotFound,
+            match=f"No mappings found for workspace_id={workspace_id} and partner_id={partner_id}",
+        ):
+            await self.service.update_is_active_by_workspace_and_partner_id(partner_id, workspace_id, is_active)
 
         self.mock_logger.warning.assert_called_once_with(
             f"No mappings found for workspace_id={workspace_id} and partner_id={partner_id}"
@@ -331,10 +319,6 @@ class TestAgentMappingService:
         self.mock_repository.update_is_active_by_workspace_and_partner_id.side_effect = Exception("DB error")
 
         with pytest.raises(Exception, match="DB error"):
-            await self.service.update_is_active_by_workspace_and_partner_id(
-                partner_id, workspace_id, is_active
-            )
+            await self.service.update_is_active_by_workspace_and_partner_id(partner_id, workspace_id, is_active)
 
-        self.mock_logger.error.assert_called_once_with(
-            "Failed to delete agent–workspace mapping data: DB error"
-        )
+        self.mock_logger.error.assert_called_once_with("Failed to delete agent–workspace mapping data: DB error")

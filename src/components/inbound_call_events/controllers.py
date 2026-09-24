@@ -15,17 +15,16 @@ router: APIRouter = APIRouter()
 async def inbound_call_events_stream(
     websocket: WebSocket,
     partner_id: int,
-    broker: TalkoInboundCallEventBroker = Depends(
-        Provide[TalkoContainer.inbound_call_event_broker]
-    ),
+    broker: TalkoInboundCallEventBroker = Depends(Provide[TalkoContainer.inbound_call_event_broker]),
 ) -> None:
     """
     Streams inbound-call agent-dialplan events (partner_id, workspace_id,
     dedicated_did, agent_id) to a client subscribed for a given partner.
 
-    TEMPORARY: auth is bypassed here (matches the pstn/tata/stream websocket) for
-    testing. Must be restored (token query param + partner match, see git history
-    on this file) before this ships anywhere real users can reach it.
+    NOTE: no token/auth validation for now, by product decision — any client
+    that knows a partner_id can subscribe. Reintroduce ?token= validation
+    (Talko JWT / partner API key, see git history on this file) before
+    exposing this to untrusted networks.
 
     The broker MUST come in via Provide[...] (wired against the actual container
     instance created in main.py) rather than a bare `TalkoContainer.inbound_call_event_broker()`
@@ -36,7 +35,7 @@ async def inbound_call_events_stream(
     """
     await websocket.accept()
     await broker.register(partner_id, websocket)
-    logger.info("Inbound call ws connected for partner {}".format(partner_id))
+    logger.info(f"Inbound call ws connected for partner {partner_id}")
 
     try:
         while True:
@@ -46,7 +45,7 @@ async def inbound_call_events_stream(
         pass
     finally:
         broker.unregister(partner_id, websocket)
-        logger.info("Inbound call ws disconnected for partner {}".format(partner_id))
+        logger.info(f"Inbound call ws disconnected for partner {partner_id}")
 
 
 class TalkoInboundCallEventController:

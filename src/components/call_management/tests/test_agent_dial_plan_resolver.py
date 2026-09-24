@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -24,16 +23,6 @@ def mock_logger():
 
 
 @pytest.fixture
-def mock_maglo_client():
-    """Mock TalkoMagloClient"""
-    client = MagicMock()
-    client.get_agent_details = AsyncMock()
-    client.upsert_ivr_lead = AsyncMock()
-    client.reassign_lead_by_phone = AsyncMock()
-    return client
-
-
-@pytest.fixture
 def mock_agent_mapping_repo():
     """Mock TalkoAgentMappingRepository"""
     repo = MagicMock()
@@ -50,22 +39,18 @@ def mock_user_service_client():
 
 
 @pytest_asyncio.fixture
-async def resolver(mock_maglo_client, mock_agent_mapping_repo, mock_logger):
+async def resolver(mock_agent_mapping_repo, mock_logger):
     """Create TalkoAgentDialPlanResolver instance"""
     return TalkoAgentDialPlanResolver(
-        maglo_client=mock_maglo_client,
         agent_mapping_repo=mock_agent_mapping_repo,
         logger=mock_logger,
     )
 
 
 @pytest_asyncio.fixture
-async def resolver_with_availability(
-    mock_maglo_client, mock_agent_mapping_repo, mock_logger, mock_user_service_client
-):
+async def resolver_with_availability(mock_agent_mapping_repo, mock_logger, mock_user_service_client):
     """Create TalkoAgentDialPlanResolver instance wired with a user_service_client"""
     return TalkoAgentDialPlanResolver(
-        maglo_client=mock_maglo_client,
         agent_mapping_repo=mock_agent_mapping_repo,
         logger=mock_logger,
         user_service_client=mock_user_service_client,
@@ -108,17 +93,8 @@ class TestAgentDialPlanResolver:
     """Tests for TalkoAgentDialPlanResolver"""
 
     @pytest.mark.asyncio
-    async def test_resolve_for_single_agent_with_cloud_enabled(
-        self, resolver, mock_maglo_client, mock_logger
-    ):
-        """Test resolving single agent with cloud phonic enabled"""
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "name": "Test Agent",
-            "number": "+919876543210",
-            "extension": "ext123",
-            "internet_calling_enable": True,
-        }
+    async def test_resolve_for_single_agent_with_cloud_enabled(self, resolver, mock_logger):
+        """Cloud lookup removed — always falls back to the phone number."""
 
         result = await resolver.resolve_for_single_agent(
             partner_id=12,
@@ -127,23 +103,14 @@ class TestAgentDialPlanResolver:
             fallback_agent_number="+919876543210",
         )
 
-        assert result.type == "agent"
-        assert result.data == ["ext123"]
+        assert result.type == "number"
+        assert result.data == ["+919876543210"]
         assert result.ring_type == "simultaneous"
         assert result.skip_active is False
 
     @pytest.mark.asyncio
-    async def test_resolve_for_single_agent_cloud_disabled(
-        self, resolver, mock_maglo_client
-    ):
+    async def test_resolve_for_single_agent_cloud_disabled(self, resolver):
         """Test resolving single agent with cloud phonic disabled"""
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "name": "Test Agent",
-            "number": "+919876543210",
-            "extension": "ext123",
-            "internet_calling_enable": False,
-        }
 
         result = await resolver.resolve_for_single_agent(
             partner_id=12,
@@ -156,17 +123,8 @@ class TestAgentDialPlanResolver:
         assert result.data == ["+919876543210"]
 
     @pytest.mark.asyncio
-    async def test_resolve_for_single_agent_no_extension(
-        self, resolver, mock_maglo_client
-    ):
+    async def test_resolve_for_single_agent_no_extension(self, resolver):
         """Test resolving single agent with cloud enabled but no extension"""
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "name": "Test Agent",
-            "number": "+919876543210",
-            "extension": None,
-            "internet_calling_enable": True,
-        }
 
         result = await resolver.resolve_for_single_agent(
             partner_id=12,
@@ -179,18 +137,9 @@ class TestAgentDialPlanResolver:
         assert result.data == ["+919876543210"]
 
     @pytest.mark.asyncio
-    async def test_resolve_for_single_agent_no_fallback(
-        self, resolver, mock_maglo_client, mock_logger
-    ):
+    async def test_resolve_for_single_agent_no_fallback(self, resolver, mock_logger):
         """Test resolving single agent with neither a live Maglo number nor a
         fallback number available"""
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "name": "Test Agent",
-            "number": None,
-            "extension": None,
-            "internet_calling_enable": False,
-        }
 
         result = await resolver.resolve_for_single_agent(
             partner_id=12,
@@ -204,52 +153,25 @@ class TestAgentDialPlanResolver:
         mock_logger.warning.assert_called()
 
     @pytest.mark.asyncio
-    async def test_resolve_for_single_agent_prefers_live_number_over_stale_fallback(
-        self, resolver, mock_maglo_client
-    ):
-        """Regression test: the TalkoCDR-cached fallback number can go stale (e.g.
-        after the assigned agent changes) while Maglo still has the current
-        agent's real number — the live number must win."""
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "name": "Test Agent",
-            "number": "+918839749767",
-            "extension": None,
-            "internet_calling_enable": False,
-        }
+    async def test_resolve_for_single_agent_prefers_live_number_over_stale_fallback(self, resolver):
+        """No live lookup exists anymore — the caller-supplied fallback wins."""
 
         result = await resolver.resolve_for_single_agent(
             partner_id=12,
             workspace_id=70,
             agent_id=33,
-            # Stale number left over from a previous agent/TalkoCDR — must be
-            # ignored in favor of the live Maglo number above.
             fallback_agent_number="+919311634345",
         )
 
         assert result.type == "number"
-        assert result.data == ["+918839749767"]
+        assert result.data == ["+919311634345"]
 
     @pytest.mark.asyncio
-    async def test_resolve_inbound_no_cdr_with_assigned_agent(
-        self, resolver, mock_maglo_client
-    ):
-        """Test resolve_inbound_no_cdr when lead has assigned agent"""
-        mock_maglo_client.upsert_ivr_lead.return_value = {
-            "id": 100,
-            "name": "Test Lead",
-            "lead_request_id": 100,  # This is what gets returned as lead_id
-            "assigned_to": 33,
-        }
-
-        # Mock agent details
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "name": "Test Agent",
-            "number": "+919876543210",
-            "extension": "ext123",
-            "internet_calling_enable": True,
-        }
+    async def test_resolve_inbound_no_cdr_with_assigned_agent(self, resolver, mock_agent_mapping_repo):
+        """No external lead store — falls back to workspace board routing."""
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
+            {"agent_id": 33, "agent_number": "+919876543210"},
+        ]
 
         result = await resolver.resolve_inbound_no_cdr(
             customer_number="+919999999999",
@@ -259,50 +181,23 @@ class TestAgentDialPlanResolver:
             create_lead=True,
         )
 
-        assert result["lead_id"] == 100
-        assert result["lead_name"] == "Test Lead"
-        assert result["agent_id"] == 33
-        assert result["target"].type == "agent"
-        assert result["target"].data == ["ext123"]
+        assert result["lead_id"] is None
+        assert result["lead_name"] == ""
+        assert result["agent_id"] is None
+        assert result["target"].type == "number"
+        assert result["target"].data == ["+919876543210"]
         assert len(result["agent_ids"]) == 1
         assert result["agent_ids"][0]["agent_id"] == 33
 
     @pytest.mark.asyncio
-    async def test_resolve_inbound_no_cdr_no_assigned_agent(
-        self, resolver, mock_maglo_client, mock_agent_mapping_repo
-    ):
-        """Test resolve_inbound_no_cdr when no agent is assigned"""
-        mock_maglo_client.upsert_ivr_lead.return_value = {
-            "id": 100,
-            "name": "Test Lead",
-            "lead_request_id": 100,  # This is what gets returned as lead_id
-            "assigned_to": None,
-        }
-
+    async def test_resolve_inbound_no_cdr_no_assigned_agent(self, resolver, mock_agent_mapping_repo):
+        """No external lead store — rings the board's numbers."""
         # Mock workspace agents
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
 
-        # Mock agent details for multiple agents
-        mock_maglo_client.get_agent_details.side_effect = [
-            {
-                "id": 33,
-                "name": "Agent 1",
-                "number": "+919876543210",
-                "extension": "ext123",
-                "internet_calling_enable": True,
-            },
-            {
-                "id": 34,
-                "name": "Agent 2",
-                "number": "+919876543211",
-                "extension": None,
-                "internet_calling_enable": False,
-            },
-        ]
-
         result = await resolver.resolve_inbound_no_cdr(
             customer_number="+919999999999",
             call_to_number="+918888888888",
@@ -311,31 +206,19 @@ class TestAgentDialPlanResolver:
             create_lead=True,
         )
 
-        assert result["lead_id"] == 100
+        assert result["lead_id"] is None
         assert result["agent_id"] is None
-        assert result["target"].type == "agent"
+        assert result["target"].type == "number"
         assert len(result["agent_ids"]) == 2
-        assert "ext123" in result["target"].data
+        assert set(result["target"].data) == {"+919876543210", "+919876543211"}
         assert result["inbound_round_robin_next_index"] is None
 
     @pytest.mark.asyncio
-    async def test_resolve_inbound_no_cdr_round_robin_returns_next_index(
-        self, resolver, mock_maglo_client, mock_agent_mapping_repo
-    ):
+    async def test_resolve_inbound_no_cdr_round_robin_returns_next_index(self, resolver, mock_agent_mapping_repo):
         """When inbound round robin is enabled, the advanced cursor flows through to the result"""
-        mock_maglo_client.upsert_ivr_lead.return_value = {
-            "id": 100,
-            "name": "Test Lead",
-            "lead_request_id": 100,
-            "assigned_to": None,
-        }
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
-        ]
-        mock_maglo_client.get_agent_details.side_effect = [
-            {"id": 34, "extension": None, "internet_calling_enable": False},
-            {"id": 33, "extension": None, "internet_calling_enable": False},
         ]
 
         result = await resolver.resolve_inbound_no_cdr(
@@ -356,27 +239,13 @@ class TestAgentDialPlanResolver:
         assert result["inbound_round_robin_next_index"] == 0
 
     @pytest.mark.asyncio
-    async def test_resolve_inbound_no_cdr_lead_upsert_fails(
-        self, resolver, mock_maglo_client, mock_agent_mapping_repo, mock_logger
-    ):
-        """Test resolve_inbound_no_cdr when lead upsert fails"""
-        # Mock lead creation failure
-        mock_maglo_client.upsert_ivr_lead.side_effect = Exception("API Error")
-
+    async def test_resolve_inbound_no_cdr_lead_upsert_fails(self, resolver, mock_agent_mapping_repo, mock_logger):
+        """No external lead store — same no-lead board fallback as success path."""
         # Mock workspace agents (fallback path)
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"}
         ]
 
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "name": "Agent",
-            "number": "+919876543210",
-            "extension": None,
-            "internet_calling_enable": False,
-        }
-
-        # FIXED: Added create_lead=True to trigger the lead creation code path
         result = await resolver.resolve_inbound_no_cdr(
             customer_number="+919999999999",
             call_to_number="+918888888888",
@@ -386,101 +255,53 @@ class TestAgentDialPlanResolver:
         )
 
         assert result["lead_id"] is None
-        assert result["lead_name"] is None
+        assert result["lead_name"] == ""
         assert result["agent_id"] is None
-        mock_logger.error.assert_called()
+        assert result["target"].type == "number"
 
     @pytest.mark.asyncio
-    async def test_resolve_single_assigned_agent_cloud_enabled(
-        self, resolver, mock_maglo_client
-    ):
-        """Test _resolve_single_assigned_agent with cloud enabled"""
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "name": "Test Agent",
-            "number": "+919876543210",
-            "extension": "ext123",
-            "internet_calling_enable": True,
-        }
+    async def test_resolve_single_assigned_agent_cloud_enabled(self, resolver):
+        """Cloud lookup removed — falls back to number routing (no number known)."""
 
-        target, agent_ids = await resolver._resolve_single_assigned_agent(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
-
-        assert target.type == "agent"
-        assert target.data == ["ext123"]
-        assert len(agent_ids) == 1
-        assert agent_ids[0]["agent_id"] == 33
-        assert agent_ids[0]["cloud_agent_number"] == "ext123"
-
-    @pytest.mark.asyncio
-    async def test_resolve_single_assigned_agent_cloud_disabled(
-        self, resolver, mock_maglo_client
-    ):
-        """Test _resolve_single_assigned_agent with cloud disabled"""
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "name": "Test Agent",
-            "number": "+919876543210",
-            "extension": None,
-            "internet_calling_enable": False,
-        }
-
-        target, agent_ids = await resolver._resolve_single_assigned_agent(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
+        target, agent_ids = await resolver._resolve_single_assigned_agent(partner_id=12, workspace_id=70, agent_id=33)
 
         assert target.type == "number"
-        assert target.data == ["+919876543210"]
+        assert target.data == []
+        assert len(agent_ids) == 1
+        assert agent_ids[0]["agent_id"] == 33
         assert agent_ids[0]["cloud_agent_number"] is None
 
     @pytest.mark.asyncio
-    async def test_resolve_all_workspace_agents_mixed_cloud(
-        self, resolver, mock_maglo_client, mock_agent_mapping_repo
-    ):
-        """Test _resolve_all_workspace_agents with mix of cloud and regular"""
+    async def test_resolve_single_assigned_agent_cloud_disabled(self, resolver):
+        """Cloud lookup removed — falls back to number routing (no number known)."""
+
+        target, agent_ids = await resolver._resolve_single_assigned_agent(partner_id=12, workspace_id=70, agent_id=33)
+
+        assert target.type == "number"
+        assert target.data == []
+        assert agent_ids[0]["cloud_agent_number"] is None
+
+    @pytest.mark.asyncio
+    async def test_resolve_all_workspace_agents_mixed_cloud(self, resolver, mock_agent_mapping_repo):
+        """Cloud lookup removed — all agents ring on their board numbers."""
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
 
-        mock_maglo_client.get_agent_details.side_effect = [
-            {
-                "id": 33,
-                "extension": "ext123",
-                "internet_calling_enable": True,
-                "number": "+919876543210",
-            },
-            {
-                "id": 34,
-                "extension": None,
-                "internet_calling_enable": False,
-                "number": "+919876543211",
-            },
-        ]
+        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(partner_id=12, workspace_id=70)
 
-        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(
-            partner_id=12, workspace_id=70
-        )
-
-        assert target.type == "agent"
-        assert "ext123" in target.data
-        assert "+919876543211" in target.data
+        assert target.type == "number"
+        assert set(target.data) == {"+919876543210", "+919876543211"}
         assert target.ring_type == "simultaneous"
         assert len(agent_ids) == 2
 
     @pytest.mark.asyncio
-    async def test_resolve_all_workspace_agents_no_agents(
-        self, resolver, mock_agent_mapping_repo, mock_logger
-    ):
+    async def test_resolve_all_workspace_agents_no_agents(self, resolver, mock_agent_mapping_repo, mock_logger):
         """Test _resolve_all_workspace_agents when no agents exist"""
-        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = (
-            []
-        )
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = []
 
-        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(
-            partner_id=12, workspace_id=70
-        )
+        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(partner_id=12, workspace_id=70)
 
         assert target.type == "number"
         assert target.data == []
@@ -489,51 +310,34 @@ class TestAgentDialPlanResolver:
 
     @pytest.mark.asyncio
     async def test_resolve_all_workspace_agents_round_robin_disabled_by_default(
-        self, resolver, mock_maglo_client, mock_agent_mapping_repo
+        self, resolver, mock_agent_mapping_repo
     ):
         """Without enable_inbound_round_robin, ring order and ring_type are unchanged"""
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
-        mock_maglo_client.get_agent_details.side_effect = [
-            {"id": 33, "extension": None, "internet_calling_enable": False},
-            {"id": 34, "extension": None, "internet_calling_enable": False},
-        ]
 
-        target, agent_ids, next_index = (
-            await resolver._resolve_all_workspace_agents(
-                partner_id=12, workspace_id=70
-            )
-        )
+        target, agent_ids, next_index = await resolver._resolve_all_workspace_agents(partner_id=12, workspace_id=70)
 
         assert target.ring_type == "simultaneous"
         assert target.data == ["+919876543210", "+919876543211"]
         assert next_index is None
 
     @pytest.mark.asyncio
-    async def test_resolve_all_workspace_agents_round_robin_rotates_from_index(
-        self, resolver, mock_maglo_client, mock_agent_mapping_repo
-    ):
+    async def test_resolve_all_workspace_agents_round_robin_rotates_from_index(self, resolver, mock_agent_mapping_repo):
         """With round robin enabled, only the cursor agent is rung and ring_type is order_by"""
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
             {"agent_id": 35, "agent_number": "+919876543212"},
         ]
-        mock_maglo_client.get_agent_details.side_effect = [
-            {"id": 34, "extension": None, "internet_calling_enable": False},
-            {"id": 35, "extension": None, "internet_calling_enable": False},
-            {"id": 33, "extension": None, "internet_calling_enable": False},
-        ]
 
-        target, agent_ids, next_index = (
-            await resolver._resolve_all_workspace_agents(
-                partner_id=12,
-                workspace_id=70,
-                enable_inbound_round_robin=True,
-                inbound_round_robin_index=1,
-            )
+        target, agent_ids, next_index = await resolver._resolve_all_workspace_agents(
+            partner_id=12,
+            workspace_id=70,
+            enable_inbound_round_robin=True,
+            inbound_round_robin_index=1,
         )
 
         assert target.ring_type == "order_by"
@@ -542,26 +346,18 @@ class TestAgentDialPlanResolver:
         assert next_index == 2
 
     @pytest.mark.asyncio
-    async def test_resolve_all_workspace_agents_round_robin_wraps_index(
-        self, resolver, mock_maglo_client, mock_agent_mapping_repo
-    ):
+    async def test_resolve_all_workspace_agents_round_robin_wraps_index(self, resolver, mock_agent_mapping_repo):
         """The cursor wraps modulo the current agent count"""
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
-        mock_maglo_client.get_agent_details.side_effect = [
-            {"id": 33, "extension": None, "internet_calling_enable": False},
-            {"id": 34, "extension": None, "internet_calling_enable": False},
-        ]
 
-        target, agent_ids, next_index = (
-            await resolver._resolve_all_workspace_agents(
-                partner_id=12,
-                workspace_id=70,
-                enable_inbound_round_robin=True,
-                inbound_round_robin_index=5,
-            )
+        target, agent_ids, next_index = await resolver._resolve_all_workspace_agents(
+            partner_id=12,
+            workspace_id=70,
+            enable_inbound_round_robin=True,
+            inbound_round_robin_index=5,
         )
 
         # 5 % 2 == 1, so the cursor agent is the second one; only it is rung.
@@ -574,69 +370,40 @@ class TestAgentDialPlanResolver:
         self, resolver, mock_agent_mapping_repo
     ):
         """Round robin cursor stays unset when there's nobody to ring"""
-        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = (
-            []
-        )
+        mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = []
 
-        target, agent_ids, next_index = (
-            await resolver._resolve_all_workspace_agents(
-                partner_id=12,
-                workspace_id=70,
-                enable_inbound_round_robin=True,
-                inbound_round_robin_index=0,
-            )
+        target, agent_ids, next_index = await resolver._resolve_all_workspace_agents(
+            partner_id=12,
+            workspace_id=70,
+            enable_inbound_round_robin=True,
+            inbound_round_robin_index=0,
         )
 
         assert target.data == []
         assert next_index is None
 
     @pytest.mark.asyncio
-    async def test_resolve_all_workspace_agents_all_cloud(
-        self, resolver, mock_maglo_client, mock_agent_mapping_repo
-    ):
-        """Test _resolve_all_workspace_agents when all agents use cloud"""
+    async def test_resolve_all_workspace_agents_all_cloud(self, resolver, mock_agent_mapping_repo):
+        """Cloud lookup removed — all agents ring on their board numbers."""
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
 
-        mock_maglo_client.get_agent_details.side_effect = [
-            {
-                "id": 33,
-                "extension": "ext123",
-                "internet_calling_enable": True,
-            },
-            {
-                "id": 34,
-                "extension": "ext456",
-                "internet_calling_enable": True,
-            },
-        ]
+        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(partner_id=12, workspace_id=70)
 
-        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(
-            partner_id=12, workspace_id=70
-        )
-
-        assert target.type == "agent"
-        assert target.data == ["ext123", "ext456"]
+        assert target.type == "number"
+        assert set(target.data) == {"+919876543210", "+919876543211"}
 
     @pytest.mark.asyncio
-    async def test_no_user_service_client_rings_everyone_unfiltered(
-        self, resolver, mock_maglo_client, mock_agent_mapping_repo
-    ):
+    async def test_no_user_service_client_rings_everyone_unfiltered(self, resolver, mock_agent_mapping_repo):
         """Without a user_service_client wired, no availability filtering happens"""
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
-        mock_maglo_client.get_agent_details.side_effect = [
-            {"id": 33, "extension": None, "internet_calling_enable": False},
-            {"id": 34, "extension": None, "internet_calling_enable": False},
-        ]
 
-        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(
-            partner_id=12, workspace_id=70
-        )
+        target, agent_ids, _ = await resolver._resolve_all_workspace_agents(partner_id=12, workspace_id=70)
 
         assert len(agent_ids) == 2
         assert set(target.data) == {"+919876543210", "+919876543211"}
@@ -645,7 +412,6 @@ class TestAgentDialPlanResolver:
     async def test_filters_out_inactive_agents(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_agent_mapping_repo,
         mock_user_service_client,
     ):
@@ -658,21 +424,12 @@ class TestAgentDialPlanResolver:
             33: "Active",
             34: "On Break",
         }
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "extension": None,
-            "internet_calling_enable": False,
-        }
 
-        target, agent_ids, _ = (
-            await resolver_with_availability._resolve_all_workspace_agents(
-                partner_id=12, workspace_id=70
-            )
+        target, agent_ids, _ = await resolver_with_availability._resolve_all_workspace_agents(
+            partner_id=12, workspace_id=70
         )
 
-        mock_user_service_client.get_users_availability_status.assert_awaited_once_with(
-            [33, 34]
-        )
+        mock_user_service_client.get_users_availability_status.assert_awaited_once_with([33, 34])
         assert len(agent_ids) == 1
         assert agent_ids[0]["agent_id"] == 33
         assert target.data == ["+919876543210"]
@@ -681,7 +438,6 @@ class TestAgentDialPlanResolver:
     async def test_missing_status_defaults_to_active(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_agent_mapping_repo,
         mock_user_service_client,
     ):
@@ -694,15 +450,9 @@ class TestAgentDialPlanResolver:
         mock_user_service_client.get_users_availability_status.return_value = {
             33: "Active",
         }
-        mock_maglo_client.get_agent_details.side_effect = [
-            {"id": 33, "extension": None, "internet_calling_enable": False},
-            {"id": 34, "extension": None, "internet_calling_enable": False},
-        ]
 
-        target, agent_ids, _ = (
-            await resolver_with_availability._resolve_all_workspace_agents(
-                partner_id=12, workspace_id=70
-            )
+        target, agent_ids, _ = await resolver_with_availability._resolve_all_workspace_agents(
+            partner_id=12, workspace_id=70
         )
 
         assert len(agent_ids) == 2
@@ -712,7 +462,6 @@ class TestAgentDialPlanResolver:
     async def test_all_agents_unavailable_rings_everyone(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_agent_mapping_repo,
         mock_user_service_client,
         mock_logger,
@@ -726,30 +475,19 @@ class TestAgentDialPlanResolver:
             33: "On Break",
             34: "Offline",
         }
-        mock_maglo_client.get_agent_details.side_effect = [
-            {"id": 33, "extension": None, "internet_calling_enable": False},
-            {"id": 34, "extension": None, "internet_calling_enable": False},
-        ]
 
-        target, agent_ids, _ = (
-            await resolver_with_availability._resolve_all_workspace_agents(
-                partner_id=12, workspace_id=70
-            )
+        target, agent_ids, _ = await resolver_with_availability._resolve_all_workspace_agents(
+            partner_id=12, workspace_id=70
         )
 
         assert len(agent_ids) == 2
         assert set(target.data) == {"+919876543210", "+919876543211"}
-        mock_logger.info.assert_any_call(
-            "No agents with Active status among {}. Ringing full agent list.".format(
-                [33, 34]
-            )
-        )
+        mock_logger.info.assert_any_call(f"No agents with Active status among {[33, 34]}. Ringing full agent list.")
 
     @pytest.mark.asyncio
     async def test_availability_lookup_failure_rings_everyone(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_agent_mapping_repo,
         mock_user_service_client,
         mock_logger,
@@ -759,18 +497,10 @@ class TestAgentDialPlanResolver:
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
-        mock_user_service_client.get_users_availability_status.side_effect = Exception(
-            "console-service unavailable"
-        )
-        mock_maglo_client.get_agent_details.side_effect = [
-            {"id": 33, "extension": None, "internet_calling_enable": False},
-            {"id": 34, "extension": None, "internet_calling_enable": False},
-        ]
+        mock_user_service_client.get_users_availability_status.side_effect = Exception("console-service unavailable")
 
-        target, agent_ids, _ = (
-            await resolver_with_availability._resolve_all_workspace_agents(
-                partner_id=12, workspace_id=70
-            )
+        target, agent_ids, _ = await resolver_with_availability._resolve_all_workspace_agents(
+            partner_id=12, workspace_id=70
         )
 
         assert len(agent_ids) == 2
@@ -822,31 +552,8 @@ class TestAgentDialPlanResolver:
         mock_logger.warning.assert_called()
 
     @pytest.mark.asyncio
-    async def test_get_or_create_lead_success(self, resolver, mock_maglo_client):
-        """Test successful lead upsert"""
-        mock_maglo_client.upsert_ivr_lead.return_value = {
-            "id": 100,
-            "name": "Test Lead",
-            "assigned_to": 33,
-        }
-
-        lead_id, lead_name, assigned_agent_id = await resolver._get_or_create_lead(
-            customer_number="+919999999999",
-            partner_id=12,
-            workspace_id=70,
-        )
-
-        assert lead_id == 100
-        assert lead_name == "Test Lead"
-        assert assigned_agent_id == 33
-
-    @pytest.mark.asyncio
-    async def test_get_or_create_lead_failure(
-        self, resolver, mock_maglo_client, mock_logger
-    ):
-        """Test lead upsert failure"""
-        mock_maglo_client.upsert_ivr_lead.side_effect = Exception("API Error")
-
+    async def test_get_or_create_lead_success(self, resolver):
+        """No external lead store — always returns Nones."""
         lead_id, lead_name, assigned_agent_id = await resolver._get_or_create_lead(
             customer_number="+919999999999",
             partner_id=12,
@@ -856,87 +563,65 @@ class TestAgentDialPlanResolver:
         assert lead_id is None
         assert lead_name is None
         assert assigned_agent_id is None
-        mock_logger.error.assert_called()
 
     @pytest.mark.asyncio
-    async def test_get_cloud_phonic_info_success(self, resolver, mock_maglo_client):
-        """Test successful cloud phonic info retrieval"""
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "name": "Test Agent",
-            "number": "+919876543210",
-            "extension": "ext123",
-            "internet_calling_enable": True,
-        }
+    async def test_get_or_create_lead_failure(self, resolver, mock_logger):
+        """No external lead store — always returns Nones."""
+        lead_id, lead_name, assigned_agent_id = await resolver._get_or_create_lead(
+            customer_number="+919999999999",
+            partner_id=12,
+            workspace_id=70,
+        )
 
+        assert lead_id is None
+        assert lead_name is None
+        assert assigned_agent_id is None
+
+    @pytest.mark.asyncio
+    async def test_get_cloud_phonic_info_success(self, resolver):
+        """Cloud lookup removed — always disabled/empty."""
         (
             is_cloud,
             extension,
             agent_id,
             agent_name,
             agent_number,
-        ) = await resolver._get_cloud_phonic_info(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
-
-        assert is_cloud is True
-        assert extension == "ext123"
-        assert agent_id == 33
-        assert agent_name == "Test Agent"
-        assert agent_number == "+919876543210"
-
-    @pytest.mark.asyncio
-    async def test_get_cloud_phonic_info_404_error(
-        self, resolver, mock_maglo_client, mock_logger
-    ):
-        """Test cloud phonic info with 404 error"""
-        mock_maglo_client.get_agent_details.side_effect = ValueError(
-            "Maglo error 404: Workspace with id not found"
-        )
-
-        result = await resolver._get_cloud_phonic_info(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
-
-        assert result == (False, None, None, None, None)
-        mock_logger.warning.assert_called()
-
-    @pytest.mark.asyncio
-    async def test_get_cloud_phonic_info_general_error(
-        self, resolver, mock_maglo_client, mock_logger
-    ):
-        """Test cloud phonic info with general error"""
-        mock_maglo_client.get_agent_details.side_effect = Exception("Connection error")
-
-        result = await resolver._get_cloud_phonic_info(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
-
-        assert result == (False, None, None, None, None)
-        mock_logger.error.assert_called()
-
-    @pytest.mark.asyncio
-    async def test_get_cloud_phonic_info_missing_fields(
-        self, resolver, mock_maglo_client
-    ):
-        """Test cloud phonic info with missing optional fields"""
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-        }
-
-        (
-            is_cloud,
-            extension,
-            agent_id,
-            agent_name,
-            agent_number,
-        ) = await resolver._get_cloud_phonic_info(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
+        ) = await resolver._get_cloud_phonic_info(partner_id=12, workspace_id=70, agent_id=33)
 
         assert is_cloud is False
         assert extension is None
-        assert agent_id == 33
+        assert agent_id is None
+        assert agent_name is None
+        assert agent_number is None
+
+    @pytest.mark.asyncio
+    async def test_get_cloud_phonic_info_404_error(self, resolver, mock_logger):
+        """Cloud lookup removed — always disabled/empty."""
+        result = await resolver._get_cloud_phonic_info(partner_id=12, workspace_id=70, agent_id=33)
+
+        assert result == (False, None, None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_get_cloud_phonic_info_general_error(self, resolver, mock_logger):
+        """Cloud lookup removed — always disabled/empty."""
+        result = await resolver._get_cloud_phonic_info(partner_id=12, workspace_id=70, agent_id=33)
+
+        assert result == (False, None, None, None, None)
+
+    @pytest.mark.asyncio
+    async def test_get_cloud_phonic_info_missing_fields(self, resolver):
+        """Cloud lookup removed — always disabled/empty."""
+        (
+            is_cloud,
+            extension,
+            agent_id,
+            agent_name,
+            agent_number,
+        ) = await resolver._get_cloud_phonic_info(partner_id=12, workspace_id=70, agent_id=33)
+
+        assert is_cloud is False
+        assert extension is None
+        assert agent_id is None
         assert agent_name is None
         assert agent_number is None
 
@@ -950,29 +635,19 @@ class TestIsAgentInactive:
         assert await resolver._is_agent_inactive(33) is False
 
     @pytest.mark.asyncio
-    async def test_confirmed_active_is_not_inactive(
-        self, resolver_with_availability, mock_user_service_client
-    ):
-        mock_user_service_client.get_users_availability_status.return_value = {
-            33: "Active"
-        }
+    async def test_confirmed_active_is_not_inactive(self, resolver_with_availability, mock_user_service_client):
+        mock_user_service_client.get_users_availability_status.return_value = {33: "Active"}
 
         assert await resolver_with_availability._is_agent_inactive(33) is False
 
     @pytest.mark.asyncio
-    async def test_confirmed_non_active_is_inactive(
-        self, resolver_with_availability, mock_user_service_client
-    ):
-        mock_user_service_client.get_users_availability_status.return_value = {
-            33: "On Break"
-        }
+    async def test_confirmed_non_active_is_inactive(self, resolver_with_availability, mock_user_service_client):
+        mock_user_service_client.get_users_availability_status.return_value = {33: "On Break"}
 
         assert await resolver_with_availability._is_agent_inactive(33) is True
 
     @pytest.mark.asyncio
-    async def test_missing_status_defaults_to_not_inactive(
-        self, resolver_with_availability, mock_user_service_client
-    ):
+    async def test_missing_status_defaults_to_not_inactive(self, resolver_with_availability, mock_user_service_client):
         mock_user_service_client.get_users_availability_status.return_value = {}
 
         assert await resolver_with_availability._is_agent_inactive(33) is False
@@ -981,9 +656,7 @@ class TestIsAgentInactive:
     async def test_lookup_failure_defaults_to_not_inactive(
         self, resolver_with_availability, mock_user_service_client, mock_logger
     ):
-        mock_user_service_client.get_users_availability_status.side_effect = Exception(
-            "console-service unavailable"
-        )
+        mock_user_service_client.get_users_availability_status.side_effect = Exception("console-service unavailable")
 
         assert await resolver_with_availability._is_agent_inactive(33) is False
         mock_logger.warning.assert_called()
@@ -993,9 +666,7 @@ class TestReassignToActiveAgent:
     """Tests for TalkoAgentDialPlanResolver._reassign_to_active_agent"""
 
     @pytest.mark.asyncio
-    async def test_no_other_agents_on_board_keeps_original(
-        self, resolver, mock_agent_mapping_repo, mock_logger
-    ):
+    async def test_no_other_agents_on_board_keeps_original(self, resolver, mock_agent_mapping_repo, mock_logger):
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"}
         ]
@@ -1017,9 +688,9 @@ class TestReassignToActiveAgent:
         resolver_with_availability,
         mock_agent_mapping_repo,
         mock_user_service_client,
-        mock_maglo_client,
         monkeypatch,
     ):
+        """Peer picked from board; external notify removed (reassigned stays None)."""
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
@@ -1031,33 +702,16 @@ class TestReassignToActiveAgent:
             34: "Active",
             35: "On Break",
         }
-        mock_maglo_client.reassign_lead_by_phone.return_value = {
-            "lead_request_id": 179245,
-            "lead_name": "Saurav Singh",
-            "assigned_to": 34,
-            "phone_number": "+919999999999",
-        }
 
-        new_agent_id, reassigned_lead_id = (
-            await resolver_with_availability._reassign_to_active_agent(
-                partner_id=12,
-                workspace_id=70,
-                current_agent_id=33,
-                customer_number="+919999999999",
-            )
+        new_agent_id, reassigned_lead_id = await resolver_with_availability._reassign_to_active_agent(
+            partner_id=12,
+            workspace_id=70,
+            current_agent_id=33,
+            customer_number="+919999999999",
         )
 
         assert new_agent_id == 34
-        # The Maglo call is now awaited inline so its confirmed lead_request_id
-        # can flow back onto the current call's TalkoCDR.
-        assert reassigned_lead_id == 179245
-
-        mock_maglo_client.reassign_lead_by_phone.assert_awaited_once_with(
-            phone_number="+919999999999",
-            partner_id=12,
-            workspace_id=70,
-            agent_id=34,
-        )
+        assert reassigned_lead_id is None
 
     @pytest.mark.asyncio
     async def test_no_customer_number_skips_maglo_notification(
@@ -1065,28 +719,22 @@ class TestReassignToActiveAgent:
         resolver_with_availability,
         mock_agent_mapping_repo,
         mock_user_service_client,
-        mock_maglo_client,
     ):
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
-        mock_user_service_client.get_users_availability_status.return_value = {
-            34: "Active"
-        }
+        mock_user_service_client.get_users_availability_status.return_value = {34: "Active"}
 
-        new_agent_id, reassigned_lead_id = (
-            await resolver_with_availability._reassign_to_active_agent(
-                partner_id=12,
-                workspace_id=70,
-                current_agent_id=33,
-                customer_number=None,
-            )
+        new_agent_id, reassigned_lead_id = await resolver_with_availability._reassign_to_active_agent(
+            partner_id=12,
+            workspace_id=70,
+            current_agent_id=33,
+            customer_number=None,
         )
 
         assert new_agent_id == 34
         assert reassigned_lead_id is None
-        mock_maglo_client.reassign_lead_by_phone.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_maglo_notification_failure_is_swallowed(
@@ -1094,56 +742,37 @@ class TestReassignToActiveAgent:
         resolver_with_availability,
         mock_agent_mapping_repo,
         mock_user_service_client,
-        mock_maglo_client,
         mock_logger,
     ):
-        """A failed CRM update must never bubble up and affect the live call"""
+        """Peer swap stands without any external call."""
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
         ]
-        mock_user_service_client.get_users_availability_status.return_value = {
-            34: "Active"
-        }
-        mock_maglo_client.reassign_lead_by_phone.side_effect = Exception(
-            "Maglo API down"
-        )
+        mock_user_service_client.get_users_availability_status.return_value = {34: "Active"}
 
-        new_agent_id, reassigned_lead_id = (
-            await resolver_with_availability._reassign_to_active_agent(
-                partner_id=12,
-                workspace_id=70,
-                current_agent_id=33,
-                customer_number="+919999999999",
-            )
+        new_agent_id, reassigned_lead_id = await resolver_with_availability._reassign_to_active_agent(
+            partner_id=12,
+            workspace_id=70,
+            current_agent_id=33,
+            customer_number="+919999999999",
         )
 
         assert new_agent_id == 34
         assert reassigned_lead_id is None
-        mock_logger.error.assert_called()
 
 
 class TestResolveSingleAssignedAgentReassignment:
     """Tests for the reassign_inactive_agent branch of _resolve_single_assigned_agent"""
 
     @pytest.mark.asyncio
-    async def test_flag_off_never_checks_availability(
-        self, resolver_with_availability, mock_maglo_client, mock_user_service_client
-    ):
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "number": "+919876543210",
-            "extension": None,
-            "internet_calling_enable": False,
-        }
+    async def test_flag_off_never_checks_availability(self, resolver_with_availability, mock_user_service_client):
 
-        target, agent_ids = (
-            await resolver_with_availability._resolve_single_assigned_agent(
-                partner_id=12,
-                workspace_id=70,
-                agent_id=33,
-                reassign_inactive_agent=False,
-            )
+        target, agent_ids = await resolver_with_availability._resolve_single_assigned_agent(
+            partner_id=12,
+            workspace_id=70,
+            agent_id=33,
+            reassign_inactive_agent=False,
         )
 
         assert agent_ids[0]["agent_id"] == 33
@@ -1153,28 +782,17 @@ class TestResolveSingleAssignedAgentReassignment:
     async def test_flag_on_active_agent_not_reassigned(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
-        mock_user_service_client.get_users_availability_status.return_value = {
-            33: "Active"
-        }
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "number": "+919876543210",
-            "extension": None,
-            "internet_calling_enable": False,
-        }
+        mock_user_service_client.get_users_availability_status.return_value = {33: "Active"}
 
-        target, agent_ids = (
-            await resolver_with_availability._resolve_single_assigned_agent(
-                partner_id=12,
-                workspace_id=70,
-                agent_id=33,
-                reassign_inactive_agent=True,
-                customer_number="+919999999999",
-            )
+        target, agent_ids = await resolver_with_availability._resolve_single_assigned_agent(
+            partner_id=12,
+            workspace_id=70,
+            agent_id=33,
+            reassign_inactive_agent=True,
+            customer_number="+919999999999",
         )
 
         assert agent_ids[0]["agent_id"] == 33
@@ -1184,7 +802,6 @@ class TestResolveSingleAssignedAgentReassignment:
     async def test_flag_on_inactive_agent_reassigned_to_peer(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
@@ -1200,73 +817,41 @@ class TestResolveSingleAssignedAgentReassignment:
             {33: "On Break"},
             {34: "Active"},
         ]
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 34,
-            "number": "+919876543211",
-            "extension": "ext456",
-            "internet_calling_enable": True,
-        }
 
-        target, agent_ids = (
-            await resolver_with_availability._resolve_single_assigned_agent(
-                partner_id=12,
-                workspace_id=70,
-                agent_id=33,
-                reassign_inactive_agent=True,
-                customer_number="+919999999999",
-            )
+        target, agent_ids = await resolver_with_availability._resolve_single_assigned_agent(
+            partner_id=12,
+            workspace_id=70,
+            agent_id=33,
+            reassign_inactive_agent=True,
+            customer_number="+919999999999",
         )
 
         assert agent_ids[0]["agent_id"] == 34
-        assert target.type == "agent"
-        assert target.data == ["ext456"]
-        # Agent details should have been fetched for the *new* agent, not
-        # the original inactive one.
-        mock_maglo_client.get_agent_details.assert_awaited_once_with(
-            agent_id=34, workspace_id=70
-        )
-        await asyncio.sleep(0)
-        await asyncio.sleep(0)
-        mock_maglo_client.reassign_lead_by_phone.assert_awaited_once_with(
-            phone_number="+919999999999",
-            partner_id=12,
-            workspace_id=70,
-            agent_id=34,
-        )
+        # No cloud lookup exists — the peer rings on its board number.
+        assert target.type == "number"
+        assert target.data == ["+919876543211"]
 
     @pytest.mark.asyncio
     async def test_flag_on_inactive_agent_no_peer_keeps_original(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"}
         ]
-        mock_user_service_client.get_users_availability_status.return_value = {
-            33: "On Break"
-        }
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "number": "+919876543210",
-            "extension": None,
-            "internet_calling_enable": False,
-        }
+        mock_user_service_client.get_users_availability_status.return_value = {33: "On Break"}
 
-        target, agent_ids = (
-            await resolver_with_availability._resolve_single_assigned_agent(
-                partner_id=12,
-                workspace_id=70,
-                agent_id=33,
-                reassign_inactive_agent=True,
-                customer_number="+919999999999",
-            )
+        target, agent_ids = await resolver_with_availability._resolve_single_assigned_agent(
+            partner_id=12,
+            workspace_id=70,
+            agent_id=33,
+            reassign_inactive_agent=True,
+            customer_number="+919999999999",
         )
 
         assert agent_ids[0]["agent_id"] == 33
-        mock_maglo_client.reassign_lead_by_phone.assert_not_awaited()
 
 
 class TestResolveForSingleAgentReassignment:
@@ -1274,15 +859,7 @@ class TestResolveForSingleAgentReassignment:
     (the existing-TalkoCDR path)"""
 
     @pytest.mark.asyncio
-    async def test_flag_off_never_checks_availability(
-        self, resolver_with_availability, mock_maglo_client, mock_user_service_client
-    ):
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "number": "+919876543210",
-            "extension": None,
-            "internet_calling_enable": False,
-        }
+    async def test_flag_off_never_checks_availability(self, resolver_with_availability, mock_user_service_client):
 
         result = await resolver_with_availability.resolve_for_single_agent(
             partner_id=12,
@@ -1300,19 +877,10 @@ class TestResolveForSingleAgentReassignment:
     async def test_flag_on_active_agent_not_reassigned(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
-        mock_user_service_client.get_users_availability_status.return_value = {
-            33: "Active"
-        }
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "number": "+919876543210",
-            "extension": None,
-            "internet_calling_enable": False,
-        }
+        mock_user_service_client.get_users_availability_status.return_value = {33: "Active"}
 
         result = await resolver_with_availability.resolve_for_single_agent(
             partner_id=12,
@@ -1331,7 +899,6 @@ class TestResolveForSingleAgentReassignment:
     async def test_flag_on_inactive_agent_reassigned_to_peer(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
@@ -1347,18 +914,6 @@ class TestResolveForSingleAgentReassignment:
             {33: "On Break"},
             {34: "Active"},
         ]
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 34,
-            "number": "+919876543211",
-            "extension": None,
-            "internet_calling_enable": False,
-        }
-        mock_maglo_client.reassign_lead_by_phone.return_value = {
-            "lead_request_id": 179245,
-            "lead_name": "Saurav Singh",
-            "assigned_to": 34,
-            "phone_number": "+919999999999",
-        }
 
         result = await resolver_with_availability.resolve_for_single_agent(
             partner_id=12,
@@ -1374,41 +929,20 @@ class TestResolveForSingleAgentReassignment:
         assert result.type == "number"
         assert result.data == ["+919876543211"]
         assert result.resolved_agent_id == 34
-        # Maglo's confirmed lead_request_id must flow back onto the target so
-        # the caller can prioritize it over whatever the old TalkoCDR had on record.
-        assert result.reassigned_lead_id == 179245
-        # Agent details should have been fetched for the *new* agent, not
-        # the original inactive one.
-        mock_maglo_client.get_agent_details.assert_awaited_once_with(
-            agent_id=34, workspace_id=70
-        )
-        mock_maglo_client.reassign_lead_by_phone.assert_awaited_once_with(
-            phone_number="+919999999999",
-            partner_id=12,
-            workspace_id=70,
-            agent_id=34,
-        )
+        # No external confirmation exists — reassigned_lead_id stays None.
+        assert result.reassigned_lead_id is None
 
     @pytest.mark.asyncio
     async def test_flag_on_inactive_agent_no_peer_keeps_original(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"}
         ]
-        mock_user_service_client.get_users_availability_status.return_value = {
-            33: "On Break"
-        }
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 33,
-            "number": "+919876543210",
-            "extension": None,
-            "internet_calling_enable": False,
-        }
+        mock_user_service_client.get_users_availability_status.return_value = {33: "On Break"}
 
         result = await resolver_with_availability.resolve_for_single_agent(
             partner_id=12,
@@ -1421,7 +955,6 @@ class TestResolveForSingleAgentReassignment:
 
         assert result.data == ["+919876543210"]
         assert result.resolved_agent_id is None
-        mock_maglo_client.reassign_lead_by_phone.assert_not_awaited()
 
 
 class TestResolveInboundNoCdrReassignment:
@@ -1431,16 +964,9 @@ class TestResolveInboundNoCdrReassignment:
     async def test_result_reflects_reassigned_agent(
         self,
         resolver_with_availability,
-        mock_maglo_client,
         mock_user_service_client,
         mock_agent_mapping_repo,
     ):
-        mock_maglo_client.upsert_ivr_lead.return_value = {
-            "id": 100,
-            "name": "Test Lead",
-            "lead_request_id": 100,
-            "assigned_to": 33,
-        }
         mock_agent_mapping_repo.get_agents_by_workspace_id_and_partner_id.return_value = [
             {"agent_id": 33, "agent_number": "+919876543210"},
             {"agent_id": 34, "agent_number": "+919876543211"},
@@ -1449,12 +975,6 @@ class TestResolveInboundNoCdrReassignment:
             {33: "On Break"},
             {34: "Active"},
         ]
-        mock_maglo_client.get_agent_details.return_value = {
-            "id": 34,
-            "number": "+919876543211",
-            "extension": "ext456",
-            "internet_calling_enable": True,
-        }
 
         result = await resolver_with_availability.resolve_inbound_no_cdr(
             customer_number="+919999999999",
@@ -1465,11 +985,12 @@ class TestResolveInboundNoCdrReassignment:
             reassign_inactive_agent=True,
         )
 
-        # agent_id in the result (used for TalkoCDR + websocket event metadata)
-        # must be the new agent, not the stale Maglo-assigned owner.
-        assert result["agent_id"] == 34
+        # No external lead store — no assigned owner exists, so the board
+        # fallback rings and agent_id stays None.
+        assert result["agent_id"] is None
         assert result["agent_ids"][0]["agent_id"] == 34
-        assert result["target"].data == ["ext456"]
+        assert result["target"].type == "number"
+        assert result["target"].data == ["+919876543211"]
 
 
 class TestDialplanResponseBuilder:
@@ -1560,44 +1081,26 @@ class TestDialplanResponseBuilder:
         assert response[0]["transfer"]["data"] == []
 
     @pytest.mark.asyncio
-    async def test_get_cloud_phonic_info_with_nested_data_key(
-        self, resolver, mock_maglo_client
-    ):
-        """Test cloud phonic info retrieval when response has nested 'data' key"""
-        # Response with nested 'data' key
-        mock_maglo_client.get_agent_details.return_value = {
-            "data": {
-                "id": 33,
-                "name": "Test Agent",
-                "number": "+919876543210",
-                "extension": "ext123",
-                "internet_calling_enable": True,
-            }
-        }
-
+    async def test_get_cloud_phonic_info_with_nested_data_key(self, resolver):
+        """Cloud lookup removed — always disabled/empty."""
         (
             is_cloud,
             extension,
             agent_id,
             agent_name,
             agent_number,
-        ) = await resolver._get_cloud_phonic_info(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
+        ) = await resolver._get_cloud_phonic_info(partner_id=12, workspace_id=70, agent_id=33)
 
-        assert is_cloud is True
-        assert extension == "ext123"
-        assert agent_id == 33
-        assert agent_name == "Test Agent"
-        assert agent_number == "+919876543210"
+        assert is_cloud is False
+        assert extension is None
+        assert agent_id is None
+        assert agent_name is None
+        assert agent_number is None
 
     @pytest.mark.asyncio
-    async def test_get_cloud_phonic_info_with_empty_nested_data(
-        self, resolver, mock_maglo_client
-    ):
+    async def test_get_cloud_phonic_info_with_empty_nested_data(self, resolver):
         """Test cloud phonic info when nested 'data' is None or empty"""
         # Response with None nested 'data'
-        mock_maglo_client.get_agent_details.return_value = {"data": None}
 
         (
             is_cloud,
@@ -1605,9 +1108,7 @@ class TestDialplanResponseBuilder:
             agent_id,
             agent_name,
             agent_number,
-        ) = await resolver._get_cloud_phonic_info(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
+        ) = await resolver._get_cloud_phonic_info(partner_id=12, workspace_id=70, agent_id=33)
 
         assert is_cloud is False
         assert extension is None
@@ -1616,12 +1117,9 @@ class TestDialplanResponseBuilder:
         assert agent_number is None
 
     @pytest.mark.asyncio
-    async def test_get_cloud_phonic_info_with_non_dict_response(
-        self, resolver, mock_maglo_client
-    ):
+    async def test_get_cloud_phonic_info_with_non_dict_response(self, resolver):
         """Test cloud phonic info when response is not a dict"""
         # Response is not a dict (e.g., list or string)
-        mock_maglo_client.get_agent_details.return_value = "Invalid response"
 
         (
             is_cloud,
@@ -1629,9 +1127,7 @@ class TestDialplanResponseBuilder:
             agent_id,
             agent_name,
             agent_number,
-        ) = await resolver._get_cloud_phonic_info(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
+        ) = await resolver._get_cloud_phonic_info(partner_id=12, workspace_id=70, agent_id=33)
 
         assert is_cloud is False
         assert extension is None
@@ -1640,42 +1136,17 @@ class TestDialplanResponseBuilder:
         assert agent_number is None
 
     @pytest.mark.asyncio
-    async def test_get_cloud_phonic_info_404_error_different_message(
-        self, resolver, mock_maglo_client, mock_logger
-    ):
-        """Test cloud phonic info with 404 error but different message (not workspace)"""
-        # ValueError with 404 but different message
-        mock_maglo_client.get_agent_details.side_effect = ValueError(
-            "Maglo error 404: Agent not found"
-        )
-
-        result = await resolver._get_cloud_phonic_info(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
+    async def test_get_cloud_phonic_info_404_error_different_message(self, resolver, mock_logger):
+        """Cloud lookup removed — always disabled/empty, no error logged."""
+        result = await resolver._get_cloud_phonic_info(partner_id=12, workspace_id=70, agent_id=33)
 
         assert result == (False, None, None, None, None)
-        # Should call logger.error instead of logger.warning
-        mock_logger.error.assert_called()
-        # Verify the error message
-        error_call = mock_logger.error.call_args[0][0]
-        assert "Maglo API error for agent" in error_call
+        mock_logger.error.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_get_cloud_phonic_info_value_error_without_404(
-        self, resolver, mock_maglo_client, mock_logger
-    ):
-        """Test cloud phonic info with ValueError that doesn't contain '404'"""
-        # ValueError without 404
-        mock_maglo_client.get_agent_details.side_effect = ValueError(
-            "Some other Maglo error"
-        )
-
-        result = await resolver._get_cloud_phonic_info(
-            partner_id=12, workspace_id=70, agent_id=33
-        )
+    async def test_get_cloud_phonic_info_value_error_without_404(self, resolver, mock_logger):
+        """Cloud lookup removed — always disabled/empty, no error logged."""
+        result = await resolver._get_cloud_phonic_info(partner_id=12, workspace_id=70, agent_id=33)
 
         assert result == (False, None, None, None, None)
-        # Should call logger.error
-        mock_logger.error.assert_called()
-        error_call = mock_logger.error.call_args[0][0]
-        assert "Maglo API error for agent 33" in error_call
+        mock_logger.error.assert_not_called()

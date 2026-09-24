@@ -1,6 +1,3 @@
-from typing import Any, Dict, List, Optional, Union
-from unittest.mock import MagicMock, patch
-
 import pytest
 from pydantic import ValidationError
 
@@ -160,7 +157,7 @@ def test_cdr_response_valid():
         "transfer_missed_agent": [4],
         "call_hint": "urgent",
         "support_api_call": True,
-        "lead_id": "lead123",
+        "lead_id": 123,
         "sid": "sid123",
         "sname": "Service One",
         "is_incoming_from_broadcast": False,
@@ -438,9 +435,7 @@ def test_call_record_history_payload_invalid_call_status():
     data = {
         "call_status": ["answered", "invalid"],
     }
-    with pytest.raises(
-        ValidationError, match=r"Invalid call_status values: \['invalid'\]"
-    ):
+    with pytest.raises(ValidationError, match=r"Invalid call_status values: \['invalid'\]"):
         TalkoContract.CallRecordHistoryPayload(**data)
 
 

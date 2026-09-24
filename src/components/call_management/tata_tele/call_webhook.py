@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 from uuid import uuid4
 
 from src.components.analytics.constants import INBOUND
@@ -74,9 +74,7 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
             return False
         return len(cleaned) >= 10
 
-    def _preserve_entity_fields(
-        self, cdr: Dict[str, Any], updates: Dict[str, Any]
-    ) -> None:
+    def _preserve_entity_fields(self, cdr: dict[str, Any], updates: dict[str, Any]) -> None:
         """
         Preserve entity fields from existing TalkoCDR when webhook/API payload
         does not explicitly provide them. Also backfills entity_type/entity_id/
@@ -100,7 +98,7 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
             if value is not None:
                 updates[field] = value
 
-    async def _maybe_schedule_missed_call_callback(self, cdr: Dict[str, Any]) -> None:
+    async def _maybe_schedule_missed_call_callback(self, cdr: dict[str, Any]) -> None:
         """
         Hands a missed inbound call to the beat sweeper
         (missed_callback_sweeper_task, every minute), which is the normal —
@@ -124,11 +122,11 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
         from src.components.call_management.tasks import missed_callback_task_id
 
         self.logger.info(
-            "Missed inbound observed for call_uuid={} — leaving pickup to "
-            "sweeper task_id={}".format(call_uuid, missed_callback_task_id(call_uuid))
+            f"Missed inbound observed for call_uuid={call_uuid} — leaving pickup to "
+            f"sweeper task_id={missed_callback_task_id(call_uuid)}"
         )
 
-    async def process_webhook(self, payload: Dict[str, Any]) -> Dict[str, str]:
+    async def process_webhook(self, payload: dict[str, Any]) -> dict[str, str]:
         """
         Process Tata Tele webhook payload and update TalkoCDR.
 
@@ -142,10 +140,10 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
 
     async def process_cdr_api_payload(
         self,
-        payload: Dict[str, Any],
-        call_id: Optional[str] = None,
-        uuid: Optional[str] = None,
-    ) -> Dict[str, str]:
+        payload: dict[str, Any],
+        call_id: str | None = None,
+        uuid: str | None = None,
+    ) -> dict[str, str]:
         """
         Process Tata Tele TalkoCDR API payload and update TalkoCDR.
 
@@ -157,17 +155,15 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
         Returns:
             Dict[str, str]: Status response.
         """
-        return await self._process_payload(
-            payload, source=API, call_id=call_id, uuid=uuid
-        )
+        return await self._process_payload(payload, source=API, call_id=call_id, uuid=uuid)
 
     async def _process_payload(
         self,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         source: str,
-        call_id: Optional[str] = None,
-        uuid: Optional[str] = None,
-    ) -> Dict[str, str]:
+        call_id: str | None = None,
+        uuid: str | None = None,
+    ) -> dict[str, str]:
         """
         Common logic to process payload (webhook or API) and update TalkoCDR.
 
@@ -181,13 +177,11 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
             Dict[str, str]: Status response.
         """
         try:
-            self.logger.info(
-                "Processing {} {} payload: {}".format(self.vendor_type, source, payload)
-            )
+            self.logger.info(f"Processing {self.vendor_type} {source} payload: {payload}")
             # Captured before any reassignment below (the "results" unwrap
             # is API-payload-only) — this is what gets relayed to makun-ai,
             # matching exactly what Tata sent for this webhook delivery.
-            raw_payload: Dict[str, Any] = payload
+            raw_payload: dict[str, Any] = payload
 
             # Determine identifier
             if source == API:
@@ -204,32 +198,24 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
                 identifier = call_id or uuid  # type: ignore
 
             # Fetch TalkoCDR
-            cdr: dict = await self.call_repository.get_cdr_by_call_id_or_uuid(
-                str(call_id), uuid
-            )
+            cdr: dict = await self.call_repository.get_cdr_by_call_id_or_uuid(str(call_id), uuid)
             if not cdr:
-                self.logger.error("No TalkoCDR found for {}".format(identifier))
+                self.logger.error(f"No TalkoCDR found for {identifier}")
                 raise TalkoResourceNotFound(CDR_NOT_FOUND)
 
-            self.logger.debug("Webhook process payload cdr data: {}".format(cdr))
+            self.logger.debug(f"Webhook process payload cdr data: {cdr}")
 
             # Unwrap results wrapper if present (API response format)
             if "results" in payload and len(payload["results"]) > 0:
                 payload = payload["results"][0]
 
-            self.logger.debug("Actual payload data in webhook: {}".format(payload))
+            self.logger.debug(f"Actual payload data in webhook: {payload}")
 
-            field_mappings = (
-                TATA_WEBHOOK_FIELD_MAPPINGS
-                if source == WEBHOOK
-                else TATA_CDR_FIELD_MAPPING
-            )
-            self.logger.debug(
-                "Process payload field mapping: {}".format(field_mappings)
-            )
+            field_mappings = TATA_WEBHOOK_FIELD_MAPPINGS if source == WEBHOOK else TATA_CDR_FIELD_MAPPING
+            self.logger.debug(f"Process payload field mapping: {field_mappings}")
 
             # Map payload fields to TalkoCDR fields
-            updates: Dict[str, Any] = {
+            updates: dict[str, Any] = {
                 db_field: payload.get(payload_key)
                 for payload_key, db_field in field_mappings.items()
                 if payload.get(payload_key) is not None
@@ -240,17 +226,11 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
                 if isinstance(val, dict):
                     # Prefer the actual phone number field if present
                     preferred = (
-                        val.get("follow_me_number")
-                        or val.get("number")
-                        or val.get("id")
-                        or val.get("name")
-                        or None
+                        val.get("follow_me_number") or val.get("number") or val.get("id") or val.get("name") or None
                     )
                     normalized = str(preferred) if preferred else None
                     self.logger.info(
-                        "Normalized answered_agent_number from dict → '{}' ".format(
-                            normalized
-                        )
+                        f"Normalized answered_agent_number from dict → '{normalized}' "
                         + "(original keys: {}, call_id: {})".format(
                             list(val.keys()),
                             payload.get("call_id") or payload.get("uuid"),
@@ -260,23 +240,18 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
 
             self._preserve_entity_fields(cdr, updates)
 
-            self.logger.debug("Map payload fields to TalkoCDR fields: {}".format(updates))
+            self.logger.debug(f"Map payload fields to TalkoCDR fields: {updates}")
 
             # FIX: use `or []` to safely handle None agent_ids from DB
             agent_ids = cdr.get("agent_ids") or []
-            self.logger.info("Webhook agentIds: {}".format(agent_ids))
+            self.logger.info(f"Webhook agentIds: {agent_ids}")
 
             existing_agent_number = cdr.get("agent_number")
-            self.logger.info(
-                "Existing agent_number in DB: {}".format(existing_agent_number)
-            )
+            self.logger.info(f"Existing agent_number in DB: {existing_agent_number}")
 
             # FIX: Only treat existing_agent_number as valid if it is a real mobile
             # number. Cloud extensions like "0607182380010" must not block resolution.
-            is_valid_existing = bool(
-                existing_agent_number
-                and self._is_real_mobile_number(existing_agent_number)
-            )
+            is_valid_existing = bool(existing_agent_number and self._is_real_mobile_number(existing_agent_number))
 
             if not is_valid_existing:
                 answered_agent_number = ""
@@ -298,9 +273,7 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
                             payload.get("answered_agent_number")
                         )
                     )
-                    answered_agent_number = str(payload.get("answered_agent_number"))[
-                        -10:
-                    ]
+                    answered_agent_number = str(payload.get("answered_agent_number"))[-10:]
 
                 # 3. missed_agent — webhook format (list of dicts with agent_number/number)
                 missed_agent = payload.get("missed_agent")
@@ -309,45 +282,25 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
                         first_missed = missed_agent[0]
                         if isinstance(first_missed, dict):
                             # Prefer agent_number (real mobile) over number (may be extension)
-                            number = first_missed.get(
-                                "agent_number"
-                            ) or first_missed.get("number")
+                            number = first_missed.get("agent_number") or first_missed.get("number")
                             if number:
                                 answered_agent_number = str(number)[-10:]
                                 self.logger.info(
-                                    "Resolved answered_agent_number from missed_agent list: {}".format(
-                                        answered_agent_number
-                                    )
+                                    f"Resolved answered_agent_number from missed_agent list: {answered_agent_number}"
                                 )
                         else:
-                            self.logger.warning(
-                                "missed_agent[0] is not a dict: {}".format(
-                                    type(first_missed)
-                                )
-                            )
+                            self.logger.warning(f"missed_agent[0] is not a dict: {type(first_missed)}")
                     elif isinstance(missed_agent, dict):
-                        number = missed_agent.get("agent_number") or missed_agent.get(
-                            "number"
-                        )
+                        number = missed_agent.get("agent_number") or missed_agent.get("number")
                         if number:
                             answered_agent_number = str(number)[-10:]
                             self.logger.info(
-                                "Resolved answered_agent_number from missed_agent dict: {}".format(
-                                    answered_agent_number
-                                )
+                                f"Resolved answered_agent_number from missed_agent dict: {answered_agent_number}"
                             )
                     else:
-                        self.logger.warning(
-                            "Unexpected missed_agent type: {} → {}".format(
-                                type(missed_agent), missed_agent
-                            )
-                        )
+                        self.logger.warning(f"Unexpected missed_agent type: {type(missed_agent)} → {missed_agent}")
 
-                self.logger.info(
-                    "answered_agent_number after resolution: {}".format(
-                        answered_agent_number
-                    )
-                )
+                self.logger.info(f"answered_agent_number after resolution: {answered_agent_number}")
 
                 # FIX: strip whitespace and guard against empty string
                 cloud_agent_number = str(payload.get("extension_c2c") or "").strip()
@@ -358,32 +311,19 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
                         if not isinstance(agent, dict):
                             continue
 
-                        agent_number_from_list = str(agent.get("agent_number", ""))[
-                            -10:
-                        ]
-                        cloud_agent_number_list = str(
-                            agent.get("cloud_agent_number", "")
-                        ).strip()
+                        agent_number_from_list = str(agent.get("agent_number", ""))[-10:]
+                        cloud_agent_number_list = str(agent.get("cloud_agent_number", "")).strip()
 
                         self.logger.info(
-                            "Comparing agent_ids entry — agent_number_sliced: {}, cloud_agent_number: {}".format(
-                                agent_number_from_list, cloud_agent_number_list
-                            )
+                            f"Comparing agent_ids entry — agent_number_sliced: {agent_number_from_list}, cloud_agent_number: {cloud_agent_number_list}"
                         )
 
                         # Primary match: real mobile number comparison
-                        if (
-                            answered_agent_number
-                            and agent_number_from_list == answered_agent_number
-                        ):
+                        if answered_agent_number and agent_number_from_list == answered_agent_number:
                             updates["agent"] = agent.get("agent_id")
                             updates["agent_number"] = agent.get("agent_number")
-                            updates["cloud_agent_number"] = agent.get(
-                                "cloud_agent_number"
-                            )
-                            self.logger.info(
-                                "Mapped agent via agent_number match from agent_ids (softphone flow)"
-                            )
+                            updates["cloud_agent_number"] = agent.get("cloud_agent_number")
+                            self.logger.info("Mapped agent via agent_number match from agent_ids (softphone flow)")
                             break
 
                         # Secondary match: cloud extension comparison
@@ -395,9 +335,7 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
                         ):
                             updates["agent"] = agent.get("agent_id")
                             updates["agent_number"] = agent.get("agent_number")
-                            updates["cloud_agent_number"] = agent.get(
-                                "cloud_agent_number"
-                            )
+                            updates["cloud_agent_number"] = agent.get("cloud_agent_number")
                             self.logger.info(
                                 "Mapped agent via cloud_agent_number match from agent_ids (softphone flow)"
                             )
@@ -410,20 +348,14 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
                         if answered_agent_number:
                             updates["agent_number"] = answered_agent_number
                             self.logger.info(
-                                "Using fallback agent_number for inbound call (phone_number flow): {}".format(
-                                    answered_agent_number
-                                )
+                                f"Using fallback agent_number for inbound call (phone_number flow): {answered_agent_number}"
                             )
                         else:
-                            self.logger.warning(
-                                "No answered_agent_number resolved for inbound call without agent_ids"
-                            )
+                            self.logger.warning("No answered_agent_number resolved for inbound call without agent_ids")
 
             else:
                 self.logger.info(
-                    "Valid real mobile agent_number exists in DB ({}); skipping agent resolution".format(
-                        existing_agent_number
-                    )
+                    f"Valid real mobile agent_number exists in DB ({existing_agent_number}); skipping agent resolution"
                 )
                 if "agent_number" in updates:
                     updates["agent_number"] = existing_agent_number
@@ -431,18 +363,16 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
                 if "agent" in updates:
                     updates["agent"] = cdr.get("agent")
 
-            self.logger.info("Field conversion started: {}".format(updates))
+            self.logger.info(f"Field conversion started: {updates}")
 
             for ts_field in ["start_stamp", "end_stamp", "answer_stamp"]:
                 if updates.get(ts_field):
-                    self.logger.info("Converting {} to datetime".format(ts_field))
-                    updates[ts_field] = self.datetime_util.convert_date_time(
-                        updates[ts_field]
-                    )
+                    self.logger.info(f"Converting {ts_field} to datetime")
+                    updates[ts_field] = self.datetime_util.convert_date_time(updates[ts_field])
 
             for ts_field in ["total_call_duration", "talk_time"]:
                 if updates.get(ts_field):
-                    self.logger.info("Converting {} to int".format(ts_field))
+                    self.logger.info(f"Converting {ts_field} to int")
                     updates[ts_field] = int(updates[ts_field])
 
             updates["updated_at"] = self.datetime_util.get_current_time()
@@ -450,10 +380,10 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
             # Update TalkoCDR
             result: bool = await self.call_repository.update_cdr(cdr["_id"], updates)
             if not result:
-                self.logger.error("Failed to update TalkoCDR for {}".format(identifier))
+                self.logger.error(f"Failed to update TalkoCDR for {identifier}")
                 raise TalkoBadRequestError(FAILED_TO_UPDATE)
 
-            self.logger.info("Successfully updated TalkoCDR for {}".format(identifier))
+            self.logger.info(f"Successfully updated TalkoCDR for {identifier}")
 
             # AI-bridge/campaign calls complete via THIS path (Tata's
             # standard call webhook, calling_mode=clicktocall) — not
@@ -486,22 +416,15 @@ class TalkoTataTeleWebhookHandler(TalkoWebhookHandler):
                             "partner_id": partner_id,
                             "event_type": "call.completed",
                             "event_id": str(uuid4()),
-                            "payload": TalkoCommonCDRHelper.create_filtered_cdr(
-                                {**cdr, **updates}, self.logger
-                            ),
+                            "payload": TalkoCommonCDRHelper.create_filtered_cdr({**cdr, **updates}, self.logger),
                         }
                     )
 
-                if (
-                    updates.get("call_status") == "missed"
-                    and cdr.get("action") == "inbound"
-                ):
+                if updates.get("call_status") == "missed" and cdr.get("action") == "inbound":
                     await self._maybe_schedule_missed_call_callback(cdr)
 
             return {"status": "success", "call_id": str(identifier)}
 
         except Exception as e:
-            self.logger.error(
-                "Exception occurred while updating TalkoCDR: {}".format(str(e))
-            )
+            self.logger.error(f"Exception occurred while updating TalkoCDR: {str(e)}")
             raise

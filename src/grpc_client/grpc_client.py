@@ -1,15 +1,13 @@
 import asyncio
-import os
 import base64
 from functools import wraps
 
 import grpc
-
-from src.loggers.talko_rpc_logger import TalkoRPCLogger
 from dotenv import load_dotenv
-from .constants import TalkoENV
+
 from src.core.environment import TalkoENV as environment
 from src.grpc_interceptor.auth_interceptor import TalkoApiKeyClientInterceptor
+from src.loggers.talko_rpc_logger import TalkoRPCLogger
 
 logger = TalkoRPCLogger.get_logger()
 
@@ -17,12 +15,13 @@ load_dotenv()
 
 
 class TalkoGRPCClient:
-
     MAX_RETRIES = 3
     RETRY_DELAY = 2
 
-    HOST = environment.CONSOLE_GRPC_HOST
-    PORT = environment.CONSOLE_GRPC_PORT
+    # NOTE (grpc disabled for now): console endpoint vars removed from
+    # environment.py — literals kept so this dormant module still imports.
+    HOST = "localhost"
+    PORT = "50051"
 
     def __init__(self):
         logger.info("Initializing TalkoGRPCClient")
@@ -31,7 +30,7 @@ class TalkoGRPCClient:
         self.channel = self.create_channel(self.server_address)
 
     def create_channel(self, server_address):
-        logger.info("Creating gRPC channel to: {}: CA env: {}".format(server_address, environment.CA))
+        logger.info(f"Creating gRPC channel to: {server_address}: CA env: {environment.CA}")
         if environment.CA != "None":
             logger.info(f"Creating a secure gRPC channel to: {server_address}")
             return self._create_secure_channel(server_address)
@@ -43,7 +42,7 @@ class TalkoGRPCClient:
         logger.debug("Loading CA certificate for secure channel setup")
         ca_cert = environment.CA
         ca_cert = base64.b64decode(ca_cert)
-        logger.info("Creating gRPC secure channel to: {}: CA env: {}".format(server_address, ca_cert))
+        logger.info(f"Creating gRPC secure channel to: {server_address}: CA env: {ca_cert}")
         logger.info("Loading certificates....")
 
         credentials = grpc.ssl_channel_credentials(root_certificates=ca_cert)
@@ -53,12 +52,7 @@ class TalkoGRPCClient:
         options = (("grpc.ssl_target_name_override", "console-service.makunaiglobal.ai"),)
 
         logger.info(f"Creating secure gRPC channel with interceptors to {server_address}")
-        return grpc.aio.secure_channel(
-            server_address,
-            credentials,
-            interceptors=[auth_interceptor],
-            options=options
-        )
+        return grpc.aio.secure_channel(server_address, credentials, interceptors=[auth_interceptor], options=options)
 
     def _create_insecure_channel(self, server_address):
         logger.info(f"Creating an insecure gRPC channel to: {server_address}")
@@ -83,14 +77,10 @@ class TalkoGRPCClient:
                 except grpc.aio.AioRpcError as exc:
                     logger.error(f"gRPC error in {func.__name__}: {exc}")
                     if attempt < TalkoGRPCClient.MAX_RETRIES - 1:
-                        logger.info(
-                            f"Retrying {func.__name__} (attempt {attempt + 2}/{TalkoGRPCClient.MAX_RETRIES})"
-                        )
+                        logger.info(f"Retrying {func.__name__} (attempt {attempt + 2}/{TalkoGRPCClient.MAX_RETRIES})")
                         await asyncio.sleep(TalkoGRPCClient.RETRY_DELAY)
                     else:
-                        logger.error(
-                            f"Failed to execute {func.__name__} after {TalkoGRPCClient.MAX_RETRIES} attempts"
-                        )
+                        logger.error(f"Failed to execute {func.__name__} after {TalkoGRPCClient.MAX_RETRIES} attempts")
                         return None
 
         return wrapper

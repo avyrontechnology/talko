@@ -2,11 +2,9 @@ import pytest
 from pydantic import ValidationError
 
 from src.components.call_management.dto import TalkoContract
-from src.components.call_management.enums import TalkoOutboundType
 
 
 class TestCallCreateDTO:
-
     def test_valid_with_encryption_and_secret(self):
         """Test that encryption requires lead_secret and passes when provided."""
         data = {

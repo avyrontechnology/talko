@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Dict
+from typing import Any
 
 from celery import shared_task
 from pymongo.operations import UpdateOne
@@ -31,9 +31,7 @@ def process_expired_did_cooldowns(self) -> str:
         now: int = TalkoDateTimeUtil.get_current_time()
         updated_count: int = 0
 
-        logger.info(
-            "Checking for DIDs in Cooling Period that expired before {}".format(now)
-        )
+        logger.info(f"Checking for DIDs in Cooling Period that expired before {now}")
 
         async def run_expiry() -> str:
             nonlocal updated_count
@@ -42,31 +40,25 @@ def process_expired_did_cooldowns(self) -> str:
             # plain collection() helper, so the expired-DID selection and
             # the batch status transition stay consistent with each other.
             async with db.connect() as mongo_db:
-                collection = mongo_db[
-                    TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT
-                ]
+                collection = mongo_db[TalkoPhoneNumberManagement.CollectionName.PHONE_NUMBER_MANAGEMENT]
 
-                query: Dict[str, Any] = {
+                query: dict[str, Any] = {
                     "status": TalkoDIDStatus.COOLING_PERIOD.value,
                     "cooldown_until": {"$lte": now},
                 }
 
-                logger.info("Executing query in cooldowns: {}".format(query))
+                logger.info(f"Executing query in cooldowns: {query}")
 
                 cursor = collection.find(query)
                 expired_docs = [doc async for doc in cursor]
 
-                logger.info(
-                    "Query executed, found {} expired DIDs".format(len(expired_docs))
-                )
-                logger.debug("Expired DIDs: {}".format(expired_docs))
+                logger.info(f"Query executed, found {len(expired_docs)} expired DIDs")
+                logger.debug(f"Expired DIDs: {expired_docs}")
 
                 if not expired_docs:
                     return "No expired Cooling Period DIDs found"
 
-                logger.info(
-                    "Found {} expired Cooling Period DIDs".format(len(expired_docs))
-                )
+                logger.info(f"Found {len(expired_docs)} expired Cooling Period DIDs")
 
                 bulk_ops: list = []
                 for doc in expired_docs:
@@ -87,22 +79,20 @@ def process_expired_did_cooldowns(self) -> str:
                 if bulk_ops:
                     result = await collection.bulk_write(bulk_ops)
                     updated_count = result.modified_count
-                    logger.info(
-                        "Transitioned {} DIDs to Cooldown Completed".format(
-                            updated_count
-                        )
-                    )
+                    logger.info(f"Transitioned {updated_count} DIDs to Cooldown Completed")
 
-                return "Processed {} DIDs, updated {}".format(
-                    len(expired_docs), updated_count
-                )
+                return f"Processed {len(expired_docs)} DIDs, updated {updated_count}"
 
         # Run the async logic
         result_message: str = asyncio.run(run_expiry())
 
-        logger.info("DID cooldown expiry task completed: {}".format(result_message))
+        logger.info(f"DID cooldown expiry task completed: {result_message}")
         return result_message
 
+    except (ValueError, TypeError) as exc:
+        # Non-transient (bad data shape): retrying would spin forever.
+        logger.error(f"Non-transient error in DID cooldown expiry task: {str(exc)}")
+        return f"Failed (non-transient): {str(exc)}"
     except Exception as exc:
-        logger.error("Error in DID cooldown expiry task: {}".format(str(exc)))
+        logger.error(f"Error in DID cooldown expiry task: {str(exc)}")
         raise self.retry(exc=exc, countdown=300)  # retry after 5 minutes

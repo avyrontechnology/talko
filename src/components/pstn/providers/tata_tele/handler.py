@@ -1,5 +1,4 @@
 import base64
-from typing import Optional
 
 from src.components.pstn.constants import TalkoCallDirection, TalkoPSTNProvider
 from src.components.pstn.dto import TalkoCallContext
@@ -51,7 +50,7 @@ class TalkoTataTeleProvider(TalkoAbstractPSTNProvider):
         self,
         ws,
         audio_bytes: bytes,
-        label: Optional[str] = None,
+        label: str | None = None,
         stream_sid: str = "",
         chunk: int = 1,
     ) -> None:

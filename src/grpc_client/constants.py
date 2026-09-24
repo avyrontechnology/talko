@@ -12,3 +12,4 @@ class TalkoGrpcServices:
     PARTNER: str = "partner"
     USER: str = "user"
     API_KEY: str = "x_api_key"
+    TELEPHONY: str = "telephony"

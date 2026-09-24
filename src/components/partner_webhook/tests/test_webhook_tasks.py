@@ -19,11 +19,10 @@ class TestDeliverWebhookEventTask:
         service = MagicMock()
         service.deliver_event = AsyncMock(return_value="delivered")
 
-        with patch(
-            "src.components.partner_webhook.tasks.TalkoContainer"
-        ) as mock_container_cls, patch(
-            "src.components.partner_webhook.tasks.asyncio.run"
-        ) as mock_asyncio_run:
+        with (
+            patch("src.components.partner_webhook.tasks.TalkoContainer") as mock_container_cls,
+            patch("src.components.partner_webhook.tasks.asyncio.run") as mock_asyncio_run,
+        ):
             mock_container_cls.return_value.partner_webhook_service.return_value = service
             mock_asyncio_run.return_value = "delivered"
 

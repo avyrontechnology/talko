@@ -1,7 +1,6 @@
+from dependency_injector.wiring import inject
 from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi import Depends, Request
-from dependency_injector.wiring import Provide, inject
-from src.core.container import TalkoContainer
+
 from src.components.common.responses import (
     TalkoForbiddenResponse,
     TalkoInternalServerErrorResponse,
@@ -37,6 +36,6 @@ class TalkoAllowedHostsMiddleware(BaseHTTPMiddleware):
                 # maglo_service_logger.error(f"Host not Allowed Host: {host}")
                 return TalkoForbiddenResponse(detail="Host Not Allowed")
             return await call_next(request)
-        except Exception as exc:
+        except Exception:
             # maglo_service_logger.error(f"Got an unexpected Error: {exc}")
             return TalkoInternalServerErrorResponse()

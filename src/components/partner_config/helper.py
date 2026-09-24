@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from bson import ObjectId
 
@@ -26,31 +26,17 @@ class TalkoPartnerConfigHelper:
         try:
             vendor_id: ObjectId = ObjectId(config.vendor_id)
         except Exception:
-            logger.error("Invalid vendor_id: {}".format(config.vendor_id))
+            logger.error(f"Invalid vendor_id: {config.vendor_id}")
             raise ValueError("Invalid vendor_id format.")
 
-        logger.debug(
-            "Partner config for partner_id {} with vendor_id: {}".format(
-                config.partner_id, vendor_id
-            )
-        )
+        logger.debug(f"Partner config for partner_id {config.partner_id} with vendor_id: {vendor_id}")
         await vendor_config_validator.validate_vendor_exists(vendor_id)
-        await vendor_config_validator.validate_vendor_config_not_exist_using_vendor_id(
-            vendor_id
-        )
-        await partner_config_validator.check_if_already_partner_exist_in_partner_config(
-            config.partner_id
-        )
+        await vendor_config_validator.validate_vendor_config_not_exist_using_vendor_id(vendor_id)
+        await partner_config_validator.check_if_already_partner_exist_in_partner_config(config.partner_id)
 
-        existing_config: Optional[Dict[str, Any]] = (
-            await repository.find_partner_config_by_id(config.partner_id)
-        )
+        existing_config: dict[str, Any] | None = await repository.find_partner_config_by_id(config.partner_id)
         if existing_config:
-            logger.error(
-                "Partner config with partner_id {} already exists".format(
-                    config.partner_id
-                )
-            )
+            logger.error(f"Partner config with partner_id {config.partner_id} already exists")
             raise TalkoConflictError("Partner config with partner_id already exists.")
 
         return vendor_id
@@ -63,101 +49,83 @@ class TalkoPartnerConfigHelper:
         vendor_config_service: TalkoVendorConfigService,
         did_management_service: TalkoDidManagementService,
         logger: TalkoServiceLogger,
-    ) -> Dict[str, Union[str, bool, List[str], Dict[str, List[str]], int]]:
+    ) -> dict[str, str | bool | list[str] | dict[str, list[str]] | int]:
         """
         Handles the assignment of DIDs based on configuration by updating existing records.
         """
         logger.info("In partner config creation, handle did assignment method started.")
-        logger.debug(
-            "In partner config creation, handle did assignment method, data: config: {}".format(
-                config
-            )
-        )
+        logger.debug(f"In partner config creation, handle did assignment method, data: config: {config}")
 
-        vendor_config_id: Optional[ObjectId] = ObjectId(config.vendor_config_id)
+        vendor_config_id: ObjectId | None = ObjectId(config.vendor_config_id)
 
-        available_dids: List[str] = await did_management_service.get_available_dids(
-            vendor_id, vendor_config_id
-        )
+        available_dids: list[str] = await did_management_service.get_available_dids(vendor_id, vendor_config_id)
         if not available_dids:
-            logger.warning("No available DIDs for vendor_id {}".format(vendor_id))
+            logger.warning(f"No available DIDs for vendor_id {vendor_id}")
             return {"vendor_id": str(vendor_id), "is_active": True}
 
         num_dids: int = TalkoPartnerConfigHelper._calculate_num_dids(config)
         if len(available_dids) < num_dids:
             raise TalkoBadRequestError(
-                "Insufficient available DIDs. Required: {}, Available: {}".format(
-                    num_dids, len(available_dids)
-                )
+                f"Insufficient available DIDs. Required: {num_dids}, Available: {len(available_dids)}"
             )
 
-        assigned_dids: List[str] = available_dids[:num_dids]
-        config_dict: Dict[str, Any] = {"vendor_id": str(vendor_id), "is_active": True}
+        assigned_dids: list[str] = available_dids[:num_dids]
+        config_dict: dict[str, Any] = {"vendor_id": str(vendor_id), "is_active": True}
 
         if config.enable_workspace and config.workspace_did_counts:
-            workspace_mapping: Dict[str, Any] = (
-                await TalkoPartnerConfigHelper._assign_workspace_dids(
-                    config,
-                    assigned_dids,
-                    vendor_id,
-                    did_management_service,
-                    logger,
-                    vendor_config_id,
-                )
+            workspace_mapping: dict[str, Any] = await TalkoPartnerConfigHelper._assign_workspace_dids(
+                config,
+                assigned_dids,
+                vendor_id,
+                did_management_service,
+                logger,
+                vendor_config_id,
             )
             config_dict.update(workspace_mapping)
 
         if config.enable_agent_mapping and config.agent_mapping_ids:
-            agent_mapping_data: Dict[str, Any] = (
-                await TalkoPartnerConfigHelper._assign_agent_mapping_dids(
-                    config,
-                    assigned_dids,
-                    vendor_id,
-                    did_management_service,
-                    logger,
-                    vendor_config_id,
-                )
+            agent_mapping_data: dict[str, Any] = await TalkoPartnerConfigHelper._assign_agent_mapping_dids(
+                config,
+                assigned_dids,
+                vendor_id,
+                did_management_service,
+                logger,
+                vendor_config_id,
             )
             config_dict.update(agent_mapping_data)
 
         if config.enable_round_robin:
-            round_robin_data: Dict[str, Any] = (
-                await TalkoPartnerConfigHelper._assign_round_robin_dids(
-                    config,
-                    assigned_dids,
-                    vendor_id,
-                    did_management_service,
-                    logger,
-                    vendor_config_id,
-                )
+            round_robin_data: dict[str, Any] = await TalkoPartnerConfigHelper._assign_round_robin_dids(
+                config,
+                assigned_dids,
+                vendor_id,
+                did_management_service,
+                logger,
+                vendor_config_id,
             )
             config_dict.update(round_robin_data)
 
-        logger.debug(
-            "In partner config creation, handle did assignment method ended, data: config: {}".format(
-                config_dict
-            )
-        )
+        logger.debug(f"In partner config creation, handle did assignment method ended, data: config: {config_dict}")
         return config_dict
 
     @staticmethod
     async def _assign_workspace_dids(
         config: TalkoContract.PartnerConfigCreate,
-        assigned_dids: List[str],
+        assigned_dids: list[str],
         vendor_id: ObjectId,
         did_management_service: TalkoDidManagementService,
         logger: TalkoServiceLogger,
-        vendor_config_id: Optional[ObjectId] = None,
-    ) -> Dict[str, Any]:
+        vendor_config_id: ObjectId | None = None,
+    ) -> dict[str, Any]:
         """
         Assigns DIDs for workspace configurations.
         """
-        workspace_mapping: Dict[int, List[str]] = {}
+        workspace_mapping: dict[int, list[str]] = {}
         start_idx: int = 0
         for workspace_id, count in config.workspace_did_counts.items():
             if count > 0:
                 end_idx: int = start_idx + count
-                dids: List[str] = assigned_dids[start_idx:end_idx]
+                dids: list[str] = assigned_dids[start_idx:end_idx]
                 workspace_mapping[workspace_id] = dids
                 for did in dids:
                     await did_management_service.update_did(
@@ -177,24 +145,18 @@ class TalkoPartnerConfigHelper:
     @staticmethod
     async def _assign_agent_mapping_dids(
         config: TalkoContract.PartnerConfigCreate,
-        assigned_dids: List[str],
+        assigned_dids: list[str],
         vendor_id: ObjectId,
         did_management_service: TalkoDidManagementService,
         logger: TalkoServiceLogger,
-        vendor_config_id: Optional[ObjectId] = None,
-    ) -> Dict[str, Any]:
+        vendor_config_id: ObjectId | None = None,
+    ) -> dict[str, Any]:
         """
         Assigns DIDs for agent mapping configurations.
         """
-        start_idx: int = (
-            len(assigned_dids)
-            if config.enable_workspace and config.workspace_did_counts
-            else 0
-        )
-        agent_mapping_dids: List[str] = assigned_dids[
-            start_idx : start_idx + len(config.agent_mapping_ids)
-        ]
-        for agent_id, did in zip(config.agent_mapping_ids, agent_mapping_dids):
+        start_idx: int = len(assigned_dids) if config.enable_workspace and config.workspace_did_counts else 0
+        agent_mapping_dids: list[str] = assigned_dids[start_idx : start_idx + len(config.agent_mapping_ids)]
+        for agent_id, did in zip(config.agent_mapping_ids, agent_mapping_dids, strict=True):
             await did_management_service.update_did(
                 did_number=did,
                 vendor_id=str(vendor_id),
@@ -208,21 +170,19 @@ class TalkoPartnerConfigHelper:
     @staticmethod
     async def _assign_round_robin_dids(
         config: TalkoContract.PartnerConfigCreate,
-        assigned_dids: List[str],
+        assigned_dids: list[str],
         vendor_id: ObjectId,
         did_management_service: TalkoDidManagementService,
         logger: TalkoServiceLogger,
-        vendor_config_id: Optional[ObjectId] = None,
-    ) -> Dict[str, Any]:
+        vendor_config_id: ObjectId | None = None,
+    ) -> dict[str, Any]:
         """
         Assigns DIDs for round-robin configurations.
         """
         if config.enable_workspace:
             raise TalkoBadRequestError("Round-robin cannot be enabled with workspace.")
         if not config.round_robin_did_count:
-            raise TalkoBadRequestError(
-                "round_robin_did_count is required when enable_round_robin is true."
-            )
+            raise TalkoBadRequestError("round_robin_did_count is required when enable_round_robin is true.")
 
         start_idx: int = 0
         if config.enable_workspace and config.workspace_did_counts:
@@ -230,9 +190,7 @@ class TalkoPartnerConfigHelper:
         if config.enable_agent_mapping and config.agent_mapping_ids:
             start_idx += len(assigned_dids)
 
-        round_robin_dids: List[str] = assigned_dids[
-            start_idx : start_idx + config.round_robin_did_count
-        ]
+        round_robin_dids: list[str] = assigned_dids[start_idx : start_idx + config.round_robin_did_count]
         for did in round_robin_dids:
             await did_management_service.update_did(
                 did_number=did,
@@ -264,7 +222,7 @@ class TalkoPartnerConfigHelper:
         vendor_id: ObjectId,
         did_management_service: TalkoDidManagementService,
         logger: TalkoServiceLogger,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Update default attendance for workspace or round-robin.
 
@@ -285,23 +243,18 @@ class TalkoPartnerConfigHelper:
                     config.partner_id, workspace_id, str(vendor_id)
                 )
                 service_default_attendance[workspace_id] = [
-                    {"phone_number": did["did_number"], "agent_id": did.get("agent_id")}
-                    for did in dids
+                    {"phone_number": did["did_number"], "agent_id": did.get("agent_id")} for did in dids
                 ]
             attendance_data["service_default_attendance"] = service_default_attendance
         elif config.enable_round_robin and config.round_robin_did_count:
-            dids = await did_management_service.get_dids_by_partner_and_vendor(
-                config.partner_id, str(vendor_id)
-            )
+            dids = await did_management_service.get_dids_by_partner_and_vendor(config.partner_id, str(vendor_id))
             round_robin_default_attendance = {
                 "default": [
                     {"phone_number": did["did_number"], "agent_id": did.get("agent_id")}
                     for did in dids[: config.round_robin_did_count]
                 ]
             }
-            attendance_data["round_robin_default_attendance"] = (
-                round_robin_default_attendance
-            )
+            attendance_data["round_robin_default_attendance"] = round_robin_default_attendance
 
         logger.info(f"Updated default attendance: {attendance_data}")
         return attendance_data

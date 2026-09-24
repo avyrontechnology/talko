@@ -1,16 +1,8 @@
-import uuid
-from typing import Dict, List, Optional
-
-from fastapi import HTTPException
-
 from src.components.call_assets.messages import INVALID_ASSET_TYPE
-from src.components.call_assets.models import TalkoAssetsModel
 from src.components.call_assets.repository import TalkoAssetRepository
 from src.components.digital_assets.constants import TalkoDigitalAssetEnum
-from src.components.digital_assets.schema import TalkoDigitalAssetResponse
 from src.components.digital_assets.storage.helper import TalkoStorageHelper
 from src.components.digital_assets.utils import TalkoDigitalAssetUtils
-from src.core.environment import TalkoENV
 from src.exceptions import TalkoInvalidAssetTypeError, TalkoResourceNotFound
 from src.loggers.talko_service_logger import TalkoServiceLogger
 
@@ -44,25 +36,15 @@ class TalkoAssetService:
         """
         try:
             self.__logger.info(
-                "Trying to fetch the digital asset details for partner_id: {}, asset_type: {}".format(
-                    partner_id, asset_type
-                )
+                f"Trying to fetch the digital asset details for partner_id: {partner_id}, asset_type: {asset_type}"
             )
             if not TalkoDigitalAssetUtils.is_valid_asset_type(asset_type):
                 raise TalkoInvalidAssetTypeError(INVALID_ASSET_TYPE)
-            asset: Optional[Dict] = (
-                await self.__repository.get_digital_asset_by_partner_id(
-                    partner_id, asset_type
-                )
-            )
+            asset: dict | None = await self.__repository.get_digital_asset_by_partner_id(partner_id, asset_type)
 
             if not asset:
-                self.__logger.error(
-                    "Digital asset not found for partner_id {}".format(partner_id)
-                )
-                raise TalkoResourceNotFound(
-                    "Digital asset with ID {} not found".format(partner_id)
-                )
+                self.__logger.error(f"Digital asset not found for partner_id {partner_id}")
+                raise TalkoResourceNotFound(f"Digital asset with ID {partner_id} not found")
 
             asset_url: str = TalkoStorageHelper.get_presigned_url(asset["name"])
             result: dict = {
@@ -80,8 +62,6 @@ class TalkoAssetService:
 
         except Exception as e:
             self.__logger.error(
-                "An unexpected error occurred while fetching digital asset details for partner_id {}: {}".format(
-                    partner_id, str(e)
-                )
+                f"An unexpected error occurred while fetching digital asset details for partner_id {partner_id}: {str(e)}"
             )
             raise e

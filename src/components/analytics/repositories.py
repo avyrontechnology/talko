@@ -1,20 +1,14 @@
-import bisect
-from collections import defaultdict
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple, Union
-
-import pytz
-from dateutil.relativedelta import relativedelta
+from datetime import datetime
+from typing import Any
 
 from src.components.analytics import constants as analytics_constants
 from src.components.analytics.builder import TalkoQueryBuilder
 from src.components.analytics.date_range_helper import TalkoDateRangeHelper
-from src.components.analytics.enums import TalkoMetric, TalkoTimeInterval
+from src.components.analytics.enums import TalkoTimeInterval
 from src.components.analytics.helper import TalkoCallTrendsHelper
 from src.components.cdr.models import TalkoCDR
 from src.core.doc_db import TalkoDocDatabaseSessionManager
 from src.loggers.talko_service_logger import TalkoServiceLogger
-from src.utils.auto_format import safe_to_int
 from src.utils.enums import TalkoUserRoleHierarchy
 
 
@@ -35,13 +29,9 @@ class TalkoAnalyticsRepository:
             {"range": "5-10 minutes", "min": 300, "max": 600},
             {"range": ">=10 minutes", "min": 600, "max": float("inf")},
         ]
-        self.__call_trends_helper = TalkoCallTrendsHelper(
-            self.__logger, self.__date_range_helper, self.__query_builder
-        )
+        self.__call_trends_helper = TalkoCallTrendsHelper(self.__logger, self.__date_range_helper, self.__query_builder)
 
-    def _format_agent_response(
-        self, result: List[Dict], fields: List[str]
-    ) -> List[Dict]:
+    def _format_agent_response(self, result: list[dict], fields: list[str]) -> list[dict]:
         """Format agent-based aggregation results into response structure."""
         return [{field: doc[field] for field in fields} for doc in result]
 
@@ -55,28 +45,22 @@ class TalkoAnalyticsRepository:
     async def get_agent_call_analytics(
         self,
         partner_id: int,
-        start_date: Optional[int],
-        end_date: Optional[int],
-        agents: Optional[List[int]],
-        workspace_id: Optional[List[int]] = None,
-        entity_type: Optional[str] = None,
+        start_date: int | None,
+        end_date: int | None,
+        agents: list[int] | None,
+        workspace_id: list[int] | None = None,
+        entity_type: str | None = None,
         limit: int = 10,
         offset: int = 1,
         user_role: int = TalkoUserRoleHierarchy.MAINTAINER.value,
-    ) -> Dict:
+    ) -> dict:
         try:
             if not agents and user_role != TalkoUserRoleHierarchy.MAINTAINER.value:
-                self.__logger.info(
-                    f"No agents provided for partner_id: {partner_id}, returning empty result"
-                )
+                self.__logger.info(f"No agents provided for partner_id: {partner_id}, returning empty result")
                 return {analytics_constants.AGENTS: [], "total_count": 0}
             self._validate_pagination(offset, limit)
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                start_date_ms, end_date_ms, period = (
-                    self.__date_range_helper.adjust_date_range(start_date, end_date)
-                )
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                start_date_ms, end_date_ms, period = self.__date_range_helper.adjust_date_range(start_date, end_date)
                 self.__logger.debug(
                     f"Retrieving agent call analytics for partner_id: {partner_id}, "
                     f"start_date: {start_date_ms}, end_date: {end_date_ms}, period: {period}, "
@@ -94,11 +78,7 @@ class TalkoAnalyticsRepository:
 
                 count_pipeline = [
                     {analytics_constants.MATCH: query},
-                    {
-                        analytics_constants.GROUP: {
-                            analytics_constants.UNDERSCORE_ID: analytics_constants.AGENT
-                        }
-                    },
+                    {analytics_constants.GROUP: {analytics_constants.UNDERSCORE_ID: analytics_constants.AGENT}},
                     {analytics_constants.COUNT: "total_count"},
                 ]
                 count_result = await collection.aggregate(count_pipeline).to_list()
@@ -111,9 +91,7 @@ class TalkoAnalyticsRepository:
                     {
                         analytics_constants.GROUP: {
                             analytics_constants.UNDERSCORE_ID: analytics_constants.AGENT,
-                            analytics_constants.TOTAL_CALLS: {
-                                analytics_constants.SUM: 1
-                            },
+                            analytics_constants.TOTAL_CALLS: {analytics_constants.SUM: 1},
                             analytics_constants.UNIQUE_CALLS: {
                                 analytics_constants.ADDTOSET: analytics_constants.LEAD_ID
                             },
@@ -320,9 +298,7 @@ class TalkoAnalyticsRepository:
                 self.__logger.debug(f"Agent call analytics pipeline: {pipeline}")
                 result = await collection.aggregate(pipeline).to_list()
                 self.__logger.debug(f"Aggregation result: {result}")
-                self.__logger.info(
-                    f"Successfully retrieved agent call analytics for partner_id: {partner_id}"
-                )
+                self.__logger.info(f"Successfully retrieved agent call analytics for partner_id: {partner_id}")
                 return {
                     analytics_constants.AGENTS: self._format_agent_response(
                         result,
@@ -348,28 +324,22 @@ class TalkoAnalyticsRepository:
     async def get_total_agent_talk_time(
         self,
         partner_id: int,
-        start_date: Optional[int],
-        end_date: Optional[int],
-        agents: Optional[List[int]],
-        workspace_id: Optional[List[int]] = None,
-        entity_type: Optional[str] = None,
+        start_date: int | None,
+        end_date: int | None,
+        agents: list[int] | None,
+        workspace_id: list[int] | None = None,
+        entity_type: str | None = None,
         limit: int = 10,
         offset: int = 1,
         user_role: int = TalkoUserRoleHierarchy.MAINTAINER.value,
-    ) -> Dict:
+    ) -> dict:
         try:
             if not agents and user_role != TalkoUserRoleHierarchy.MAINTAINER.value:
-                self.__logger.info(
-                    f"No agents provided for partner_id: {partner_id}, returning empty result"
-                )
+                self.__logger.info(f"No agents provided for partner_id: {partner_id}, returning empty result")
                 return {analytics_constants.AGENTS: [], "total_count": 0}
             self._validate_pagination(offset, limit)
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                start_date_ms, end_date_ms, period = (
-                    self.__date_range_helper.adjust_date_range(start_date, end_date)
-                )
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                start_date_ms, end_date_ms, period = self.__date_range_helper.adjust_date_range(start_date, end_date)
                 self.__logger.debug(
                     f"Retrieving total agent talk time for partner_id: {partner_id}, "
                     f"start_date: {start_date_ms}, end_date: {end_date_ms}, period: {period}, "
@@ -387,11 +357,7 @@ class TalkoAnalyticsRepository:
 
                 count_pipeline = [
                     {analytics_constants.MATCH: query},
-                    {
-                        analytics_constants.GROUP: {
-                            analytics_constants.UNDERSCORE_ID: analytics_constants.AGENT
-                        }
-                    },
+                    {analytics_constants.GROUP: {analytics_constants.UNDERSCORE_ID: analytics_constants.AGENT}},
                     {analytics_constants.COUNT: "total_count"},
                 ]
                 count_result = await collection.aggregate(count_pipeline).to_list()
@@ -447,9 +413,7 @@ class TalkoAnalyticsRepository:
                 self.__logger.debug(f"Total agent talk time pipeline: {pipeline}")
                 result = await collection.aggregate(pipeline).to_list()
                 self.__logger.debug(f"Aggregation result: {result}")
-                self.__logger.info(
-                    f"Successfully retrieved total agent talk time for partner_id: {partner_id}"
-                )
+                self.__logger.info(f"Successfully retrieved total agent talk time for partner_id: {partner_id}")
                 return {
                     analytics_constants.AGENTS: self._format_agent_response(
                         result,
@@ -469,28 +433,22 @@ class TalkoAnalyticsRepository:
     async def get_agent_talk_time_distribution(
         self,
         partner_id: int,
-        start_date: Optional[int],
-        end_date: Optional[int],
-        agents: Optional[List[int]],
-        workspace_id: Optional[List[int]] = None,
-        entity_type: Optional[str] = None,
+        start_date: int | None,
+        end_date: int | None,
+        agents: list[int] | None,
+        workspace_id: list[int] | None = None,
+        entity_type: str | None = None,
         limit: int = 10,
         offset: int = 1,
         user_role: int = TalkoUserRoleHierarchy.MAINTAINER.value,
-    ) -> Dict:
+    ) -> dict:
         try:
             if not agents and user_role != TalkoUserRoleHierarchy.MAINTAINER.value:
-                self.__logger.info(
-                    f"No agents provided for partner_id: {partner_id}, returning empty result"
-                )
+                self.__logger.info(f"No agents provided for partner_id: {partner_id}, returning empty result")
                 return {analytics_constants.AGENTS: [], "total_count": 0}
             self._validate_pagination(offset, limit)
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                start_date_ms, end_date_ms, period = (
-                    self.__date_range_helper.adjust_date_range(start_date, end_date)
-                )
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                start_date_ms, end_date_ms, period = self.__date_range_helper.adjust_date_range(start_date, end_date)
                 self.__logger.debug(
                     f"Retrieving agent talk time distribution for partner_id: {partner_id}, "
                     f"start_date: {start_date_ms}, end_date: {end_date_ms}, period: {period}, "
@@ -508,11 +466,7 @@ class TalkoAnalyticsRepository:
 
                 count_pipeline = [
                     {analytics_constants.MATCH: query},
-                    {
-                        analytics_constants.GROUP: {
-                            analytics_constants.UNDERSCORE_ID: analytics_constants.AGENT
-                        }
-                    },
+                    {analytics_constants.GROUP: {analytics_constants.UNDERSCORE_ID: analytics_constants.AGENT}},
                     {analytics_constants.COUNT: "total_count"},
                 ]
                 count_result = await collection.aggregate(count_pipeline).to_list()
@@ -525,9 +479,7 @@ class TalkoAnalyticsRepository:
                     {
                         analytics_constants.GROUP: {
                             analytics_constants.UNDERSCORE_ID: analytics_constants.AGENT,
-                            "calls": {
-                                "$push": {"duration": analytics_constants.TALK_TIME}
-                            },
+                            "calls": {"$push": {"duration": analytics_constants.TALK_TIME}},
                         }
                     },
                     {
@@ -595,14 +547,10 @@ class TalkoAnalyticsRepository:
                     {analytics_constants.LIMIT: limit},
                 ]
 
-                self.__logger.debug(
-                    f"Agent talk time distribution pipeline: {pipeline}"
-                )
+                self.__logger.debug(f"Agent talk time distribution pipeline: {pipeline}")
                 result = await collection.aggregate(pipeline).to_list()
                 self.__logger.debug(f"Aggregation result: {result}")
-                self.__logger.info(
-                    f"Successfully retrieved agent talk time distribution for partner_id: {partner_id}"
-                )
+                self.__logger.info(f"Successfully retrieved agent talk time distribution for partner_id: {partner_id}")
                 return {
                     analytics_constants.AGENTS: self._format_agent_response(
                         result,
@@ -615,36 +563,28 @@ class TalkoAnalyticsRepository:
                     "total_count": total_count,
                 }
         except Exception as e:
-            self.__logger.error(
-                f"Failed to retrieve agent talk time distribution: {str(e)}"
-            )
+            self.__logger.error(f"Failed to retrieve agent talk time distribution: {str(e)}")
             raise
 
     async def get_partner_workspace(
         self,
         partner_id: int,
-        start_date: Optional[int],
-        end_date: Optional[int],
-        workspace_id: Optional[List[int]] = None,
-        entity_type: Optional[str] = None,
+        start_date: int | None,
+        end_date: int | None,
+        workspace_id: list[int] | None = None,
+        entity_type: str | None = None,
         limit: int = 10,
         offset: int = 1,
-        agents: Optional[List[int]] = None,
+        agents: list[int] | None = None,
         user_role: int = TalkoUserRoleHierarchy.MAINTAINER.value,
-    ) -> Dict:
+    ) -> dict:
         try:
             if not agents and user_role != TalkoUserRoleHierarchy.MAINTAINER.value:
-                self.__logger.info(
-                    f"No agents provided for partner_id: {partner_id}, returning empty result"
-                )
+                self.__logger.info(f"No agents provided for partner_id: {partner_id}, returning empty result")
                 return {analytics_constants.AGENTS: [], "total_count": 0}
             self._validate_pagination(offset, limit)
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                start_date_ms, end_date_ms, period = (
-                    self.__date_range_helper.adjust_date_range(start_date, end_date)
-                )
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                start_date_ms, end_date_ms, period = self.__date_range_helper.adjust_date_range(start_date, end_date)
                 self.__logger.debug(
                     f"Retrieving partner workspace analytics for partner_id: {partner_id}, "
                     f"start_date: {start_date_ms}, end_date: {end_date_ms}, period: {period}, "
@@ -665,9 +605,7 @@ class TalkoAnalyticsRepository:
                     {
                         analytics_constants.GROUP: {
                             analytics_constants.UNDERSCORE_ID: analytics_constants.PARTNER_ID,
-                            analytics_constants.TOTAL_CALLS: {
-                                analytics_constants.SUM: 1
-                            },
+                            analytics_constants.TOTAL_CALLS: {analytics_constants.SUM: 1},
                             analytics_constants.TOTAL_UNIQUE_CALLS: {
                                 analytics_constants.ADDTOSET: analytics_constants.LEAD_ID
                             },
@@ -711,9 +649,7 @@ class TalkoAnalyticsRepository:
                         analytics_constants.PROJECT: {
                             analytics_constants.PARTNER_ID: analytics_constants.ID,
                             analytics_constants.TOTAL_CALLS: 1,
-                            analytics_constants.TOTAL_UNIQUE_CALLS: {
-                                analytics_constants.SIZE: "$total_unique_calls"
-                            },
+                            analytics_constants.TOTAL_UNIQUE_CALLS: {analytics_constants.SIZE: "$total_unique_calls"},
                             analytics_constants.TOTAL_CONNECTED: 1,
                             analytics_constants.TOTAL_MISSED: 1,
                             analytics_constants.TOTAL_TALK_TIME: 1,
@@ -725,9 +661,7 @@ class TalkoAnalyticsRepository:
                 self.__logger.debug(f"Partner workspace pipeline: {pipeline}")
                 result = await collection.aggregate(pipeline).to_list()
                 self.__logger.debug(f"Aggregation result: {result}")
-                self.__logger.info(
-                    f"Successfully retrieved partner workspace analytics for partner_id: {partner_id}"
-                )
+                self.__logger.info(f"Successfully retrieved partner workspace analytics for partner_id: {partner_id}")
                 metrics = {
                     analytics_constants.TOTAL_CALLS: 0,
                     analytics_constants.TOTAL_UNIQUE_CALLS: 0,
@@ -752,9 +686,7 @@ class TalkoAnalyticsRepository:
                             },
                             {
                                 "title": "Unique Calls",
-                                "count": metrics[
-                                    analytics_constants.TOTAL_UNIQUE_CALLS
-                                ],
+                                "count": metrics[analytics_constants.TOTAL_UNIQUE_CALLS],
                             },
                             {
                                 "title": "Connected Calls",
@@ -770,9 +702,7 @@ class TalkoAnalyticsRepository:
                             },
                             {
                                 "title": "Total Call Duration",
-                                "count": metrics[
-                                    analytics_constants.TOTAL_CALL_DURATION
-                                ],
+                                "count": metrics[analytics_constants.TOTAL_CALL_DURATION],
                             },
                         ],
                     },
@@ -780,88 +710,69 @@ class TalkoAnalyticsRepository:
                 self.__logger.debug(f"Get partner workspace final data: {response}")
                 return response
         except Exception as e:
-            self.__logger.error(
-                f"Failed to retrieve partner workspace analytics: {str(e)}"
-            )
+            self.__logger.error(f"Failed to retrieve partner workspace analytics: {str(e)}")
             raise
 
     async def get_dashboard_call_trends(
         self,
         partner_id: int,
-        start_date: Optional[int],
-        end_date: Optional[int],
-        agents: List[int],
-        workspace_id: Optional[List[int]],
-        entity_type: Optional[str],
+        start_date: int | None,
+        end_date: int | None,
+        agents: list[int],
+        workspace_id: list[int] | None,
+        entity_type: str | None,
         metric: str,
         trend_basis: str,
         limit: int,
         offset: int,
         user_role: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Retrieve dashboard followup trends for a partner with specified metric and trend basis."""
         try:
             self.__logger.info(
-                "Retrieving call trends for partner {} — metric={}, trend={}".format(
-                    partner_id, metric, trend_basis
-                )
+                f"Retrieving call trends for partner {partner_id} — metric={metric}, trend={trend_basis}"
             )
             self.__logger.debug(
-                "Parameters — start_date: {}, end_date: {}, agents: {}, workspace_id: {}, limit: {}, offset: {}, user_role: {}".format(
-                    start_date,
-                    end_date,
-                    agents,
-                    workspace_id,
-                    limit,
-                    offset,
-                    user_role,
-                )
+                f"Parameters — start_date: {start_date}, end_date: {end_date}, agents: {agents}, workspace_id: {workspace_id}, limit: {limit}, offset: {offset}, user_role: {user_role}"
             )
 
             self._validate_pagination(offset, limit)
 
             # Step 1: Prepare query parameters
-            query, start_date_ms, end_date_ms, _ = (
-                await self.__call_trends_helper.prepare_query_params(
-                    partner_id,
-                    start_date,
-                    end_date,
-                    agents,
-                    workspace_id,
-                    entity_type,
-                    user_role,
-                )
+            query, start_date_ms, end_date_ms, _ = await self.__call_trends_helper.prepare_query_params(
+                partner_id,
+                start_date,
+                end_date,
+                agents,
+                workspace_id,
+                entity_type,
+                user_role,
             )
 
             # Step 2: Projection and sorting
-            projection, sort_order = (
-                await self.__call_trends_helper.get_projection_and_sort_for_trends()
-            )
+            projection, sort_order = await self.__call_trends_helper.get_projection_and_sort_for_trends()
 
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                cdrs = await collection.find(
-                    query, projection=projection, sort=sort_order
-                ).to_list(None)
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                cdrs = await collection.find(query, projection=projection, sort=sort_order).to_list(None)
 
                 # Step 3: Filter and format data
-                filtered_docs, formatted_data, total_periods_count, current_month = (
-                    await self.__call_trends_helper.filter_and_format_data(
-                        cdrs,
-                        metric,
-                        trend_basis,
-                        start_date_ms,
-                        end_date_ms,
-                        limit,
-                        offset,
-                    )
+                (
+                    filtered_docs,
+                    formatted_data,
+                    total_periods_count,
+                    current_month,
+                ) = await self.__call_trends_helper.filter_and_format_data(
+                    cdrs,
+                    metric,
+                    trend_basis,
+                    start_date_ms,
+                    end_date_ms,
+                    limit,
+                    offset,
                 )
 
                 # Step 4: Total
-                total_count = self.__call_trends_helper._calculate_total_count(
-                    filtered_docs, metric
-                )
+                total_count = self.__call_trends_helper._calculate_total_count(filtered_docs, metric)
 
                 response = {
                     "trend_basis": trend_basis,

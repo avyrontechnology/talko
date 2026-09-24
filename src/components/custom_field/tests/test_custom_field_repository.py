@@ -35,9 +35,7 @@ class TestCustomFieldRepository:
     async def test_insert_custom_field_success(self, setup):
         repo, mock_db_manager, mock_logger = setup
         mock_collection = MagicMock()
-        mock_collection.insert_one = AsyncMock(
-            return_value=MagicMock(inserted_id="field123")
-        )
+        mock_collection.insert_one = AsyncMock(return_value=MagicMock(inserted_id="field123"))
         self._mock_collection(mock_db_manager, mock_collection)
 
         result = await repo.insert_custom_field({"field_slug": "lead_source"})
@@ -90,9 +88,7 @@ class TestCustomFieldRepository:
         repo, mock_db_manager, _ = setup
         field_id = ObjectId()
         mock_collection = MagicMock()
-        mock_collection.find_one_and_update = AsyncMock(
-            return_value={"_id": field_id, "is_active": False}
-        )
+        mock_collection.find_one_and_update = AsyncMock(return_value={"_id": field_id, "is_active": False})
         self._mock_collection(mock_db_manager, mock_collection)
 
         result = await repo.update_by_id(field_id, {"is_active": False})

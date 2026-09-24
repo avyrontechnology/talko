@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Optional
 
 from src.utils.auto_format import normalize_auto_format
 
@@ -9,6 +8,7 @@ class TalkoVendorType(str, Enum):
     TATA_TELE = "tata_tele"
     KNOWLARITY = "knowlarity"
     ACEFHONE = "acefhone"
+    OTOBA = "otoba"
 
 
 class TalkoNumberType(str, Enum):
@@ -46,7 +46,7 @@ class TalkoHangupCause(str, Enum):
     NORMAL_CLEARING = "Normal clearing"
 
     @classmethod
-    def from_raw(cls, value: Optional[str]) -> "TalkoHangupCause":
+    def from_raw(cls, value: str | None) -> "TalkoHangupCause":
         mapping = {
             None: cls.UNKNOWN,
             "cancel": cls.CANCELED,
@@ -62,7 +62,7 @@ class TalkoHangupCause(str, Enum):
             "FAILED": cls.FAILED,
             "Facility rejected": cls.FACILITY_REJECTED,
             "NormalClearing": cls.NORMAL_CLEARING,
-            "congestion": cls.CONGESTION
+            "congestion": cls.CONGESTION,
         }
         if value in mapping:
             return mapping[value]
@@ -88,7 +88,7 @@ class TalkoReasonKey(str, Enum):
     HANDLE_NONE = ""
 
     @classmethod
-    def from_raw(cls, value: Optional[str]) -> "TalkoReasonKey":
+    def from_raw(cls, value: str | None) -> "TalkoReasonKey":
         mapping = {
             None: cls.HANDLE_NONE,
             "": cls.HANDLE_NONE,  # Handle empty string
@@ -101,7 +101,7 @@ class TalkoReasonKey(str, Enum):
             "no answer": cls.NOANSWER,  # Handle case variations
             "NO ANSWER": cls.NOANSWER,  # Handle potential case variations
             "Congestion in network": cls.CONGESTION_IN_NETWORK,
-            "busy": cls.BUSY
+            "busy": cls.BUSY,
         }
         if value in mapping:
             return mapping[value]

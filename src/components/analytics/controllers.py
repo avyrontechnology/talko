@@ -41,9 +41,7 @@ class TalkoAnalyticsController:
     @inject
     async def get_analytics(
         request: Request,
-        analytics_type: TalkoAnalyticsType = Query(
-            ..., description="Analytic type to retrieve"
-        ),
+        analytics_type: TalkoAnalyticsType = Query(..., description="Analytic type to retrieve"),
         payload: str = Query(
             ...,
             description='Analytic-specific data as JSON string (e.g., {"time_range": "1749148200000-1756992444404", "workspace_id": [40]})',
@@ -60,20 +58,14 @@ class TalkoAnalyticsController:
             description="Number of items per page",
         ),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-        analytics_service: "TalkoAnalyticsService" = Depends(
-            Provide[TalkoContainer.analytics_service]
-        ),
+        analytics_service: "TalkoAnalyticsService" = Depends(Provide[TalkoContainer.analytics_service]),
     ) -> TalkoAnalyticsResponse:
         try:
             talko_service_logger.info(
-                "Received analytics request: analytics_type={}, payload={}, limit={}, offset={}".format(
-                    analytics_type.value, payload, limit, offset
-                )
+                f"Received analytics request: analytics_type={analytics_type.value}, payload={payload}, limit={limit}, offset={offset}"
             )
             current_user_detail: dict = request.state.user
-            talko_service_logger.debug(
-                "Current user details: {}".format(current_user_detail)
-            )
+            talko_service_logger.debug(f"Current user details: {current_user_detail}")
             current_user_id: int = current_user_detail.get("user_id")
             partner_id: int = current_user_detail.get("partner_id")
 
@@ -82,14 +74,10 @@ class TalkoAnalyticsController:
             except json.JSONDecodeError as e:
                 talko_service_logger.error(f"Error in parsing JSON payload: {str(e)}")
                 return TalkoBadRequestResponse(
-                    detail="Data must be a valid JSON string. Example: {{'start_date': {}, 'end_date': {}, 'agents': {}}}".format(
-                        1625097600, 1627689600, [1, 2, 3]
-                    )
+                    detail=f"Data must be a valid JSON string. Example: {{'start_date': {1625097600}, 'end_date': {1627689600}, 'agents': {[1, 2, 3]}}}"
                 )
 
-            analytics_request = TalkoAnalyticsRequest(
-                analytics_type=analytics_type.value, data=data_dict
-            ).model_dump()
+            analytics_request = TalkoAnalyticsRequest(analytics_type=analytics_type.value, data=data_dict).model_dump()
 
             result: TalkoAnalyticsResponse = await analytics_service.get_analytics(
                 current_user_id=current_user_id,
@@ -99,47 +87,23 @@ class TalkoAnalyticsController:
                 offset=offset,
             )
 
-            talko_service_logger.info(
-                "Successfully processed analytics request for partner_id: {}".format(
-                    partner_id
-                )
-            )
+            talko_service_logger.info(f"Successfully processed analytics request for partner_id: {partner_id}")
             return TalkoSuccessResponse(data=result)
         except TalkoInvalidAnalyticTypeError as e:
-            talko_service_logger.error("Invalid analytics type: {}".format(str(e)))
-            return TalkoBadRequestResponse(
-                detail=analytics_messages.INVALID_ANALYTIC_TYPE_ERROR
-            )
+            talko_service_logger.error(f"Invalid analytics type: {str(e)}")
+            return TalkoBadRequestResponse(detail=analytics_messages.INVALID_ANALYTIC_TYPE_ERROR)
         except TalkoPayloadValidationError as e:
-            talko_service_logger.error(
-                "Payload validation error: {}".format(e.message)
-            )
-            return TalkoBadRequestResponse(
-                detail=analytics_messages.PAYLOAD_VALIDATION_ERROR
-            )
+            talko_service_logger.error(f"Payload validation error: {e.message}")
+            return TalkoBadRequestResponse(detail=analytics_messages.PAYLOAD_VALIDATION_ERROR)
         except TalkoResourceNotFound as e:
-            talko_service_logger.error(
-                "Resource not found while processing analytics: {}".format(str(e))
-            )
-            return TalkoResourceNotFoundResponse(
-                detail=analytics_messages.RESOURCE_NOT_FOUND_ERROR
-            )
+            talko_service_logger.error(f"Resource not found while processing analytics: {str(e)}")
+            return TalkoResourceNotFoundResponse(detail=analytics_messages.RESOURCE_NOT_FOUND_ERROR)
         except TalkoBadRequestError as e:
-            talko_service_logger.error(
-                "Bad request while processing analytics: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Bad request while processing analytics: {str(e)}")
             return TalkoBadRequestResponse(detail=analytics_messages.BAD_REQUEST_ERROR)
         except TalkoInvalidPermissionTypeError as e:
-            talko_service_logger.error("Error in getting analytics: {}".format(str(e)))
-            return TalkoForbiddenPermissionResponse(
-                detail=analytics_messages.INVALID_PERMISSION_ERROR
-            )
+            talko_service_logger.error(f"Error in getting analytics: {str(e)}")
+            return TalkoForbiddenPermissionResponse(detail=analytics_messages.INVALID_PERMISSION_ERROR)
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error occurred while processing analytics: {}".format(
-                    str(e)
-                )
-            )
-            return TalkoInternalServerErrorResponse(
-                detail=analytics_messages.EXCEPTION_ERROR
-            )
+            talko_service_logger.error(f"Unexpected error occurred while processing analytics: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=analytics_messages.EXCEPTION_ERROR)

@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import audioop
 import base64
 import json
 import time
 import traceback
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import httpx
-from bson import ObjectId
 from livekit import rtc
 from redis import asyncio as aioredis
 
@@ -19,11 +17,11 @@ from src.components.call_management.repository import TalkoCallRepository
 from src.components.call_management.tata_tele.call_service import TalkoTataTeleCallHandler
 from src.components.did_management.constants import TalkoDIDType
 from src.components.did_management.repositories import TalkoDidRepository
+from src.components.pstn.audio_bridge import TalkoAudioBridge  # noqa: F401 (re-export)
 from src.components.pstn.dto import TalkoCallContext
 from src.components.pstn.providers.base import TalkoAbstractPSTNProvider
 from src.components.pstn.voiceai_relay import VOICEAI_AGENT_ID_KEY, TalkoVoiceaiRelay
 from src.core.environment import TalkoENV
-from src.utils.phone_number_utils import normalize_phone_number
 from src.core.redis_constants import (
     ACK_WAIT_SECONDS,
     API_KEY_CACHE_KEY,
@@ -36,9 +34,12 @@ from src.core.redis_constants import (
     STREAM_CONTEXT_TTL_SECONDS,
     VOICEAI_DID_CACHE_KEY,
 )
+from src.exceptions import TalkoBadRequestError
 from src.grpc_client.constants import TalkoGrpcServices
 from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
 from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.mongo_utils import stringify_object_ids
+from src.utils.phone_number_utils import normalize_phone_number
 
 GREETING_PLAYED_KEY = "greeting_played:{call_sid}"
 GREETING_PLAYED_TTL_SECONDS = 60 * 60  # generous upper bound on call duration
@@ -49,41 +50,6 @@ INBOUND_GREETING_DELAY_SECONDS = 2.2  # natural pause before inbound greeting st
 # can legitimately take longer under load, so it needs its own, longer budget
 # rather than inheriting the shared client's default.
 MAKUNAI_SESSION_TIMEOUT_SECONDS = 15.0
-
-
-class TalkoAudioBridge:
-    def __init__(self) -> None:
-        self._inbound_state: Optional[Tuple[bytes, int]] = None
-        self._outbound_state: Optional[Tuple[bytes, int]] = None
-
-    def inbound(self, mulaw_bytes: bytes) -> bytes:
-        try:
-            pcm_8k: bytes = audioop.ulaw2lin(mulaw_bytes, 2)
-            pcm_48k, self._inbound_state = audioop.ratecv(
-                pcm_8k, 2, 1, 8000, 48000, self._inbound_state
-            )
-            return pcm_48k
-        except Exception as e:
-            raise RuntimeError("TalkoAudioBridge.inbound conversion failed: {}".format(e))
-
-    def outbound(self, pcm_48k: bytes) -> bytes:
-        try:
-            pcm_8k, self._outbound_state = audioop.ratecv(
-                pcm_48k, 2, 1, 48000, 8000, self._outbound_state
-            )
-            return audioop.lin2ulaw(pcm_8k, 2)
-        except Exception as e:
-            raise RuntimeError("TalkoAudioBridge.outbound conversion failed: {}".format(e))
-
-    @staticmethod
-    def align_chunks(
-        buffer: bytes, chunk_size: int = CHUNK_SIZE
-    ) -> Tuple[List[bytes], bytes]:
-        chunks: List[bytes] = []
-        while len(buffer) >= chunk_size:
-            chunks.append(buffer[:chunk_size])
-            buffer = buffer[chunk_size:]
-        return chunks, buffer
 
 
 class TalkoPSTNBridgeService:
@@ -100,12 +66,8 @@ class TalkoPSTNBridgeService:
         self.__http_client = http_client
         self.__call_redis_helper = call_redis_helper
         self.__call_repository = call_repository
-        self.__redis: Optional[aioredis.Redis] = None
-        self.__logger.info(
-            "[TalkoPSTNBridgeService][INIT] call_redis_helper_id={}".format(
-                id(call_redis_helper)
-            )
-        )
+        self.__redis: aioredis.Redis | None = None
+        self.__logger.info(f"[TalkoPSTNBridgeService][INIT] call_redis_helper_id={id(call_redis_helper)}")
 
     async def _get_redis(self) -> aioredis.Redis:
         # Returns the singleton pool — no new connection per call
@@ -114,7 +76,7 @@ class TalkoPSTNBridgeService:
             self.__logger.info("[TalkoPSTNBridgeService] Redis pool acquired")
         return self.__redis
 
-    async def _get_cached_did(self, did_number: str) -> Optional[Dict[str, Any]]:
+    async def _get_cached_did(self, did_number: str) -> dict[str, Any] | None:
         key = DID_CACHE_KEY.format(did_number=did_number)
         try:
             redis = await self._get_redis()
@@ -122,56 +84,34 @@ class TalkoPSTNBridgeService:
             if raw is not None:
                 if isinstance(raw, bytes):
                     raw = raw.decode()
-                self.__logger.debug(
-                    "[PSTN][DID_CACHE][GET] HIT did_number={}".format(did_number)
-                )
+                self.__logger.debug(f"[PSTN][DID_CACHE][GET] HIT did_number={did_number}")
                 return json.loads(raw)
-            self.__logger.debug(
-                "[PSTN][DID_CACHE][GET] MISS did_number={}".format(did_number)
-            )
+            self.__logger.debug(f"[PSTN][DID_CACHE][GET] MISS did_number={did_number}")
         except Exception as exc:
-            self.__logger.warning(
-                "[PSTN][DID_CACHE][GET] ERROR did={} error={}".format(did_number, exc)
-            )
+            self.__logger.warning(f"[PSTN][DID_CACHE][GET] ERROR did={did_number} error={exc}")
         return None
 
-    async def _set_cached_did(self, did_number: str, record: Dict[str, Any], ttl: Optional[int] = None) -> None:
+    async def _set_cached_did(self, did_number: str, record: dict[str, Any], ttl: int | None = None) -> None:
         key = DID_CACHE_KEY.format(did_number=did_number)
         try:
             redis = await self._get_redis()
-            serializable_record: Dict[str, Any] = {
-                k: str(v) if isinstance(v, ObjectId) else v for k, v in record.items()
-            }
-            await redis.set(
-                key, json.dumps(serializable_record), ex=ttl or DID_CACHE_TTL_SECONDS
-            )
-            self.__logger.debug(
-                "[PSTN][DID_CACHE][SET] OK did_number={}".format(did_number)
-            )
+            serializable_record: dict[str, Any] = stringify_object_ids(record)
+            await redis.set(key, json.dumps(serializable_record), ex=ttl or DID_CACHE_TTL_SECONDS)
+            self.__logger.debug(f"[PSTN][DID_CACHE][SET] OK did_number={did_number}")
         except Exception as exc:
-            self.__logger.warning(
-                "[PSTN][DID_CACHE][SET] ERROR did={} error={}".format(did_number, exc)
-            )
+            self.__logger.warning(f"[PSTN][DID_CACHE][SET] ERROR did={did_number} error={exc}")
 
-    async def _get_cached_api_key(self, partner_id: int) -> Optional[str]:
+    async def _get_cached_api_key(self, partner_id: int) -> str | None:
         key = API_KEY_CACHE_KEY.format(partner_id=partner_id)
         try:
             redis = await self._get_redis()
             raw = await redis.get(key)
             if raw is not None:
-                self.__logger.debug(
-                    "[PSTN][API_KEY_CACHE][GET] HIT partner_id={}".format(partner_id)
-                )
+                self.__logger.debug(f"[PSTN][API_KEY_CACHE][GET] HIT partner_id={partner_id}")
                 return raw if isinstance(raw, str) else raw.decode()
-            self.__logger.debug(
-                "[PSTN][API_KEY_CACHE][GET] MISS partner_id={}".format(partner_id)
-            )
+            self.__logger.debug(f"[PSTN][API_KEY_CACHE][GET] MISS partner_id={partner_id}")
         except Exception as exc:
-            self.__logger.warning(
-                "[PSTN][API_KEY_CACHE][GET] ERROR partner_id={} error={}".format(
-                    partner_id, exc
-                )
-            )
+            self.__logger.warning(f"[PSTN][API_KEY_CACHE][GET] ERROR partner_id={partner_id} error={exc}")
         return None
 
     async def _set_cached_api_key(self, partner_id: int, api_key: str) -> None:
@@ -179,98 +119,64 @@ class TalkoPSTNBridgeService:
         try:
             redis = await self._get_redis()
             await redis.set(key, api_key, ex=API_KEY_CACHE_TTL_SECONDS)
-            self.__logger.debug(
-                "[PSTN][API_KEY_CACHE][SET] OK partner_id={}".format(partner_id)
-            )
+            self.__logger.debug(f"[PSTN][API_KEY_CACHE][SET] OK partner_id={partner_id}")
         except Exception as exc:
-            self.__logger.warning(
-                "[PSTN][API_KEY_CACHE][SET] ERROR partner_id={} error={}".format(
-                    partner_id, exc
-                )
-            )
+            self.__logger.warning(f"[PSTN][API_KEY_CACHE][SET] ERROR partner_id={partner_id} error={exc}")
 
-    async def _set_stream_context(
-        self, stream_sid: str, payload: Dict[str, Any]
-    ) -> None:
+    async def _set_stream_context(self, stream_sid: str, payload: dict[str, Any]) -> None:
         key = STREAM_CONTEXT_KEY.format(stream_sid=stream_sid)
         try:
             redis = await self._get_redis()
             await redis.set(key, json.dumps(payload), ex=STREAM_CONTEXT_TTL_SECONDS)
-            self.__logger.info(
-                "[PSTN][STREAM_CTX][SET] OK stream_sid={}".format(stream_sid)
-            )
+            self.__logger.info(f"[PSTN][STREAM_CTX][SET] OK stream_sid={stream_sid}")
         except Exception as exc:
-            self.__logger.warning(
-                "[PSTN][STREAM_CTX][SET] ERROR stream_sid={} error={}".format(
-                    stream_sid, exc
-                )
-            )
+            self.__logger.warning(f"[PSTN][STREAM_CTX][SET] ERROR stream_sid={stream_sid} error={exc}")
 
     async def _resolve_partner_api_key(self, partner_id: int) -> str:
-        self.__logger.info("[PSTN][API_KEY] Resolving partner_id={}".format(partner_id))
+        self.__logger.info(f"[PSTN][API_KEY] Resolving partner_id={partner_id}")
         cached = await self._get_cached_api_key(partner_id)
         if cached:
-            self.__logger.info(
-                "[PSTN][API_KEY] Cache HIT partner_id={}".format(partner_id)
-            )
+            self.__logger.info(f"[PSTN][API_KEY] Cache HIT partner_id={partner_id}")
             return cached
-        self.__logger.info(
-            "[PSTN][API_KEY] Cache MISS fetching via gRPC partner_id={}".format(
-                partner_id
-            )
-        )
-        grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+        self.__logger.info(f"[PSTN][API_KEY] Cache MISS fetching via gRPC partner_id={partner_id}")
+        grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
+        if grpc_client is None:
+            raise TalkoBadRequestError("Console API key unavailable — gRPC disabled and key not cached")
         api_key: str = await grpc_client.get_partner_api_key(partner_id)
         await self._set_cached_api_key(partner_id, api_key)
         return api_key
 
     async def _resolve_did(self, ctx: TalkoCallContext) -> TalkoCallContext:
-        self.__logger.info("[PSTN][DID] Resolving did_number={}".format(ctx.did_number))
+        self.__logger.info(f"[PSTN][DID] Resolving did_number={ctx.did_number}")
         did_record = await self._get_cached_did(ctx.did_number)
         # Prefetched by the dynamic DB-miss branch below — reuse it in the
         # ai_agent branch so one inbound call pays one engine HTTP max.
-        prefetched_voiceai_agent: Optional[str] = None
+        prefetched_voiceai_agent: str | None = None
 
         if did_record is None:
-            self.__logger.info(
-                "[PSTN][DID] Cache MISS fetching from DB did_number={}".format(
-                    ctx.did_number
-                )
-            )
+            self.__logger.info(f"[PSTN][DID] Cache MISS fetching from DB did_number={ctx.did_number}")
             try:
                 did_record = await self.__did_repository.get_did_by_number(
                     call_to_number=ctx.did_number, partner_id=None
                 )
                 self.__logger.info(
-                    "[PSTN][DID] DB fetch done did_number={} found={}".format(
-                        ctx.did_number, did_record is not None
-                    )
+                    f"[PSTN][DID] DB fetch done did_number={ctx.did_number} found={did_record is not None}"
                 )
             except Exception as e:
                 self.__logger.error(
-                    "[PSTN][DID] DB fetch failed did_number={} error={} traceback={}".format(
-                        ctx.did_number, e, traceback.format_exc()
-                    )
+                    f"[PSTN][DID] DB fetch failed did_number={ctx.did_number} error={e} traceback={traceback.format_exc()}"
                 )
                 raise
             if not did_record or not did_record.get("is_active", True):
                 if did_record and not did_record.get("is_active", True):
-                    raise ValueError(
-                        "No active DID record found for {}".format(ctx.did_number)
-                    )
+                    raise ValueError(f"No active DID record found for {ctx.did_number}")
                 # DB-miss: single-entry dynamic inbound. Otoba is source of
                 # truth — if the engine has DID -> (agent, talko_partner_id),
                 # auto-use it without a Talko DID row. Inactive rows still
                 # reject above (explicit disable wins over engine).
-                dynamic = await self._aresolve_voiceai_resolution_for_did(
-                    ctx.did_number
-                )
-                if dynamic is None or not dynamic.get("agent_id") or not dynamic.get(
-                    "partner_id"
-                ):
-                    raise ValueError(
-                        "No active DID record found for {}".format(ctx.did_number)
-                    )
+                dynamic = await self._aresolve_voiceai_resolution_for_did(ctx.did_number)
+                if dynamic is None or not dynamic.get("agent_id") or not dynamic.get("partner_id"):
+                    raise ValueError(f"No active DID record found for {ctx.did_number}")
                 did_record = {
                     "did_type": TalkoDIDType.AI_AGENT.value,
                     "partner_id": dynamic["partner_id"],
@@ -291,33 +197,25 @@ class TalkoPSTNBridgeService:
                 # re-resolves quickly; agent truth still re-checked per call
                 # via the voiceai agent cache (60s) + Step 4b.
                 try:
-                    ttl = int(
-                        getattr(TalkoENV, "VOICEAI_DID_CACHE_TTL_SECONDS", 60) or 60
-                    )
+                    ttl = int(getattr(TalkoENV, "VOICEAI_DID_CACHE_TTL_SECONDS", 60) or 60)
                 except Exception:
                     ttl = 60
                 await self._set_cached_did(ctx.did_number, did_record, ttl=ttl)
             else:
                 await self._set_cached_did(ctx.did_number, did_record)
         else:
-            self.__logger.info(
-                "[PSTN][DID] Cache HIT did_number={}".format(ctx.did_number)
-            )
+            self.__logger.info(f"[PSTN][DID] Cache HIT did_number={ctx.did_number}")
             if not did_record.get("is_active", True):
-                raise ValueError(
-                    "No active DID record found for {}".format(ctx.did_number)
-                )
+                raise ValueError(f"No active DID record found for {ctx.did_number}")
 
         did_type: str = did_record.get("did_type", TalkoDIDType.NORMAL.value)
         partner_id: int = did_record["partner_id"]
         vendor_config_id: str = str(did_record.get("vendor_config_id", ""))
-        agent_id: Optional[int] = did_record.get("agent_id")
-        agent_bot_id: Optional[int] = did_record.get("agent_bot_id")
+        agent_id: int | None = did_record.get("agent_id")
+        agent_bot_id: int | None = did_record.get("agent_bot_id")
 
         self.__logger.info(
-            "[PSTN][DID] did_type={} partner_id={} vendor_config_id={} agent_id={} agent_bot_id={}".format(
-                did_type, partner_id, vendor_config_id, agent_id, agent_bot_id
-            )
+            f"[PSTN][DID] did_type={did_type} partner_id={partner_id} vendor_config_id={vendor_config_id} agent_id={agent_id} agent_bot_id={agent_bot_id}"
         )
 
         if did_type == TalkoDIDType.AI_AGENT.value:
@@ -330,35 +228,27 @@ class TalkoPSTNBridgeService:
                 # Cache the agent on ctx so fast-path / outbound fast-path /
                 # Step 4b / session reuse it without extra Redis round trips.
                 # Dynamic DB-miss already fetched it above — reuse, don't refetch.
-                voiceai_agent = prefetched_voiceai_agent or await self._aresolve_voiceai_agent_id_for_did(ctx.did_number)
+                voiceai_agent = prefetched_voiceai_agent or await self._aresolve_voiceai_agent_id_for_did(
+                    ctx.did_number
+                )
                 if voiceai_agent is None:
-                    raise ValueError(
-                        "DID {} is ai_agent but agent_bot_id is missing".format(
-                            ctx.did_number
-                        )
-                    )
+                    raise ValueError(f"DID {ctx.did_number} is ai_agent but agent_bot_id is missing")
                 ctx.voiceai_agent_id = voiceai_agent
                 self.__logger.info(
-                    "[PSTN][DID] voiceai-mapped DID {} agent={} — cached on ctx".format(
-                        ctx.did_number, voiceai_agent
-                    )
+                    f"[PSTN][DID] voiceai-mapped DID {ctx.did_number} agent={voiceai_agent} — cached on ctx"
                 )
             else:
                 ctx.makunai_agent_id = agent_bot_id
         else:
             if not agent_id:
-                raise ValueError(
-                    "DID {} is normal but agent_id is missing".format(ctx.did_number)
-                )
+                raise ValueError(f"DID {ctx.did_number} is normal but agent_id is missing")
             ctx.makunai_agent_id = agent_id
 
         ctx.partner_id = partner_id
         ctx.vendor_config_id = vendor_config_id
 
         self.__logger.info(
-            "[PSTN][DID] ✅ Resolved partner_id={} makunai_agent_id={}".format(
-                ctx.partner_id, ctx.makunai_agent_id
-            )
+            f"[PSTN][DID] ✅ Resolved partner_id={ctx.partner_id} makunai_agent_id={ctx.makunai_agent_id}"
         )
         return ctx
 
@@ -389,7 +279,7 @@ class TalkoPSTNBridgeService:
             pass
         return "".join(ch for ch in (did_number or "") if ch.isdigit())
 
-    async def _resolve_voiceai_agent_id(self, ctx: TalkoCallContext) -> Optional[str]:
+    async def _resolve_voiceai_agent_id(self, ctx: TalkoCallContext) -> str | None:
         """Resolve the voiceai agent for this call, if it is voiceai-routed.
 
         Outbound: ``context_data.voiceai_agent_id`` (set by voiceai's
@@ -407,14 +297,14 @@ class TalkoPSTNBridgeService:
             return str(ctx.voiceai_agent_id)
         return await self._aresolve_voiceai_agent_id_for_did(ctx.did_number)
 
-    def _resolve_voiceai_agent_id_sync(self, ctx: TalkoCallContext) -> Optional[str]:
+    def _resolve_voiceai_agent_id_sync(self, ctx: TalkoCallContext) -> str | None:
         """Sync env-only fast check (kept for backward compat / tests)."""
         agent_id = (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY)
         if agent_id:
             return str(agent_id)
         return self._resolve_voiceai_agent_id_for_did(ctx.did_number)
 
-    def _resolve_voiceai_agent_id_for_did(self, did_number: str) -> Optional[str]:
+    def _resolve_voiceai_agent_id_for_did(self, did_number: str) -> str | None:
         """Inbound lookup only, env override: DID -> voiceai agent id.
 
         Tolerant of leading '+' (Tata sends +9179…, maps may store 9179…),
@@ -424,9 +314,7 @@ class TalkoPSTNBridgeService:
         try:
             mapping = json.loads(TalkoENV.VOICEAI_INBOUND_AGENT_MAP or "{}")
         except (json.JSONDecodeError, TypeError) as e:
-            self.__logger.warning(
-                "[PSTN][VOICEAI] Ignoring invalid VOICEAI_INBOUND_AGENT_MAP: {}".format(e)
-            )
+            self.__logger.warning(f"[PSTN][VOICEAI] Ignoring invalid VOICEAI_INBOUND_AGENT_MAP: {e}")
             return None
         if not isinstance(mapping, dict):
             return None
@@ -443,7 +331,7 @@ class TalkoPSTNBridgeService:
                 return str(agent_id)
         return None
 
-    async def _get_cached_voiceai_agent(self, digits: str) -> Tuple[bool, Optional[str]]:
+    async def _get_cached_voiceai_agent(self, digits: str) -> tuple[bool, str | None]:
         """Redis lookup for engine DID mapping.
 
         Returns (found, agent_id): found=False means cache miss (or Redis
@@ -459,23 +347,15 @@ class TalkoPSTNBridgeService:
             if isinstance(raw, bytes):
                 raw = raw.decode()
             if not raw:
-                self.__logger.debug(
-                    "[PSTN][VOICEAI][CACHE] NEGATIVE HIT digits={}".format(digits)
-                )
+                self.__logger.debug(f"[PSTN][VOICEAI][CACHE] NEGATIVE HIT digits={digits}")
                 return True, None
-            self.__logger.debug(
-                "[PSTN][VOICEAI][CACHE] HIT digits={}".format(digits)
-            )
+            self.__logger.debug(f"[PSTN][VOICEAI][CACHE] HIT digits={digits}")
             return True, str(raw)
         except Exception as exc:
-            self.__logger.warning(
-                "[PSTN][VOICEAI][CACHE] GET ERROR digits={} error={} — treating as miss".format(
-                    digits, exc
-                )
-            )
+            self.__logger.warning(f"[PSTN][VOICEAI][CACHE] GET ERROR digits={digits} error={exc} — treating as miss")
             return False, None
 
-    async def _set_cached_voiceai_agent(self, digits: str, agent_id: Optional[str]) -> None:
+    async def _set_cached_voiceai_agent(self, digits: str, agent_id: str | None) -> None:
         """Cache engine answer: positives 60s, 404 misses 10s (self-heals)."""
         key = VOICEAI_DID_CACHE_KEY.format(digits=digits)
         try:
@@ -487,13 +367,11 @@ class TalkoPSTNBridgeService:
                 ttl = int(getattr(TalkoENV, "VOICEAI_DID_NEGATIVE_CACHE_TTL_SECONDS", 10) or 10)
                 await redis.set(key, "", ex=ttl)
         except Exception as exc:
-            self.__logger.warning(
-                "[PSTN][VOICEAI][CACHE] SET ERROR digits={} error={}".format(digits, exc)
-            )
+            self.__logger.warning(f"[PSTN][VOICEAI][CACHE] SET ERROR digits={digits} error={exc}")
 
     async def _fetch_voiceai_resolution_from_engine(
         self, did_number: str, digits: str
-    ) -> Tuple[bool, Optional[str], Optional[int], Optional[str]]:
+    ) -> tuple[bool, str | None, int | None, str | None]:
         """Direct engine call. Returns (completed, agent_id, partner_id, vendor_config_id).
 
         completed=False means transport error/timeout — caller must NOT cache
@@ -505,13 +383,13 @@ class TalkoPSTNBridgeService:
         base = (TalkoENV.VOICEAI_API_BASE_URL or "").rstrip("/")
         if not base or not TalkoENV.VOICEAI_API_KEY:
             return True, None, None, None
-        url = "{}/phone-numbers/resolve".format(base)
+        url = f"{base}/phone-numbers/resolve"
         timeout = float(getattr(TalkoENV, "VOICEAI_DID_RESOLVE_TIMEOUT_SECONDS", 0.3) or 0.3)
         try:
             resp = await self.__http_client.get(
                 url,
                 params={"number": did_number},
-                headers={"Authorization": "Bearer {}".format(TalkoENV.VOICEAI_API_KEY)},
+                headers={"Authorization": f"Bearer {TalkoENV.VOICEAI_API_KEY}"},
                 timeout=timeout,
             )
             if resp.status_code == 200:
@@ -521,7 +399,7 @@ class TalkoPSTNBridgeService:
                     data = {}
                 data = data or {}
                 agent_id = data.get("agent_id")
-                partner_id: Optional[int] = None
+                partner_id: int | None = None
                 try:
                     raw_partner = data.get("talko_partner_id")
                     if raw_partner is not None and str(raw_partner).strip() != "":
@@ -538,30 +416,18 @@ class TalkoPSTNBridgeService:
                 )
             if resp.status_code == 404:
                 return True, None, None, None
-            self.__logger.warning(
-                "[PSTN][VOICEAI][ENGINE] Unexpected status={} digits={}".format(
-                    resp.status_code, digits
-                )
-            )
+            self.__logger.warning(f"[PSTN][VOICEAI][ENGINE] Unexpected status={resp.status_code} digits={digits}")
             return False, None, None, None
         except Exception as exc:
-            self.__logger.warning(
-                "[PSTN][VOICEAI][ENGINE] Lookup failed digits={} error={} — fail-closed".format(
-                    digits, exc
-                )
-            )
+            self.__logger.warning(f"[PSTN][VOICEAI][ENGINE] Lookup failed digits={digits} error={exc} — fail-closed")
             return False, None, None, None
 
-    async def _fetch_voiceai_agent_from_engine(self, did_number: str, digits: str) -> Tuple[bool, Optional[str]]:
+    async def _fetch_voiceai_agent_from_engine(self, did_number: str, digits: str) -> tuple[bool, str | None]:
         """Backward-compat wrapper: agent only (partner ignored)."""
-        completed, agent_id, _, _ = await self._fetch_voiceai_resolution_from_engine(
-            did_number, digits
-        )
+        completed, agent_id, _, _ = await self._fetch_voiceai_resolution_from_engine(did_number, digits)
         return completed, agent_id
 
-    async def _aresolve_voiceai_resolution_for_did(
-        self, did_number: str
-    ) -> Optional[Dict[str, Any]]:
+    async def _aresolve_voiceai_resolution_for_did(self, did_number: str) -> dict[str, Any] | None:
         """Full inbound resolution: env override -> Redis -> engine HTTP.
 
         Returns {"agent_id", "partner_id", "vendor_config_id"} or None.
@@ -582,8 +448,8 @@ class TalkoPSTNBridgeService:
         # intentionally not used here — partner isn't cached there, and this
         # runs only on Talko DB-miss (then synthetic DID cache covers the
         # next 60s; steady-state calls use the agent-only helper, no HTTP).
-        completed, agent_id, partner_id, vendor_config_id = (
-            await self._fetch_voiceai_resolution_from_engine(did_number, digits)
+        completed, agent_id, partner_id, vendor_config_id = await self._fetch_voiceai_resolution_from_engine(
+            did_number, digits
         )
         if not completed:
             return None
@@ -597,7 +463,7 @@ class TalkoPSTNBridgeService:
             "vendor_config_id": vendor_config_id,
         }
 
-    async def _aresolve_voiceai_agent_id_for_did(self, did_number: str) -> Optional[str]:
+    async def _aresolve_voiceai_agent_id_for_did(self, did_number: str) -> str | None:
         """Full inbound lookup: env override -> Redis -> engine HTTP.
 
         Env always wins (break-glass). Redis holds positives 60s and 404
@@ -627,9 +493,7 @@ class TalkoPSTNBridgeService:
         await self._set_cached_voiceai_agent(digits, agent_id)
         return agent_id
 
-    async def _run_voiceai_relay(
-        self, ws, provider, ctx, event, raw_events, voiceai_agent_id: str
-    ) -> None:
+    async def _run_voiceai_relay(self, ws, provider, ctx, event, raw_events, voiceai_agent_id: str) -> None:
         """Run one voiceai relay leg. Shared by the Step-2 fast path (inbound
         voiceai DIDs) and Step 4b (outbound AI-bridge after context attach).
         Returns normally either way; the caller breaks out to cleanup."""
@@ -643,20 +507,19 @@ class TalkoPSTNBridgeService:
                 connect_timeout_seconds=TalkoENV.VOICEAI_WS_CONNECT_TIMEOUT_SECONDS,
             )
             await relay.run(
-                ws, provider, ctx, event,
-                raw_events, voiceai_agent_id,
+                ws,
+                provider,
+                ctx,
+                event,
+                raw_events,
+                voiceai_agent_id,
             )
         except Exception as e:
             self.__logger.error(
-                "[PSTN][CALL] ❌ voiceai relay FAILED sid={} "
-                "error={} traceback={}".format(
-                    ctx.call_sid, e, traceback.format_exc()
-                )
+                f"[PSTN][CALL] ❌ voiceai relay FAILED sid={ctx.call_sid} error={e} traceback={traceback.format_exc()}"
             )
 
-    async def _attach_pending_context(
-        self, ctx: TalkoCallContext, event: Dict[str, Any]
-    ) -> TalkoCallContext:
+    async def _attach_pending_context(self, ctx: TalkoCallContext, event: dict[str, Any]) -> TalkoCallContext:
         """
         Attach pre-stored call context to ctx.
 
@@ -669,22 +532,14 @@ class TalkoPSTNBridgeService:
            needed before _create_session so there is no reason to await it
            on the critical path. Saves ~30-80ms per call.
         """
-        self.__logger.info(
-            "[PSTN][CTX] ===== ATTACH PENDING CONTEXT ===== call_sid={}".format(
-                ctx.call_sid
-            )
-        )
+        self.__logger.info(f"[PSTN][CTX] ===== ATTACH PENDING CONTEXT ===== call_sid={ctx.call_sid}")
 
         try:
-            start: Dict[str, Any] = (
-                event.get("start", {}) if isinstance(event, dict) else {}
-            )
+            start: dict[str, Any] = event.get("start", {}) if isinstance(event, dict) else {}
             to_number_raw = start.get("to", "")
             to_number = to_number_raw.lstrip("+")
 
-            self.__logger.info(
-                "[PSTN][CTX] to_number={} raw={}".format(to_number, to_number_raw)
-            )
+            self.__logger.info(f"[PSTN][CTX] to_number={to_number} raw={to_number_raw}")
 
             if not to_number:
                 self.__logger.warning("[PSTN][CTX] to_number missing in start event")
@@ -694,32 +549,17 @@ class TalkoPSTNBridgeService:
             # (1 GET for index, 1 pipeline for GET+DELETE+DELETE)
             pending = await self.__call_redis_helper.fetch_and_delete_context(to_number)
 
-            self.__logger.info(
-                "[PSTN][CTX] pending context found={} to_number={}".format(
-                    pending is not None, to_number
-                )
-            )
+            self.__logger.info(f"[PSTN][CTX] pending context found={pending is not None} to_number={to_number}")
 
             if not pending:
-                self.__logger.warning(
-                    "[PSTN][CTX] ❌ No context found for to_number={}".format(to_number)
-                )
+                self.__logger.warning(f"[PSTN][CTX] ❌ No context found for to_number={to_number}")
                 return ctx
 
             ctx.context_data = pending.get("context_data") or {}
             ctx.pending_context_found = True
-            ctx.vendor_call_id = (
-                start.get("callSid")
-                or start.get("callId")
-                or start.get("callid")
-                or ctx.call_sid
-            )
+            ctx.vendor_call_id = start.get("callSid") or start.get("callId") or start.get("callid") or ctx.call_sid
 
-            self.__logger.info(
-                "[PSTN][CTX] vendor_call_id={} context_data={}".format(
-                    ctx.vendor_call_id, ctx.context_data
-                )
-            )
+            self.__logger.info(f"[PSTN][CTX] vendor_call_id={ctx.vendor_call_id} context_data={ctx.context_data}")
 
             # Fire-and-forget — stream context is used for observability/debugging
             # only and is NOT needed before session creation or LiveKit connect.
@@ -736,36 +576,26 @@ class TalkoPSTNBridgeService:
                         "context_data": ctx.context_data,
                     },
                 ),
-                name="stream_ctx_{}".format(ctx.call_sid),
+                name=f"stream_ctx_{ctx.call_sid}",
             )
 
-            self.__logger.info(
-                "[PSTN][CTX] ✅ Context attached call_sid={}".format(ctx.call_sid)
-            )
+            self.__logger.info(f"[PSTN][CTX] ✅ Context attached call_sid={ctx.call_sid}")
             return ctx
 
         except Exception as exc:
-            self.__logger.error(
-                "[PSTN][CTX] ❌ error={} traceback={}".format(
-                    exc, traceback.format_exc()
-                )
-            )
+            self.__logger.error(f"[PSTN][CTX] ❌ error={exc} traceback={traceback.format_exc()}")
             return ctx
 
     async def _create_session(self, ctx: TalkoCallContext) -> TalkoCallContext:
         self.__logger.info(
-            "[PSTN][SESSION] Creating session call_sid={} partner_id={} agent_id={}".format(
-                ctx.call_sid, ctx.partner_id, ctx.makunai_agent_id
-            )
+            f"[PSTN][SESSION] Creating session call_sid={ctx.call_sid} partner_id={ctx.partner_id} agent_id={ctx.makunai_agent_id}"
         )
         if (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY):
             # voiceai-routed call — no makun-ai session; handle_call() runs
             # the voiceai relay instead (see Step 4b below).
             self.__logger.info(
-                "[PSTN][SESSION] voiceai-routed call sid={} agent={} — "
-                "skipping makun-ai session".format(
-                    ctx.call_sid, ctx.context_data.get(VOICEAI_AGENT_ID_KEY)
-                )
+                f"[PSTN][SESSION] voiceai-routed call sid={ctx.call_sid} agent={ctx.context_data.get(VOICEAI_AGENT_ID_KEY)} — "
+                "skipping makun-ai session"
             )
             return ctx
         if (await self._resolve_voiceai_agent_id(ctx)) is not None:
@@ -774,10 +604,7 @@ class TalkoPSTNBridgeService:
             # on the hot path. Without this, _create_session would attempt
             # the makun-ai path (incl. a gRPC API-key fetch) and kill the
             # call before Step 4b ever runs.
-            self.__logger.info(
-                "[PSTN][SESSION] voiceai-mapped DID sid={} — "
-                "skipping makun-ai session".format(ctx.call_sid)
-            )
+            self.__logger.info(f"[PSTN][SESSION] voiceai-mapped DID sid={ctx.call_sid} — skipping makun-ai session")
             return ctx
         try:
             api_key: str = await self._resolve_partner_api_key(ctx.partner_id)
@@ -786,7 +613,7 @@ class TalkoPSTNBridgeService:
             # known here for both inbound and the outbound fallback path, so it can
             # go straight into context_data for makun-ai's tool-call auto-injection
             # (see tools/executor.py). Our value wins over any caller-supplied one.
-            session_context_data: Dict[str, Any] = {
+            session_context_data: dict[str, Any] = {
                 **(ctx.context_data or {}),
                 "call_id": ctx.call_sid,
             }
@@ -802,9 +629,7 @@ class TalkoPSTNBridgeService:
                 "skip_greeting_audio": True,
             }
             self.__logger.info(
-                "[PSTN][SESSION] Sending to MAKUNAI_SESSION_URL={} payload={}".format(
-                    TalkoENV.MAKUNAI_SESSION_URL, json.dumps(payload, default=str)
-                )
+                f"[PSTN][SESSION] Sending to MAKUNAI_SESSION_URL={TalkoENV.MAKUNAI_SESSION_URL} payload={json.dumps(payload, default=str)}"
             )
             resp = await self.__http_client.post(
                 TalkoENV.MAKUNAI_SESSION_URL,
@@ -812,32 +637,22 @@ class TalkoPSTNBridgeService:
                 json=payload,
                 timeout=MAKUNAI_SESSION_TIMEOUT_SECONDS,
             )
-            self.__logger.info(
-                "[PSTN][SESSION] Response status={}".format(resp.status_code)
-            )
+            self.__logger.info(f"[PSTN][SESSION] Response status={resp.status_code}")
             resp.raise_for_status()
             data = resp.json()["data"]
             ctx.livekit_url = data["livekit_url"]
             ctx.caller_token = data["caller_token"]
             ctx.room_name = data["room_name"]
             ctx.greeting_audio = data.get("greeting_audio")  # NEW
-            self.__logger.info(
-                "[PSTN][SESSION] ✅ Session created call_sid={} room={}".format(
-                    ctx.call_sid, ctx.room_name
-                )
-            )
+            self.__logger.info(f"[PSTN][SESSION] ✅ Session created call_sid={ctx.call_sid} room={ctx.room_name}")
             return ctx
         except Exception as e:
             self.__logger.error(
-                "[PSTN][SESSION] ❌ FAILED call_sid={} error={} traceback={}".format(
-                    ctx.call_sid, e, traceback.format_exc()
-                )
+                f"[PSTN][SESSION] ❌ FAILED call_sid={ctx.call_sid} error={e} traceback={traceback.format_exc()}"
             )
             raise
 
-    async def _backfill_real_vendor_call_id(
-        self, ctx: TalkoCallContext, room: rtc.Room
-    ) -> None:
+    async def _backfill_real_vendor_call_id(self, ctx: TalkoCallContext, room: rtc.Room) -> None:
         """
         Best-effort background task: resolve Tata's real vendor call_id (not
         ctx.call_sid) via the live_calls poll and republish it over the
@@ -859,76 +674,54 @@ class TalkoPSTNBridgeService:
         """
         try:
             self.__logger.info(
-                "[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={} room={}, call_context={}".format(
-                    ctx.call_sid, room.name, ctx.context_data
-                )
+                f"[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={ctx.call_sid} room={room.name}, call_context={ctx.context_data}"
             )
-            partner_config = await self.__call_repository.get_partner_config_by_partner_id(
-                ctx.partner_id
-            )
+            partner_config = await self.__call_repository.get_partner_config_by_partner_id(ctx.partner_id)
             if not partner_config:
                 return
 
             self.__logger.info(
-                "[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={} room={}, partner_config={}".format(
-                    ctx.call_sid, room.name, partner_config
-                )
+                f"[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={ctx.call_sid} room={room.name}, partner_config={partner_config}"
             )
 
-            vendor_id: Optional[str] = partner_config.get("vendor_id")
-            vendor_config_id: Optional[str] = partner_config.get(
-                "ai_vendor_config_id"
-            ) or partner_config.get("vendor_config_id")
+            vendor_id: str | None = partner_config.get("vendor_id")
+            vendor_config_id: str | None = partner_config.get("ai_vendor_config_id") or partner_config.get(
+                "vendor_config_id"
+            )
             if not vendor_id or not vendor_config_id:
                 return
 
             self.__logger.info(
-                "[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={} room={}, vendor_id={} vendor_config_id={}".format(
-                    ctx.call_sid, room.name, vendor_id, vendor_config_id
-                )
+                f"[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={ctx.call_sid} room={room.name}, vendor_id={vendor_id} vendor_config_id={vendor_config_id}"
             )
 
-            vendor_config = await self.__call_repository.get_vendor_config(
-                vendor_id, vendor_config_id
-            )
+            vendor_config = await self.__call_repository.get_vendor_config(vendor_id, vendor_config_id)
             if not vendor_config:
                 return
 
             self.__logger.info(
-                "[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={} room={}, vendor_config={}".format(
-                    ctx.call_sid, room.name, vendor_config
-                )
+                f"[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={ctx.call_sid} room={room.name}, vendor_config={vendor_config}"
             )
 
-            handler = TalkoTataTeleCallHandler(
-                vendor_config, self.__logger, vendor_config.get("vendor_type")
-            )
+            handler = TalkoTataTeleCallHandler(vendor_config, self.__logger, vendor_config.get("vendor_type"))
 
             self.__logger.info(
-                "[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={} room={}, handler={}".format(
-                    ctx.call_sid, room.name, handler
-                )
+                f"[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={ctx.call_sid} room={room.name}, handler={handler}"
             )
             resolved_call_id = await handler.find_live_call_id(
                 did_number=ctx.did_number, customer_number=ctx.caller_number
             )
             self.__logger.info(
-                "[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={} room={}, resolved_call_id={}".format(
-                    ctx.call_sid, room.name, resolved_call_id
-                )
+                f"[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={ctx.call_sid} room={room.name}, resolved_call_id={resolved_call_id}"
             )
 
             if resolved_call_id:
                 await room.local_participant.publish_data(
-                    payload=json.dumps(
-                        {"type": "call_id", "call_id": resolved_call_id}
-                    ).encode("utf-8"),
+                    payload=json.dumps({"type": "call_id", "call_id": resolved_call_id}).encode("utf-8"),
                     reliable=True,
                 )
                 self.__logger.info(
-                    "[PSTN][CALL_ID] ✅ Backfilled real vendor call_id={} call_sid={} room={}".format(
-                        resolved_call_id, ctx.call_sid, room.name
-                    )
+                    f"[PSTN][CALL_ID] ✅ Backfilled real vendor call_id={resolved_call_id} call_sid={ctx.call_sid} room={room.name}"
                 )
             else:
                 # live_calls poll found nothing (call already progressed
@@ -939,7 +732,7 @@ class TalkoPSTNBridgeService:
                 # call_id empty forever just because this specific poll missed.
                 self.__logger.info(
                     "[PSTN][CALL_ID] No live_calls match — falling back to "
-                    "ctx.call_sid={} for TalkoCDR update".format(ctx.call_sid)
+                    f"ctx.call_sid={ctx.call_sid} for TalkoCDR update"
                 )
 
             # Fix up Talko's own TalkoCDR row (inserted at initiate_call time
@@ -955,27 +748,19 @@ class TalkoPSTNBridgeService:
             if cdr_id and final_call_id:
                 try:
                     self.__logger.info(
-                        "[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={} room={}, cdr_id={}".format(
-                            ctx.call_sid, room.name, cdr_id
-                        )
+                        f"[PSTN][CALL_ID] Backfilling real vendor call_id call_sid={ctx.call_sid} room={room.name}, cdr_id={cdr_id}"
                     )
-                    await self.__call_repository.update_cdr(
-                        cdr_id, {"call_id": final_call_id}
-                    )
+                    await self.__call_repository.update_cdr(cdr_id, {"call_id": final_call_id})
                     self.__logger.info(
-                        "[PSTN][CALL_ID] ✅ Updated TalkoCDR cdr_id={} with call_id={}".format(
-                            cdr_id, final_call_id
-                        )
+                        f"[PSTN][CALL_ID] ✅ Updated TalkoCDR cdr_id={cdr_id} with call_id={final_call_id}"
                     )
                 except Exception as exc:
                     self.__logger.warning(
-                        "[PSTN][CALL_ID] Failed to update TalkoCDR cdr_id={} with "
-                        "call_id={}: {}".format(cdr_id, final_call_id, exc)
+                        f"[PSTN][CALL_ID] Failed to update TalkoCDR cdr_id={cdr_id} with call_id={final_call_id}: {exc}"
                     )
         except Exception as e:
             self.__logger.warning(
-                "[PSTN][CALL_ID] Background vendor call_id backfill failed "
-                "call_sid={}: {}".format(ctx.call_sid, e)
+                f"[PSTN][CALL_ID] Background vendor call_id backfill failed call_sid={ctx.call_sid}: {e}"
             )
 
     # ── NEW: greeting playback idempotency + direct playback ─────────────────
@@ -996,9 +781,7 @@ class TalkoPSTNBridgeService:
             return bool(claimed)
         except Exception as e:
             self.__logger.warning(
-                "[PSTN][GREETING] Idempotency check failed call_sid={}: {} — playing anyway".format(
-                    call_sid, e
-                )
+                f"[PSTN][GREETING] Idempotency check failed call_sid={call_sid}: {e} — playing anyway"
             )
             return True
 
@@ -1009,8 +792,8 @@ class TalkoPSTNBridgeService:
         stream_sid: str,
         greeting_audio_b64: str,
         bridge: TalkoAudioBridge,
-        pending_marks: Dict[str, asyncio.Event],
-        mark_sent_at: Dict[str, float],
+        pending_marks: dict[str, asyncio.Event],
+        mark_sent_at: dict[str, float],
         delay_seconds: float = 0.0,
     ) -> None:
         """
@@ -1034,9 +817,7 @@ class TalkoPSTNBridgeService:
         try:
             if delay_seconds > 0:
                 self.__logger.info(
-                    "[PSTN][GREETING] Delaying greeting playback by {:.1f}s stream_sid={}".format(
-                        delay_seconds, stream_sid
-                    )
+                    f"[PSTN][GREETING] Delaying greeting playback by {delay_seconds:.1f}s stream_sid={stream_sid}"
                 )
                 await asyncio.sleep(delay_seconds)
 
@@ -1044,48 +825,30 @@ class TalkoPSTNBridgeService:
             mulaw_8k = bridge.outbound(pcm_48k)
             chunks, _ = TalkoAudioBridge.align_chunks(mulaw_8k)
 
-            self.__logger.info(
-                "[PSTN][GREETING] Playing cached greeting stream_sid={} chunks={}".format(
-                    stream_sid, len(chunks)
-                )
-            )
+            self.__logger.info(f"[PSTN][GREETING] Playing cached greeting stream_sid={stream_sid} chunks={len(chunks)}")
 
             for chunk in chunks:
                 while len(pending_marks) >= MAX_PENDING_MARKS:
                     oldest_label = next(iter(pending_marks))
                     try:
-                        await asyncio.wait_for(
-                            pending_marks[oldest_label].wait(), timeout=ACK_WAIT_SECONDS
-                        )
-                    except asyncio.TimeoutError:
+                        await asyncio.wait_for(pending_marks[oldest_label].wait(), timeout=ACK_WAIT_SECONDS)
+                    except TimeoutError:
                         self.__logger.warning(
-                            "[PSTN][GREETING] Ack timeout label={} pending={}".format(
-                                oldest_label, len(pending_marks)
-                            )
+                            f"[PSTN][GREETING] Ack timeout label={oldest_label} pending={len(pending_marks)}"
                         )
                     finally:
                         pending_marks.pop(oldest_label, None)
                         mark_sent_at.pop(oldest_label, None)
 
                 chunk_num += 1
-                label = "greeting_{:06d}".format(chunk_num)
+                label = f"greeting_{chunk_num:06d}"
                 pending_marks[label] = asyncio.Event()
                 mark_sent_at[label] = time.perf_counter()
-                await provider.send_audio(
-                    ws, chunk, label, stream_sid=stream_sid, chunk=chunk_num
-                )
+                await provider.send_audio(ws, chunk, label, stream_sid=stream_sid, chunk=chunk_num)
 
-            self.__logger.info(
-                "[PSTN][GREETING] Cached greeting sent chunks={} stream_sid={}".format(
-                    chunk_num, stream_sid
-                )
-            )
+            self.__logger.info(f"[PSTN][GREETING] Cached greeting sent chunks={chunk_num} stream_sid={stream_sid}")
         except Exception as e:
-            self.__logger.warning(
-                "[PSTN][GREETING] Cached greeting playback failed stream_sid={}: {}".format(
-                    stream_sid, e
-                )
-            )
+            self.__logger.warning(f"[PSTN][GREETING] Cached greeting playback failed stream_sid={stream_sid}: {e}")
 
     async def _run_outbound_with_greeting(
         self,
@@ -1111,49 +874,39 @@ class TalkoPSTNBridgeService:
                 raise
             except Exception:
                 pass  # greeting failure already logged inside _play_cached_greeting
-        await self._outbound_audio(
-            room, ws, provider, pending_marks, mark_sent_at, stream_sid, bridge
-        )
+        await self._outbound_audio(room, ws, provider, pending_marks, mark_sent_at, stream_sid, bridge)
 
     # ─────────────────────────────────────────────────────────────────────────
 
     async def handle_call(self, ws, provider: TalkoAbstractPSTNProvider, raw_events) -> None:
         self.__logger.info("[PSTN][CALL] ===== HANDLE CALL STARTED =====")
-        ctx: Optional[TalkoCallContext] = None
-        room: Optional[rtc.Room] = None
-        audio_source: Optional[rtc.AudioSource] = None
-        pending_marks: Dict[str, asyncio.Event] = {}
-        mark_sent_at: Dict[str, float] = {}
+        ctx: TalkoCallContext | None = None
+        room: rtc.Room | None = None
+        audio_source: rtc.AudioSource | None = None
+        pending_marks: dict[str, asyncio.Event] = {}
+        mark_sent_at: dict[str, float] = {}
         media_frame_count: int = 0
-        outbound_task: Optional[asyncio.Task] = None
-        greeting_task: Optional[asyncio.Task] = None
+        outbound_task: asyncio.Task | None = None
+        greeting_task: asyncio.Task | None = None
         bridge = TalkoAudioBridge()
 
         try:
             async for raw in raw_events:
                 try:
-                    event: Dict[str, Any] = json.loads(raw)
+                    event: dict[str, Any] = json.loads(raw)
                 except json.JSONDecodeError as e:
-                    self.__logger.warning("[PSTN][CALL] Invalid JSON: {}".format(e))
+                    self.__logger.warning(f"[PSTN][CALL] Invalid JSON: {e}")
                     continue
 
-                etype: Optional[str] = event.get("event")
-                self.__logger.debug(
-                    "[PSTN][CALL] Event type={} sid={}".format(
-                        etype, ctx.call_sid if ctx else "?"
-                    )
-                )
+                etype: str | None = event.get("event")
+                self.__logger.debug("[PSTN][CALL] Event type={} sid={}".format(etype, ctx.call_sid if ctx else "?"))
 
                 if etype == "connected":
                     await ws.send_text(json.dumps({"event": "connected"}))
                     self.__logger.info("[PSTN][CALL] WebSocket connected ack sent")
 
                 elif etype == "start":
-                    self.__logger.info(
-                        "[PSTN][CALL] ===== START EVENT ===== raw={}".format(
-                            str(event)[:500]
-                        )
-                    )
+                    self.__logger.info(f"[PSTN][CALL] ===== START EVENT ===== raw={str(event)[:500]}")
                     try:
                         t0 = time.perf_counter()
 
@@ -1161,25 +914,14 @@ class TalkoPSTNBridgeService:
                         self.__logger.info("[PSTN][CALL] Step 1: Parsing start event")
                         ctx = await provider.parse_start_event(event)
                         self.__logger.info(
-                            "[PSTN][CALL] Step 1 done: call_sid={} did={} caller={} stream_sid={}".format(
-                                ctx.call_sid,
-                                ctx.did_number,
-                                ctx.caller_number,
-                                ctx.stream_sid,
-                            )
+                            f"[PSTN][CALL] Step 1 done: call_sid={ctx.call_sid} did={ctx.did_number} caller={ctx.caller_number} stream_sid={ctx.stream_sid}"
                         )
 
                         # ── Step 2: DID resolve ───────────────────────────────
-                        self.__logger.info(
-                            "[PSTN][CALL] Step 2: Resolving DID={}".format(
-                                ctx.did_number
-                            )
-                        )
+                        self.__logger.info(f"[PSTN][CALL] Step 2: Resolving DID={ctx.did_number}")
                         ctx = await self._resolve_did(ctx)
                         self.__logger.info(
-                            "[PSTN][CALL] Step 2 done: partner_id={} agent_id={}".format(
-                                ctx.partner_id, ctx.makunai_agent_id
-                            )
+                            f"[PSTN][CALL] Step 2 done: partner_id={ctx.partner_id} agent_id={ctx.makunai_agent_id}"
                         )
 
                         # ── Fast path: voiceai DIDs skip room/session ──
@@ -1197,24 +939,18 @@ class TalkoPSTNBridgeService:
                         # directly. Context timeout still bounds slow Redis —
                         # relay falls back to the DID agent.
                         # ─────────────────────────────────────────────────────
-                        start_dir = (event.get("start", {}) or {}).get(
-                            "direction", "inbound"
-                        )
+                        start_dir = (event.get("start", {}) or {}).get("direction", "inbound")
                         # Step-2 cached — zero Redis trips on the hot path.
                         fast_voiceai_agent = getattr(ctx, "voiceai_agent_id", None)
                         if fast_voiceai_agent is None:
-                            fast_voiceai_agent = await self._aresolve_voiceai_agent_id_for_did(
-                                ctx.did_number
-                            )
+                            fast_voiceai_agent = await self._aresolve_voiceai_agent_id_for_did(ctx.did_number)
                             if fast_voiceai_agent:
                                 ctx.voiceai_agent_id = fast_voiceai_agent
                         if fast_voiceai_agent and self._voiceai_configured():
                             if start_dir != "outbound":
                                 self.__logger.info(
-                                    "[PSTN][CALL] Fast path: inbound voiceai sid={} "
-                                    "agent={} — skipping Steps 3-4".format(
-                                        ctx.call_sid, fast_voiceai_agent
-                                    )
+                                    f"[PSTN][CALL] Fast path: inbound voiceai sid={ctx.call_sid} "
+                                    f"agent={fast_voiceai_agent} — skipping Steps 3-4"
                                 )
                                 # Preserve what _attach_pending_context would have
                                 # set and cleanup/observability may read (the call
@@ -1227,17 +963,19 @@ class TalkoPSTNBridgeService:
                                     or ctx.call_sid
                                 )
                                 await self._run_voiceai_relay(
-                                    ws, provider, ctx, event,
-                                    raw_events, fast_voiceai_agent,
+                                    ws,
+                                    provider,
+                                    ctx,
+                                    event,
+                                    raw_events,
+                                    fast_voiceai_agent,
                                 )
                                 break
                             # Outbound voiceai: attach per-call context, skip
                             # room selection + session entirely.
                             self.__logger.info(
-                                "[PSTN][CALL] Fast path: outbound voiceai sid={} "
-                                "did_agent={} — attaching ctx, skipping room/session".format(
-                                    ctx.call_sid, fast_voiceai_agent
-                                )
+                                f"[PSTN][CALL] Fast path: outbound voiceai sid={ctx.call_sid} "
+                                f"did_agent={fast_voiceai_agent} — attaching ctx, skipping room/session"
                             )
                             t_ctx = time.perf_counter()
                             try:
@@ -1245,29 +983,23 @@ class TalkoPSTNBridgeService:
                                     asyncio.shield(
                                         asyncio.create_task(
                                             self._attach_pending_context(ctx, event),
-                                            name="ctx_attach_{}".format(ctx.call_sid),
+                                            name=f"ctx_attach_{ctx.call_sid}",
                                         )
                                     ),
                                     timeout=0.4,
                                 )
-                            except asyncio.TimeoutError:
+                            except TimeoutError:
                                 self.__logger.warning(
                                     "[PSTN][CALL] Fast path ctx timeout (400ms) — "
-                                    "relaying with DID agent call_sid={}".format(
-                                        ctx.call_sid
-                                    )
+                                    f"relaying with DID agent call_sid={ctx.call_sid}"
                                 )
                             self.__logger.info(
-                                "[PSTN][CALL] Fast path ctx done: pending_found={} "
-                                "elapsed={:.0f}ms".format(
+                                "[PSTN][CALL] Fast path ctx done: pending_found={} elapsed={:.0f}ms".format(
                                     getattr(ctx, "pending_context_found", False),
                                     (time.perf_counter() - t_ctx) * 1000,
                                 )
                             )
-                            voiceai_agent_id = (
-                                (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY)
-                                or fast_voiceai_agent
-                            )
+                            voiceai_agent_id = (ctx.context_data or {}).get(VOICEAI_AGENT_ID_KEY) or fast_voiceai_agent
                             if not ctx.vendor_call_id:
                                 start_obj = event.get("start", {}) or {}
                                 ctx.vendor_call_id = (
@@ -1277,8 +1009,12 @@ class TalkoPSTNBridgeService:
                                     or ctx.call_sid
                                 )
                             await self._run_voiceai_relay(
-                                ws, provider, ctx, event,
-                                raw_events, str(voiceai_agent_id),
+                                ws,
+                                provider,
+                                ctx,
+                                event,
+                                raw_events,
+                                str(voiceai_agent_id),
                             )
                             break
 
@@ -1296,21 +1032,17 @@ class TalkoPSTNBridgeService:
                         # fall back to the existing parallel context+session path, which
                         # is unchanged and safe for all call types.
                         # ─────────────────────────────────────────────────────
-                        start_data: Dict[str, Any] = event.get("start", {})
+                        start_data: dict[str, Any] = event.get("start", {})
                         direction: str = start_data.get("direction", "inbound")
                         # Must match the normalization _pre_create_session uses when
                         # storing outbound_room:<to_number> (call_management/services.py)
                         # — plain .lstrip("+") let a leading zero / missing country
                         # code / spaces produce a different key on this side and
                         # miss deterministically even when timing lined up fine.
-                        to_number: str = normalize_phone_number(
-                            start_data.get("to", ""), with_plus=False
-                        )
+                        to_number: str = normalize_phone_number(start_data.get("to", ""), with_plus=False)
 
                         self.__logger.info(
-                            "[PSTN][CALL] Step 3: Room selection direction={} to_number={}".format(
-                                direction, to_number
-                            )
+                            f"[PSTN][CALL] Step 3: Room selection direction={direction} to_number={to_number}"
                         )
 
                         if direction == "outbound" and to_number:
@@ -1322,9 +1054,7 @@ class TalkoPSTNBridgeService:
 
                         if outbound_room:
                             # ── Fast path: pre-warmed room ────────────────────
-                            age = time.time() - outbound_room.get(
-                                "created_at", time.time()
-                            )
+                            age = time.time() - outbound_room.get("created_at", time.time())
                             self.__logger.info(
                                 "[PSTN][CALL] Step 3: 🔥 Pre-warmed room HIT "
                                 "to_number={} room={} age={:.1f}s — "
@@ -1343,9 +1073,7 @@ class TalkoPSTNBridgeService:
                             # _backfill_real_vendor_call_id below to update the
                             # original TalkoCDR row once the real call_id resolves.
                             ctx.context_data = outbound_room.get("context_data") or {}
-                            ctx.greeting_audio = outbound_room.get(
-                                "greeting_audio"
-                            )  # NEW
+                            ctx.greeting_audio = outbound_room.get("greeting_audio")  # NEW
 
                             # Stream context write is observability only — fire-and-forget
                             asyncio.create_task(
@@ -1359,7 +1087,7 @@ class TalkoPSTNBridgeService:
                                         "pre_warmed": True,
                                     },
                                 ),
-                                name="stream_ctx_{}".format(ctx.call_sid),
+                                name=f"stream_ctx_{ctx.call_sid}",
                             )
 
                         else:
@@ -1380,31 +1108,26 @@ class TalkoPSTNBridgeService:
                             if outbound_room is None and direction == "outbound":
                                 self.__logger.info(
                                     "[PSTN][CALL] Step 3: No pre-warmed room for outbound "
-                                    "to_number={} — falling back to on-demand session".format(
-                                        to_number
-                                    )
+                                    f"to_number={to_number} — falling back to on-demand session"
                                 )
                             else:
                                 self.__logger.info(
-                                    "[PSTN][CALL] Step 3: Inbound call to_number={} "
-                                    "— using on-demand session".format(to_number)
+                                    f"[PSTN][CALL] Step 3: Inbound call to_number={to_number} — using on-demand session"
                                 )
 
                             self.__logger.info(
                                 "[PSTN][CALL] Steps 3+4: Context attach + Session create "
-                                "(parallel) call_sid={}".format(ctx.call_sid)
+                                f"(parallel) call_sid={ctx.call_sid}"
                             )
                             t_parallel = time.perf_counter()
 
                             context_task = asyncio.create_task(
                                 self._attach_pending_context(ctx, event),
-                                name="ctx_attach_{}".format(ctx.call_sid),
+                                name=f"ctx_attach_{ctx.call_sid}",
                             )
 
                             try:
-                                ctx = await asyncio.wait_for(
-                                    asyncio.shield(context_task), timeout=0.4
-                                )
+                                ctx = await asyncio.wait_for(asyncio.shield(context_task), timeout=0.4)
                                 self.__logger.info(
                                     "[PSTN][CALL] Step 3 done: pending_found={} "
                                     "context_data={} elapsed={:.0f}ms".format(
@@ -1413,10 +1136,10 @@ class TalkoPSTNBridgeService:
                                         (time.perf_counter() - t_parallel) * 1000,
                                     )
                                 )
-                            except asyncio.TimeoutError:
+                            except TimeoutError:
                                 self.__logger.warning(
                                     "[PSTN][CALL] Step 3 timeout (400ms) — proceeding "
-                                    "without context call_sid={}".format(ctx.call_sid)
+                                    f"without context call_sid={ctx.call_sid}"
                                 )
                                 context_task.cancel()
 
@@ -1427,16 +1150,12 @@ class TalkoPSTNBridgeService:
                             # to makun-ai (see PSTN/CALL_ID comment history above).
                             session_task = asyncio.create_task(
                                 self._create_session(ctx),
-                                name="session_create_{}".format(ctx.call_sid),
+                                name=f"session_create_{ctx.call_sid}",
                             )
                             ctx = await session_task
                             self.__logger.info(
-                                "[PSTN][CALL] Step 4 done: room={} livekit_url={} "
-                                "parallel_elapsed={:.0f}ms".format(
-                                    ctx.room_name,
-                                    ctx.livekit_url,
-                                    (time.perf_counter() - t_parallel) * 1000,
-                                )
+                                f"[PSTN][CALL] Step 4 done: room={ctx.room_name} livekit_url={ctx.livekit_url} "
+                                f"parallel_elapsed={(time.perf_counter() - t_parallel) * 1000:.0f}ms"
                             )
                         # ── End room selection ────────────────────────────────
 
@@ -1452,49 +1171,35 @@ class TalkoPSTNBridgeService:
                         voiceai_agent_id = await self._resolve_voiceai_agent_id(ctx)
                         if voiceai_agent_id and self._voiceai_configured():
                             self.__logger.info(
-                                "[PSTN][CALL] Step 4b: voiceai relay sid={} agent={}".format(
-                                    ctx.call_sid, voiceai_agent_id
-                                )
+                                f"[PSTN][CALL] Step 4b: voiceai relay sid={ctx.call_sid} agent={voiceai_agent_id}"
                             )
                             await self._run_voiceai_relay(
-                                ws, provider, ctx, event,
-                                raw_events, voiceai_agent_id,
+                                ws,
+                                provider,
+                                ctx,
+                                event,
+                                raw_events,
+                                voiceai_agent_id,
                             )
                             break
 
                         # ── Step 5: LiveKit connect ───────────────────────────
-                        self.__logger.info(
-                            "[PSTN][CALL] Step 5: Connecting LiveKit room={}".format(
-                                ctx.room_name
-                            )
-                        )
+                        self.__logger.info(f"[PSTN][CALL] Step 5: Connecting LiveKit room={ctx.room_name}")
                         room = rtc.Room()
                         await room.connect(
                             ctx.livekit_url,
                             ctx.caller_token,
                             rtc.RoomOptions(auto_subscribe=True),
                         )
-                        self.__logger.info(
-                            "[PSTN][CALL] Step 5 done: LiveKit connected room={}".format(
-                                ctx.room_name
-                            )
-                        )
+                        self.__logger.info(f"[PSTN][CALL] Step 5 done: LiveKit connected room={ctx.room_name}")
 
                         # ── Step 6: Publish audio track ───────────────────────
-                        self.__logger.info(
-                            "[PSTN][CALL] Step 6: Publishing audio track"
-                        )
-                        audio_source = rtc.AudioSource(
-                            sample_rate=48000, num_channels=1
-                        )
-                        track = rtc.LocalAudioTrack.create_audio_track(
-                            "pstn-in", audio_source
-                        )
+                        self.__logger.info("[PSTN][CALL] Step 6: Publishing audio track")
+                        audio_source = rtc.AudioSource(sample_rate=48000, num_channels=1)
+                        track = rtc.LocalAudioTrack.create_audio_track("pstn-in", audio_source)
                         publish_options = rtc.TrackPublishOptions()
                         publish_options.source = rtc.TrackSource.SOURCE_MICROPHONE
-                        await room.local_participant.publish_track(
-                            track, publish_options
-                        )
+                        await room.local_participant.publish_track(track, publish_options)
                         self.__logger.info("[PSTN][CALL] Step 6 done: Track published")
 
                         # ── Backfill call_id over the data channel ────────────
@@ -1510,16 +1215,12 @@ class TalkoPSTNBridgeService:
                         # confirmation there.
                         try:
                             await room.local_participant.publish_data(
-                                payload=json.dumps(
-                                    {"type": "call_id", "call_id": ctx.call_sid}
-                                ).encode("utf-8"),
+                                payload=json.dumps({"type": "call_id", "call_id": ctx.call_sid}).encode("utf-8"),
                                 reliable=True,
                             )
                         except Exception as e:
                             self.__logger.warning(
-                                "[PSTN][CALL] Failed to publish call_id to room={}: {}".format(
-                                    ctx.room_name, e
-                                )
+                                f"[PSTN][CALL] Failed to publish call_id to room={ctx.room_name}: {e}"
                             )
 
                         # ── Best-effort second pass: resolve + republish the real
@@ -1528,14 +1229,12 @@ class TalkoPSTNBridgeService:
                         # it cannot add latency to call setup or greeting playback.
                         asyncio.create_task(
                             self._backfill_real_vendor_call_id(ctx, room),
-                            name="vendor_call_id_{}".format(ctx.call_sid),
+                            name=f"vendor_call_id_{ctx.call_sid}",
                         )
 
                         # ── NEW: play cached greeting directly, bypassing the agent ──
                         if getattr(ctx, "greeting_audio", None):
-                            should_play = await self._claim_greeting_playback(
-                                ctx.call_sid
-                            )
+                            should_play = await self._claim_greeting_playback(ctx.call_sid)
                             if should_play:
                                 # Signal the agent BEFORE playback starts, not after — greeting
                                 # length varies, but this fires within milliseconds of publish_track,
@@ -1546,11 +1245,7 @@ class TalkoPSTNBridgeService:
                                         reliable=True,
                                     )
                                 except Exception as e:
-                                    self.__logger.warning(
-                                        "[PSTN][GREETING] Failed to signal agent: {}".format(
-                                            e
-                                        )
-                                    )
+                                    self.__logger.warning(f"[PSTN][GREETING] Failed to signal agent: {e}")
 
                                 greeting_task = asyncio.create_task(
                                     self._play_cached_greeting(
@@ -1562,18 +1257,14 @@ class TalkoPSTNBridgeService:
                                         pending_marks,
                                         mark_sent_at,
                                         delay_seconds=(
-                                            INBOUND_GREETING_DELAY_SECONDS
-                                            if direction == "inbound"
-                                            else 0.0
+                                            INBOUND_GREETING_DELAY_SECONDS if direction == "inbound" else 0.0
                                         ),
                                     ),
-                                    name="greeting_{}".format(ctx.call_sid),
+                                    name=f"greeting_{ctx.call_sid}",
                                 )
                             else:
                                 self.__logger.info(
-                                    "[PSTN][GREETING] Skipping — already played for call_sid={}".format(
-                                        ctx.call_sid
-                                    )
+                                    f"[PSTN][GREETING] Skipping — already played for call_sid={ctx.call_sid}"
                                 )
 
                         outbound_task = asyncio.create_task(
@@ -1587,7 +1278,7 @@ class TalkoPSTNBridgeService:
                                 ctx.stream_sid,
                                 bridge,
                             ),
-                            name="outbound_{}".format(ctx.call_sid),
+                            name=f"outbound_{ctx.call_sid}",
                         )
 
                         self.__logger.info(
@@ -1601,19 +1292,13 @@ class TalkoPSTNBridgeService:
                             )
                         )
                     except Exception as e:
-                        self.__logger.error(
-                            "[PSTN][CALL] ❌ Setup FAILED: {} traceback={}".format(
-                                e, traceback.format_exc()
-                            )
-                        )
+                        self.__logger.error(f"[PSTN][CALL] ❌ Setup FAILED: {e} traceback={traceback.format_exc()}")
                         break
 
                 elif provider.is_media_event(event) and audio_source:
                     if media_frame_count == 0:
                         self.__logger.info(
-                            "[PSTN][CALL] First inbound media frame received {:.0f}ms after Step 6 sid={}".format(
-                                (time.perf_counter() - t0) * 1000, ctx.call_sid
-                            )
+                            f"[PSTN][CALL] First inbound media frame received {(time.perf_counter() - t0) * 1000:.0f}ms after Step 6 sid={ctx.call_sid}"
                         )
                     media_frame_count += 1
                     if media_frame_count % 100 == 0:
@@ -1634,16 +1319,12 @@ class TalkoPSTNBridgeService:
                         )
                     except Exception as e:
                         self.__logger.warning(
-                            "[PSTN][CALL] Inbound audio error sid={}: {}".format(
-                                ctx.call_sid if ctx else "?", e
-                            )
+                            "[PSTN][CALL] Inbound audio error sid={}: {}".format(ctx.call_sid if ctx else "?", e)
                         )
 
                 elif provider.is_media_event(event) and not audio_source:
                     self.__logger.warning(
-                        "[PSTN][CALL] Media event but audio_source=None sid={}".format(
-                            ctx.call_sid if ctx else "?"
-                        )
+                        "[PSTN][CALL] Media event but audio_source=None sid={}".format(ctx.call_sid if ctx else "?")
                     )
 
                 elif provider.is_mark_ack(event):
@@ -1652,18 +1333,12 @@ class TalkoPSTNBridgeService:
                         pending_marks[label].set()
 
                 elif etype == "clear":
-                    self.__logger.info(
-                        "[PSTN][CALL] Clear event sid={}".format(
-                            ctx.call_sid if ctx else "?"
-                        )
-                    )
+                    self.__logger.info("[PSTN][CALL] Clear event sid={}".format(ctx.call_sid if ctx else "?"))
                     for ev in pending_marks.values():
                         ev.set()
                     pending_marks.clear()
                     mark_sent_at.clear()
-                    await provider.send_clear(
-                        ws, stream_sid=ctx.stream_sid if ctx else ""
-                    )
+                    await provider.send_clear(ws, stream_sid=ctx.stream_sid if ctx else "")
 
                 elif provider.is_stop_event(event):
                     self.__logger.info(
@@ -1675,9 +1350,7 @@ class TalkoPSTNBridgeService:
 
                 else:
                     self.__logger.debug(
-                        "[PSTN][CALL] Unhandled event type={} sid={}".format(
-                            etype, ctx.call_sid if ctx else "?"
-                        )
+                        "[PSTN][CALL] Unhandled event type={} sid={}".format(etype, ctx.call_sid if ctx else "?")
                     )
 
         except Exception as e:
@@ -1707,26 +1380,14 @@ class TalkoPSTNBridgeService:
             if room:
                 try:
                     await room.disconnect()
-                    self.__logger.info(
-                        "[PSTN][CALL] LiveKit disconnected sid={}".format(
-                            ctx.call_sid if ctx else "?"
-                        )
-                    )
+                    self.__logger.info("[PSTN][CALL] LiveKit disconnected sid={}".format(ctx.call_sid if ctx else "?"))
                 except Exception as e:
                     self.__logger.error(
-                        "[PSTN][CALL] LiveKit disconnect failed sid={}: {}".format(
-                            ctx.call_sid if ctx else "?", e
-                        )
+                        "[PSTN][CALL] LiveKit disconnect failed sid={}: {}".format(ctx.call_sid if ctx else "?", e)
                     )
 
-    async def _outbound_audio(
-        self, room, ws, provider, pending_marks, mark_sent_at, stream_sid, bridge
-    ) -> None:
-        self.__logger.info(
-            "[PSTN][OUT] ===== OUTBOUND AUDIO STARTED ===== stream_sid={}".format(
-                stream_sid
-            )
-        )
+    async def _outbound_audio(self, room, ws, provider, pending_marks, mark_sent_at, stream_sid, bridge) -> None:
+        self.__logger.info(f"[PSTN][OUT] ===== OUTBOUND AUDIO STARTED ===== stream_sid={stream_sid}")
         buffer: bytes = b""
         chunk_num: int = 0
         audio_stream_queue: asyncio.Queue = asyncio.Queue()
@@ -1734,9 +1395,7 @@ class TalkoPSTNBridgeService:
         def on_track_subscribed(track, publication, participant):
             if isinstance(track, rtc.RemoteAudioTrack):
                 self.__logger.info(
-                    "[PSTN][OUT] Remote audio track subscribed participant={} track_id={}".format(
-                        participant.identity, track.sid
-                    )
+                    f"[PSTN][OUT] Remote audio track subscribed participant={participant.identity} track_id={track.sid}"
                 )
                 stream = rtc.AudioStream(track, sample_rate=48000, num_channels=1)
                 asyncio.ensure_future(audio_stream_queue.put(stream))
@@ -1747,49 +1406,25 @@ class TalkoPSTNBridgeService:
             existing_count = 0
             for participant in room.remote_participants.values():
                 for publication in participant.track_publications.values():
-                    if publication.track is not None and isinstance(
-                        publication.track, rtc.RemoteAudioTrack
-                    ):
+                    if publication.track is not None and isinstance(publication.track, rtc.RemoteAudioTrack):
                         existing_count += 1
-                        stream = rtc.AudioStream(
-                            publication.track, sample_rate=48000, num_channels=1
-                        )
+                        stream = rtc.AudioStream(publication.track, sample_rate=48000, num_channels=1)
                         audio_stream_queue.put_nowait(stream)
-            self.__logger.info(
-                "[PSTN][OUT] Pre-existing tracks found={} stream_sid={}".format(
-                    existing_count, stream_sid
-                )
-            )
+            self.__logger.info(f"[PSTN][OUT] Pre-existing tracks found={existing_count} stream_sid={stream_sid}")
 
             try:
-                self.__logger.info(
-                    "[PSTN][OUT] Waiting for audio stream (timeout=15s) stream_sid={}".format(
-                        stream_sid
-                    )
-                )
-                audio_stream = await asyncio.wait_for(
-                    audio_stream_queue.get(), timeout=15.0
-                )
-                self.__logger.info(
-                    "[PSTN][OUT] Audio stream ready stream_sid={}".format(stream_sid)
-                )
-            except asyncio.TimeoutError:
-                self.__logger.error(
-                    "[PSTN][OUT] ❌ Timed out waiting for remote audio track stream_sid={}".format(
-                        stream_sid
-                    )
-                )
+                self.__logger.info(f"[PSTN][OUT] Waiting for audio stream (timeout=15s) stream_sid={stream_sid}")
+                audio_stream = await asyncio.wait_for(audio_stream_queue.get(), timeout=15.0)
+                self.__logger.info(f"[PSTN][OUT] Audio stream ready stream_sid={stream_sid}")
+            except TimeoutError:
+                self.__logger.error(f"[PSTN][OUT] ❌ Timed out waiting for remote audio track stream_sid={stream_sid}")
                 return
 
             async for audio_event in audio_stream:
                 try:
                     ws_state = ws.client_state.name
                     if ws_state == "DISCONNECTED":
-                        self.__logger.info(
-                            "[PSTN][OUT] WebSocket disconnected stopping stream_sid={}".format(
-                                stream_sid
-                            )
-                        )
+                        self.__logger.info(f"[PSTN][OUT] WebSocket disconnected stopping stream_sid={stream_sid}")
                         return
                 except Exception:
                     pass
@@ -1797,9 +1432,7 @@ class TalkoPSTNBridgeService:
                 try:
                     frame = audio_event.frame
                     buffer += bridge.outbound(bytes(frame.data))
-                    chunks, buffer = TalkoAudioBridge.align_chunks(
-                        buffer, chunk_size=CHUNK_SIZE
-                    )
+                    chunks, buffer = TalkoAudioBridge.align_chunks(buffer, chunk_size=CHUNK_SIZE)
 
                     for chunk in chunks:
                         while len(pending_marks) >= MAX_PENDING_MARKS:
@@ -1809,62 +1442,39 @@ class TalkoPSTNBridgeService:
                                     pending_marks[oldest_label].wait(),
                                     timeout=ACK_WAIT_SECONDS,
                                 )
-                            except asyncio.TimeoutError:
+                            except TimeoutError:
                                 self.__logger.warning(
-                                    "[PSTN][OUT] Ack timeout label={} pending={}".format(
-                                        oldest_label, len(pending_marks)
-                                    )
+                                    f"[PSTN][OUT] Ack timeout label={oldest_label} pending={len(pending_marks)}"
                                 )
                             finally:
                                 pending_marks.pop(oldest_label, None)
                                 mark_sent_at.pop(oldest_label, None)
 
                         chunk_num += 1
-                        label = "chunk_{:06d}".format(chunk_num)
+                        label = f"chunk_{chunk_num:06d}"
                         pending_marks[label] = asyncio.Event()
                         mark_sent_at[label] = time.perf_counter()
-                        await provider.send_audio(
-                            ws, chunk, label, stream_sid=stream_sid, chunk=chunk_num
-                        )
+                        await provider.send_audio(ws, chunk, label, stream_sid=stream_sid, chunk=chunk_num)
 
                         if chunk_num % 100 == 0:
                             self.__logger.info(
-                                "[PSTN][OUT] chunks_sent={} pending={} stream_sid={}".format(
-                                    chunk_num, len(pending_marks), stream_sid
-                                )
+                                f"[PSTN][OUT] chunks_sent={chunk_num} pending={len(pending_marks)} stream_sid={stream_sid}"
                             )
 
                 except Exception as e:
                     err_str = str(e)
-                    if (
-                        "close message has been sent" in err_str
-                        or "DISCONNECTED" in err_str
-                    ):
-                        self.__logger.info(
-                            "[PSTN][OUT] WebSocket closed stopping stream_sid={}".format(
-                                stream_sid
-                            )
-                        )
+                    if "close message has been sent" in err_str or "DISCONNECTED" in err_str:
+                        self.__logger.info(f"[PSTN][OUT] WebSocket closed stopping stream_sid={stream_sid}")
                         return
-                    self.__logger.warning(
-                        "[PSTN][OUT] Frame error chunk={} error={}".format(chunk_num, e)
-                    )
+                    self.__logger.warning(f"[PSTN][OUT] Frame error chunk={chunk_num} error={e}")
                     continue
 
         except asyncio.CancelledError:
-            self.__logger.info(
-                "[PSTN][OUT] Task cancelled stream_sid={}".format(stream_sid)
-            )
+            self.__logger.info(f"[PSTN][OUT] Task cancelled stream_sid={stream_sid}")
         except Exception as e:
             self.__logger.error(
-                "[PSTN][OUT] ❌ Task error stream_sid={} error={} traceback={}".format(
-                    stream_sid, e, traceback.format_exc()
-                )
+                f"[PSTN][OUT] ❌ Task error stream_sid={stream_sid} error={e} traceback={traceback.format_exc()}"
             )
         finally:
             room.off("track_subscribed", on_track_subscribed)
-            self.__logger.info(
-                "[PSTN][OUT] Done total_chunks={} stream_sid={}".format(
-                    chunk_num, stream_sid
-                )
-            )
+            self.__logger.info(f"[PSTN][OUT] Done total_chunks={chunk_num} stream_sid={stream_sid}")

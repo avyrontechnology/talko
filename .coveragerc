@@ -1,0 +1,11 @@
+[run]
+source = src
+omit =
+    */tests/*
+    */pub/*
+    */protos/*
+    */__init__.py
+
+[report]
+show_missing = True
+skip_covered = False

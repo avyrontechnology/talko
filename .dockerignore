@@ -1,0 +1,32 @@
+# Keep the build context lean and secret-free.
+# (DO App Platform builds from GitHub, where .env/venv/logs are already
+# gitignored — this also protects local `docker build` from baking them in.)
+
+.git/
+.github/
+.gitmodules
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.log
+celerybeat-schedule
+celerybeat.pid
+keys/
+certs/
+.do/
+docs/
+tests/
+venv/
+.mypy_cache/
+.ruff_cache/
+.vscode/
+.idea/

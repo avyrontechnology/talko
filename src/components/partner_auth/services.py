@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from bson import ObjectId
 
 from src.components.partner_auth.dto import TalkoContract
@@ -28,11 +26,9 @@ class TalkoPartnerApiKeyService:
         self.datetime_util = datetime_util
 
     async def create_api_key(
-        self, data: TalkoContract.ApiKeyCreate, created_by_user_id: Optional[int]
+        self, data: TalkoContract.ApiKeyCreate, created_by_user_id: int | None
     ) -> TalkoContract.ApiKeyCreateResponse:
-        self.logger.info(
-            "Creating partner api key for partner_id: {}".format(data.partner_id)
-        )
+        self.logger.info(f"Creating partner api key for partner_id: {data.partner_id}")
         raw_key, key_prefix, key_hash = TalkoApiKeyGenerator.generate()
         now = self.datetime_util.get_current_time()
         model = TalkoPartnerApiKeyModel(
@@ -46,11 +42,7 @@ class TalkoPartnerApiKeyService:
         )
         doc = model.model_dump(exclude_unset=False)
         api_key_id = await self.repository.insert_api_key(doc)
-        self.logger.info(
-            "Created partner api key {} for partner_id: {}".format(
-                api_key_id, data.partner_id
-            )
-        )
+        self.logger.info(f"Created partner api key {api_key_id} for partner_id: {data.partner_id}")
         return TalkoContract.ApiKeyCreateResponse(
             id=api_key_id,
             key=raw_key,
@@ -60,12 +52,8 @@ class TalkoPartnerApiKeyService:
             created_at=now,
         )
 
-    async def list_api_keys(
-        self, partner_id: int
-    ) -> List[TalkoContract.ApiKeyListItem]:
-        self.logger.info(
-            "Listing partner api keys for partner_id: {}".format(partner_id)
-        )
+    async def list_api_keys(self, partner_id: int) -> list[TalkoContract.ApiKeyListItem]:
+        self.logger.info(f"Listing partner api keys for partner_id: {partner_id}")
         keys = await self.repository.find_all_by_partner_id(partner_id)
         return [
             TalkoContract.ApiKeyListItem(
@@ -82,22 +70,18 @@ class TalkoPartnerApiKeyService:
         ]
 
     async def revoke_api_key(self, id: str) -> TalkoContract.ApiKeyRevokeResponse:
-        self.logger.info("Revoking partner api key {}".format(id))
+        self.logger.info(f"Revoking partner api key {id}")
         await self.validator.validate_key_exists(ObjectId(id))
         revoked_at = self.datetime_util.get_current_time()
         result = await self.repository.revoke(ObjectId(id), revoked_at)
-        return TalkoContract.ApiKeyRevokeResponse(
-            id=id, is_active=result["is_active"], revoked_at=result["revoked_at"]
-        )
+        return TalkoContract.ApiKeyRevokeResponse(id=id, is_active=result["is_active"], revoked_at=result["revoked_at"])
 
-    async def validate_and_get_partner(self, raw_key: str) -> Optional[dict]:
+    async def validate_and_get_partner(self, raw_key: str) -> dict | None:
         key_hash = TalkoApiKeyGenerator.hash_key(raw_key)
         api_key = await self.repository.find_by_key_hash(key_hash)
         if not api_key or not api_key.get("is_active"):
             return None
-        await self.repository.touch_last_used(
-            api_key["_id"], self.datetime_util.get_current_time()
-        )
+        await self.repository.touch_last_used(api_key["_id"], self.datetime_util.get_current_time())
         return {
             "partner_id": api_key["partner_id"],
             "api_key_id": str(api_key["_id"]),

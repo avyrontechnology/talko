@@ -1,0 +1,7 @@
+CLIENT_CREATED_SUCCESSFULLY = "Client created successfully"
+CLIENT_UPDATED_SUCCESSFULLY = "Client updated successfully"
+CLIENT_ACTIVATED_SUCCESSFULLY = "Client activated successfully"
+CLIENT_DEACTIVATED_SUCCESSFULLY = "Client deactivated successfully"
+CLIENT_NOT_FOUND = "Client not found for id {}"
+CLIENT_NAME_EXISTS = "Client '{}' already exists for partner {}"
+SOMETHING_WENT_WRONG = "Something went wrong"

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Union
+from typing import Any
 
 from bson import ObjectId
 
@@ -13,9 +13,7 @@ class TalkoVendorRepository:
     Uses asynchronous MongoDB sessions via the TalkoDocDatabaseSessionManager.
     """
 
-    def __init__(
-        self, session_factory: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
-    ):
+    def __init__(self, session_factory: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger):
         """
         Initialize the TalkoVendorRepository.
 
@@ -26,7 +24,7 @@ class TalkoVendorRepository:
         self.db_manager = session_factory
         self.logger = logger
 
-    async def insert_vendor(self, vendor_dict: Dict[str, Any]) -> str:
+    async def insert_vendor(self, vendor_dict: dict[str, Any]) -> str:
         """
         Insert a new vendor into the database.
 
@@ -37,9 +35,7 @@ class TalkoVendorRepository:
             str: ID of the inserted vendor.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoVendorModel.CollectionName.VENDOR
-            ) as collection:
+            async with self.db_manager.collection(TalkoVendorModel.CollectionName.VENDOR) as collection:
                 result = await collection.insert_one(vendor_dict)
                 self.logger.info(f"Inserted vendor with ID: {result.inserted_id}")
                 return str(result.inserted_id)
@@ -47,7 +43,7 @@ class TalkoVendorRepository:
             self.logger.error(f"Failed to insert vendor: {str(e)}")
             raise
 
-    async def find_vendor_by_slug(self, slug: str) -> Union[dict, None]:
+    async def find_vendor_by_slug(self, slug: str) -> dict | None:
         """
         Find a vendor by its slug.
 
@@ -58,17 +54,13 @@ class TalkoVendorRepository:
             dict | None: Vendor document if found, else None.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoVendorModel.CollectionName.VENDOR
-            ) as collection:
+            async with self.db_manager.collection(TalkoVendorModel.CollectionName.VENDOR) as collection:
                 return await collection.find_one({"slug": slug})
         except Exception as e:
             self.logger.error(f"Failed to find vendor by slug {slug}: {str(e)}")
             raise
 
-    async def find_vendor_by_type(
-        self, vendor_type: str, vendor_name: str
-    ) -> Union[dict, None]:
+    async def find_vendor_by_type(self, vendor_type: str, vendor_name: str) -> dict | None:
         """
         Find a vendor by its type.
 
@@ -80,12 +72,8 @@ class TalkoVendorRepository:
             dict | None: Vendor document if found, else None.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoVendorModel.CollectionName.VENDOR
-            ) as collection:
-                return await collection.find_one(
-                    {"vendor_type": vendor_type, "name": vendor_name}
-                )
+            async with self.db_manager.collection(TalkoVendorModel.CollectionName.VENDOR) as collection:
+                return await collection.find_one({"vendor_type": vendor_type, "name": vendor_name})
         except Exception as e:
             self.logger.error(f"Failed to find vendor by type {vendor_type}: {str(e)}")
             raise
@@ -101,16 +89,14 @@ class TalkoVendorRepository:
             list[dict]: List of vendor documents.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoVendorModel.CollectionName.VENDOR
-            ) as collection:
+            async with self.db_manager.collection(TalkoVendorModel.CollectionName.VENDOR) as collection:
                 query = {} if include_inactive else {"is_active": True}
                 return await collection.find(query).to_list(length=None)
         except Exception as e:
             self.logger.error(f"Failed to retrieve vendors: {str(e)}")
             raise
 
-    async def find_vendor_by_id(self, vendor_id: ObjectId) -> Union[dict, None]:
+    async def find_vendor_by_id(self, vendor_id: ObjectId) -> dict | None:
         """
         Find an active vendor by its ObjectId.
 
@@ -121,15 +107,13 @@ class TalkoVendorRepository:
             dict | None: Vendor document if found and active, else None.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoVendorModel.CollectionName.VENDOR
-            ) as collection:
+            async with self.db_manager.collection(TalkoVendorModel.CollectionName.VENDOR) as collection:
                 return await collection.find_one({"_id": vendor_id, "is_active": True})
         except Exception as e:
             self.logger.error(f"Failed to find vendor by ID {vendor_id}: {str(e)}")
             raise
 
-    async def find_vendor_by_id_all(self, vendor_id: ObjectId) -> Union[dict, None]:
+    async def find_vendor_by_id_all(self, vendor_id: ObjectId) -> dict | None:
         """
         Find a vendor by its ObjectId regardless of active status.
 
@@ -140,17 +124,13 @@ class TalkoVendorRepository:
             dict | None: Vendor document if found, else None.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoVendorModel.CollectionName.VENDOR
-            ) as collection:
+            async with self.db_manager.collection(TalkoVendorModel.CollectionName.VENDOR) as collection:
                 return await collection.find_one({"_id": vendor_id})
         except Exception as e:
             self.logger.error(f"Failed to find vendor by ID {vendor_id}: {str(e)}")
             raise
 
-    async def update_vendor_status(
-        self, vendor_id: ObjectId, is_active: bool, updated_at: int
-    ) -> dict:
+    async def update_vendor_status(self, vendor_id: ObjectId, is_active: bool, updated_at: int) -> dict:
         """
         Update the active status and updated_at timestamp of a vendor.
 
@@ -166,9 +146,7 @@ class TalkoVendorRepository:
             ValueError: If the vendor is not found.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoVendorModel.CollectionName.VENDOR
-            ) as collection:
+            async with self.db_manager.collection(TalkoVendorModel.CollectionName.VENDOR) as collection:
                 result = await collection.find_one_and_update(
                     {"_id": vendor_id},
                     {"$set": {"is_active": is_active, "updated_at": updated_at}},
@@ -177,12 +155,8 @@ class TalkoVendorRepository:
                 if not result:
                     self.logger.error(f"Vendor with ID {vendor_id} not found")
                     raise ValueError(f"Vendor with ID {vendor_id} not found")
-                self.logger.info(
-                    f"Updated vendor status for ID {vendor_id} to is_active={is_active}"
-                )
+                self.logger.info(f"Updated vendor status for ID {vendor_id} to is_active={is_active}")
                 return result
         except Exception as e:
-            self.logger.error(
-                f"Failed to update vendor status for ID {vendor_id}: {str(e)}"
-            )
+            self.logger.error(f"Failed to update vendor status for ID {vendor_id}: {str(e)}")
             raise

@@ -1,7 +1,7 @@
 import asyncio
 import json
 from collections import defaultdict
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from fastapi import WebSocket
 from starlette_context import request_cycle_context
@@ -37,21 +37,19 @@ class TalkoInboundCallEventBroker:
     def __init__(self, redis_pool, logger: TalkoServiceLogger):
         self.__redis_pool = redis_pool
         self.__logger = logger
-        self.__connections: Dict[int, Set[WebSocket]] = defaultdict(set)
-        self.__listener_task: Optional[asyncio.Task] = None
+        self.__connections: dict[int, set[WebSocket]] = defaultdict(set)
+        self.__listener_task: asyncio.Task | None = None
 
     async def register(self, partner_id: int, websocket: WebSocket) -> None:
         self.__connections[partner_id].add(websocket)
         self.__logger.info(
-            "Registered inbound call ws for partner {} (active={})".format(
-                partner_id, len(self.__connections[partner_id])
-            )
+            f"Registered inbound call ws for partner {partner_id} (active={len(self.__connections[partner_id])})"
         )
 
     def unregister(self, partner_id: int, websocket: WebSocket) -> None:
         self.__connections.get(partner_id, set()).discard(websocket)
 
-    async def publish(self, data: Dict[str, Any]) -> None:
+    async def publish(self, data: dict[str, Any]) -> None:
         await self.__redis_pool.publish(INBOUND_CALL_EVENTS_CHANNEL, json.dumps(data))
 
     async def start(self) -> None:
@@ -69,9 +67,7 @@ class TalkoInboundCallEventBroker:
             try:
                 pubsub = self.__redis_pool.pubsub()
                 await pubsub.subscribe(INBOUND_CALL_EVENTS_CHANNEL)
-                self.__logger.info(
-                    "Subscribed to {}".format(INBOUND_CALL_EVENTS_CHANNEL)
-                )
+                self.__logger.info(f"Subscribed to {INBOUND_CALL_EVENTS_CHANNEL}")
                 async for message in pubsub.listen():
                     if message.get("type") != "message":
                         continue
@@ -79,9 +75,7 @@ class TalkoInboundCallEventBroker:
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                self.__logger.error(
-                    "Inbound call event listener error, retrying: {}".format(str(e))
-                )
+                self.__logger.error(f"Inbound call event listener error, retrying: {str(e)}")
                 await asyncio.sleep(_LISTENER_RETRY_DELAY_SECONDS)
 
     async def __dispatch(self, raw_message: Any) -> None:
@@ -90,19 +84,15 @@ class TalkoInboundCallEventBroker:
                 raw_message = raw_message.decode("utf-8")
             data = json.loads(raw_message)
         except Exception as e:
-            self.__logger.error(
-                "Failed to parse inbound call event message: {}".format(str(e))
-            )
+            self.__logger.error(f"Failed to parse inbound call event message: {str(e)}")
             return
 
         partner_id = data.get("partner_id")
         sockets = list(self.__connections.get(partner_id, set()))
 
-        await asyncio.gather(
-            *(self.__send(partner_id, websocket, data) for websocket in sockets)
-        )
+        await asyncio.gather(*(self.__send(partner_id, websocket, data) for websocket in sockets))
 
-    async def __send(self, partner_id: int, websocket: WebSocket, data: Dict[str, Any]) -> None:
+    async def __send(self, partner_id: int, websocket: WebSocket, data: dict[str, Any]) -> None:
         try:
             # TalkoContextMiddleware wraps every websocket's send() to attach a
             # request-id, which reads starlette_context's ContextVar. This
@@ -111,15 +101,9 @@ class TalkoInboundCallEventBroker:
             # accepted the websocket, so that ContextVar is otherwise unset —
             # request_cycle_context() gives it something to read.
             with request_cycle_context():
-                await asyncio.wait_for(
-                    websocket.send_json(data), timeout=SEND_TIMEOUT_SECONDS
-                )
+                await asyncio.wait_for(websocket.send_json(data), timeout=SEND_TIMEOUT_SECONDS)
         except Exception as e:
-            self.__logger.error(
-                "Failed to send inbound call event to a socket for partner {}: {}".format(
-                    partner_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to send inbound call event to a socket for partner {partner_id}: {str(e)}")
             self.__connections[partner_id].discard(websocket)
             try:
                 await websocket.close()

@@ -35,10 +35,6 @@ services:
         value: 6379
       - key: CACHE_DB
         value: 0
-      - key: CONSOLE_GRPC_HOST
-        sync: false
-      - key: CONSOLE_GRPC_PORT
-        value: 50051
       - key: STORAGE_SERVICE_PROVIDER
         value: CLOUDINARY
       - key: CLOUDINARY_CLOUD_NAME

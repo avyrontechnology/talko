@@ -1,20 +1,15 @@
-import bisect
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple, Union
+from datetime import datetime, timedelta
+from typing import Any
 
 import pytz
-from dateutil.relativedelta import relativedelta
 
 from src.components.analytics import constants as analytics_constants
 from src.components.analytics.builder import TalkoQueryBuilder
 from src.components.analytics.date_range_helper import TalkoDateRangeHelper
 from src.components.analytics.enums import TalkoMetric, TalkoTimeInterval
-from src.components.cdr.models import TalkoCDR
-from src.core.doc_db import TalkoDocDatabaseSessionManager
 from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.auto_format import safe_to_int
-from src.utils.enums import TalkoUserRoleHierarchy
 
 
 class TalkoCallTrendsHelper:
@@ -32,7 +27,7 @@ class TalkoCallTrendsHelper:
 
     async def get_projection_and_sort_for_trends(  # NOSONAR
         self,
-    ) -> Tuple[Dict[str, Any], List[Tuple[str, int]]]:
+    ) -> tuple[dict[str, Any], list[tuple[str, int]]]:
         """Fetch call records (CDRs) with optimized projection and sorting."""
         projection = {
             "_id": 0,
@@ -51,21 +46,17 @@ class TalkoCallTrendsHelper:
     async def prepare_query_params(  # NOSONAR
         self,
         partner_id: int,
-        start_date: Optional[int],
-        end_date: Optional[int],
-        agents: List[int],
-        workspace_id: Optional[List[int]],
-        entity_type: Optional[str],
+        start_date: int | None,
+        end_date: int | None,
+        agents: list[int],
+        workspace_id: list[int] | None,
+        entity_type: str | None,
         user_role: int,
-    ) -> Tuple[Dict[str, Any], int, int, str]:
+    ) -> tuple[dict[str, Any], int, int, str]:
         """Prepare query and compute date range."""
-        start_date_ms, end_date_ms, period = self.__date_range_helper.adjust_date_range(
-            start_date, end_date
-        )
+        start_date_ms, end_date_ms, period = self.__date_range_helper.adjust_date_range(start_date, end_date)
         if start_date is None and end_date is None:
-            start_date_ms, end_date_ms = (
-                self.__date_range_helper.get_default_time_range_trends()
-            )
+            start_date_ms, end_date_ms = self.__date_range_helper.get_default_time_range_trends()
 
         query = self.__query_builder.build_trend_query(
             partner_id=partner_id,
@@ -77,49 +68,45 @@ class TalkoCallTrendsHelper:
             user_role=user_role,
         )
 
-        self.__logger.debug(
-            f"Adjusted date range: {start_date_ms} - {end_date_ms}, period: {period}"
-        )
+        self.__logger.debug(f"Adjusted date range: {start_date_ms} - {end_date_ms}, period: {period}")
         return query, start_date_ms, end_date_ms, period
 
     async def filter_and_format_data(
         self,
-        cdrs: List[Dict[str, Any]],
+        cdrs: list[dict[str, Any]],
         metric: str,
         trend_basis: str,
         start_dt: int,
         end_dt: int,
         limit: int,
         offset: int,
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], int, Optional[str]]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, str | None]:
         """Filter data by metric and format trends."""
         metric_cond = self._get_cond_for_metric(metric)
         filtered_docs = self._filter_by_metric(cdrs, metric_cond, metric)
         self.__logger.debug(f"Filtered documents: {len(filtered_docs)}")
 
-        formatted_data, total_periods_count, current_month = (
-            await self._format_trends_data(
-                raw_data=filtered_docs,
-                view_type=trend_basis,
-                start_dt=start_dt,
-                end_dt=end_dt,
-                metric=metric,
-                limit=limit,
-                offset=offset,
-            )
+        formatted_data, total_periods_count, current_month = await self._format_trends_data(
+            raw_data=filtered_docs,
+            view_type=trend_basis,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            metric=metric,
+            limit=limit,
+            offset=offset,
         )
         return filtered_docs, formatted_data, total_periods_count, current_month
 
     async def _format_trends_data(  # NOSONAR
         self,
-        raw_data: List[Dict[str, Any]],
+        raw_data: list[dict[str, Any]],
         view_type: str,
         start_dt: int,
         end_dt: int,
         metric: str,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-    ) -> Tuple[List[Dict[str, Any]], int, Optional[str]]:
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> tuple[list[dict[str, Any]], int, str | None]:
         """Format trends data for call metrics."""
         ist = pytz.timezone("Asia/Kolkata")
         start_ist = datetime.fromtimestamp(start_dt / 1000, tz=pytz.UTC).astimezone(ist)
@@ -127,9 +114,7 @@ class TalkoCallTrendsHelper:
 
         periods = self._generate_periods(view_type, start_ist, end_ist)
         total_periods_count = len(periods)
-        periods, current_month = self._paginate_periods(
-            periods, view_type, limit, offset
-        )
+        periods, current_month = self._paginate_periods(periods, view_type, limit, offset)
         period_aggregation = self._aggregate_metric_data(raw_data, periods, metric)
 
         formatted_result = [
@@ -143,7 +128,7 @@ class TalkoCallTrendsHelper:
 
     def _get_cond_for_metric(self, metric: str) -> Any:
         """Retrieve condition for a given metric."""
-        conditions: Dict[TalkoMetric, Union[bool, Dict[str, Any]]] = {
+        conditions: dict[TalkoMetric, bool | dict[str, Any]] = {
             TalkoMetric.TOTAL_CALLS: True,
             TalkoMetric.TOTAL_CONNECTED_CALLS: {
                 analytics_constants.EQ: [
@@ -229,13 +214,9 @@ class TalkoCallTrendsHelper:
         try:
             return conditions[TalkoMetric(metric)]
         except ValueError:
-            raise ValueError(
-                f"Invalid metric_filter: {metric}. Must be one of {[m.value for m in TalkoMetric]}"
-            )
+            raise ValueError(f"Invalid metric_filter: {metric}. Must be one of {[m.value for m in TalkoMetric]}")
 
-    def _filter_by_metric(
-        self, documents: List[Dict], metric_cond: Any, metric: str
-    ) -> List[Dict]:
+    def _filter_by_metric(self, documents: list[dict], metric_cond: Any, metric: str) -> list[dict]:
         """Filter documents based on metric condition."""
         if metric_cond is True:
             return documents
@@ -246,10 +227,7 @@ class TalkoCallTrendsHelper:
                 TalkoMetric.TOTAL_CONNECTED_CALLS.value,
                 TalkoMetric.TOTAL_MISSED_CALLS.value,
             ]:
-                if (
-                    doc.get(analytics_constants.STATUS_CALL)
-                    == metric_cond[analytics_constants.EQ][1]
-                ):
+                if doc.get(analytics_constants.STATUS_CALL) == metric_cond[analytics_constants.EQ][1]:
                     filtered.append(doc)
             elif metric in [
                 TalkoMetric.LEAD_CONNECTED_CALLS.value,
@@ -259,23 +237,17 @@ class TalkoCallTrendsHelper:
             ]:
                 cond1 = (
                     doc.get(analytics_constants.STATUS_CALL)
-                    == metric_cond[analytics_constants.QUERY_AND][0][
-                        analytics_constants.EQ
-                    ][1]
+                    == metric_cond[analytics_constants.QUERY_AND][0][analytics_constants.EQ][1]
                 )
                 cond2 = (
                     doc.get(analytics_constants.MODE_CALLING)
-                    == metric_cond[analytics_constants.QUERY_AND][1][
-                        analytics_constants.EQ
-                    ][1]
+                    == metric_cond[analytics_constants.QUERY_AND][1][analytics_constants.EQ][1]
                 )
                 if cond1 and cond2:
                     filtered.append(doc)
         return filtered
 
-    def _calculate_total_count(
-        self, filtered_docs: List[Dict[str, Any]], metric: str
-    ) -> int:
+    def _calculate_total_count(self, filtered_docs: list[dict[str, Any]], metric: str) -> int:
         """Compute total count or duration based on metric type."""
         if metric == TalkoMetric.TOTAL_UNIQUE_CALLS.value:
             unique_entities = {
@@ -285,20 +257,14 @@ class TalkoCallTrendsHelper:
             }
             return len(unique_entities)
         elif metric == TalkoMetric.TOTAL_TALK_TIME.value:
-            return sum(
-                safe_to_int(doc.get(analytics_constants.DATA_TALK_TIME, 0))
-                for doc in filtered_docs
-            )
+            return sum(safe_to_int(doc.get(analytics_constants.DATA_TALK_TIME, 0)) for doc in filtered_docs)
         elif metric == TalkoMetric.TOTAL_CALL_DURATION.value:
-            return sum(
-                safe_to_int(doc.get(analytics_constants.TOTAL_CALL_DURATION, 0))
-                for doc in filtered_docs
-            )
+            return sum(safe_to_int(doc.get(analytics_constants.TOTAL_CALL_DURATION, 0)) for doc in filtered_docs)
         return len(filtered_docs)
 
     def _generate_periods(
         self, view_type: str, start_ist: datetime, end_ist: datetime
-    ) -> List[Union[datetime, Tuple[datetime, datetime]]]:
+    ) -> list[datetime | tuple[datetime, datetime]]:
         """Generate date periods for trend aggregation."""
         periods = []
         if view_type == TalkoTimeInterval.DAYS.value:
@@ -315,12 +281,8 @@ class TalkoCallTrendsHelper:
         elif view_type == TalkoTimeInterval.MONTHS.value:
             current = start_ist.replace(day=1)
             while current <= end_ist:
-                next_month = (current.replace(day=28) + timedelta(days=4)).replace(
-                    day=1
-                )
-                periods.append(
-                    (current, min(next_month - timedelta(seconds=1), end_ist))
-                )
+                next_month = (current.replace(day=28) + timedelta(days=4)).replace(day=1)
+                periods.append((current, min(next_month - timedelta(seconds=1), end_ist)))
                 current = next_month
         else:
             raise ValueError(f"Invalid trend_basis: {view_type}")
@@ -328,11 +290,11 @@ class TalkoCallTrendsHelper:
 
     def _paginate_periods(
         self,
-        periods: List[Union[datetime, Tuple[datetime, datetime]]],
+        periods: list[datetime | tuple[datetime, datetime]],
         view_type: str,
-        limit: Optional[int],
-        offset: Optional[int],
-    ) -> Tuple[List[Union[datetime, Tuple[datetime, datetime]]], Optional[str]]:
+        limit: int | None,
+        offset: int | None,
+    ) -> tuple[list[datetime | tuple[datetime, datetime]], str | None]:
         """Paginate results by month for daily view."""
         if view_type != TalkoTimeInterval.DAYS.value:
             return periods, None
@@ -357,10 +319,10 @@ class TalkoCallTrendsHelper:
 
     def _aggregate_metric_data(
         self,
-        raw_data: List[Dict[str, Any]],
-        periods: List[Union[datetime, Tuple[datetime, datetime]]],
+        raw_data: list[dict[str, Any]],
+        periods: list[datetime | tuple[datetime, datetime]],
         metric: str,
-    ) -> Dict[Union[datetime, Tuple[datetime, datetime]], int]:
+    ) -> dict[datetime | tuple[datetime, datetime], int]:
         """Aggregate raw metric data by time period."""
         ist = pytz.timezone("Asia/Kolkata")
         period_aggregation = {p: 0 for p in periods}
@@ -368,7 +330,7 @@ class TalkoCallTrendsHelper:
 
         def find_period(
             dt: datetime,
-        ) -> Optional[Union[datetime, Tuple[datetime, datetime]]]:
+        ) -> datetime | tuple[datetime, datetime] | None:
             for p in periods:
                 if isinstance(p, datetime) and dt.date() == p.date():
                     return p
@@ -377,9 +339,7 @@ class TalkoCallTrendsHelper:
             return None
 
         for doc in raw_data:
-            dt = datetime.fromtimestamp(
-                doc[analytics_constants.DATE_TIME] / 1000, tz=pytz.UTC
-            ).astimezone(ist)
+            dt = datetime.fromtimestamp(doc[analytics_constants.DATE_TIME] / 1000, tz=pytz.UTC).astimezone(ist)
             period = find_period(dt)
             if not period:
                 continue
@@ -389,13 +349,9 @@ class TalkoCallTrendsHelper:
                 if unique_key:
                     unique_entities[period].add(unique_key)
             elif metric == TalkoMetric.TOTAL_TALK_TIME.value:
-                period_aggregation[period] += safe_to_int(
-                    doc.get(analytics_constants.DATA_TALK_TIME, 0)
-                )
+                period_aggregation[period] += safe_to_int(doc.get(analytics_constants.DATA_TALK_TIME, 0))
             elif metric == TalkoMetric.TOTAL_CALL_DURATION.value:
-                period_aggregation[period] += safe_to_int(
-                    doc.get(analytics_constants.TOTAL_CALL_DURATION, 0)
-                )
+                period_aggregation[period] += safe_to_int(doc.get(analytics_constants.TOTAL_CALL_DURATION, 0))
             else:
                 period_aggregation[period] += 1
 

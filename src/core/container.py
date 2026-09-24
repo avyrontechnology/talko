@@ -7,6 +7,8 @@ from src.components.analytics.date_range_helper import TalkoDateRangeHelper
 from src.components.analytics.processor import TalkoAnalyticsProcessor
 from src.components.analytics.repositories import TalkoAnalyticsRepository
 from src.components.analytics.services import TalkoAnalyticsService
+from src.components.billing.repository import TalkoBillingRepository
+from src.components.billing.services import TalkoBillingService
 from src.components.cache.helper import TalkoCacheHelper
 from src.components.call_agent_map.repository import TalkoAgentMappingRepository
 from src.components.call_agent_map.services import TalkoAgentMappingService
@@ -16,15 +18,19 @@ from src.components.call_assets.repository import TalkoAssetRepository
 from src.components.call_assets.services import TalkoAssetService
 from src.components.call_assets.update_recordings import TalkoRecordingsUpdateTask
 from src.components.call_management.agent_dialplan_resolver import TalkoAgentDialPlanResolver
+from src.components.call_management.channel_pool import TalkoChannelPoolService
 from src.components.call_management.redis_helper import TalkoCallRedisHelper
 from src.components.call_management.repository import TalkoCallRepository
 from src.components.call_management.services import TalkoCallService
+from src.components.call_management.supervision import TalkoSupervisionService
 from src.components.call_operation.cdr_update import TalkoCDRUpdateTask
 from src.components.call_operation.vendor_cdr_gateway import TalkoVendorCDRGateway
 from src.components.call_record.repositories import TalkoCallRecordRepository
 from src.components.call_record.services import TalkoCallRecordService
 from src.components.cdr.repository import TalkoCDRRepository
 from src.components.cdr.services import TalkoCDRService
+from src.components.client.repository import TalkoClientRepository
+from src.components.client.services import TalkoClientService
 from src.components.common.user_hierarchy import TalkoUserHierarchy
 from src.components.custom_field.repository import TalkoCustomFieldRepository
 from src.components.custom_field.services import TalkoCustomFieldService
@@ -33,18 +39,12 @@ from src.components.dialer.services import TalkoDialerService
 from src.components.did_management.repositories import TalkoDidRepository
 from src.components.did_management.services import TalkoDidManagementService
 from src.components.did_management.validator import TalkoDidValidator
-from src.components.digital_assets.repositories import TalkoDigitalAssetRepository
-from src.components.digital_assets.services import TalkoDigitalAssetService
-from src.components.email_service.services import TalkoEmailService
 from src.components.inbound_call_events.connection_manager import TalkoInboundCallEventBroker
 from src.components.inbound_call_events.publisher import TalkoInboundCallEventPublisher
-from src.components.integrations.console.maglo_client import TalkoMagloClient
 from src.components.partner_auth.rate_limiter import TalkoPartnerApiKeyRateLimiter
 from src.components.partner_auth.repository import TalkoPartnerApiKeyRepository
 from src.components.partner_auth.services import TalkoPartnerApiKeyService
 from src.components.partner_auth.validation import TalkoPartnerApiKeyValidator
-from src.components.user_auth.repository import TalkoUserRepository
-from src.components.user_auth.services import TalkoUserAuthService
 from src.components.partner_config.repository import TalkoPartnerConfigRepository
 from src.components.partner_config.services import TalkoPartnerConfigService
 from src.components.partner_config.validation import TalkoPartnerConfigValidator
@@ -53,9 +53,8 @@ from src.components.partner_webhook.repository import TalkoPartnerWebhookReposit
 from src.components.partner_webhook.services import TalkoPartnerWebhookService
 from src.components.partner_webhook.validation import TalkoPartnerWebhookValidator
 from src.components.pstn.services import TalkoPSTNBridgeService
-from src.components.reports.daily_lead_report.lead_connection_service import (
-    TalkoLeadConnectionReportService,
-)
+from src.components.user_auth.repository import TalkoUserRepository
+from src.components.user_auth.services import TalkoUserAuthService
 from src.components.vendor.repository import TalkoVendorRepository
 from src.components.vendor.services import TalkoVendorService
 from src.components.vendor.validation import TalkoVendorValidator
@@ -65,17 +64,14 @@ from src.components.vendor_config.validation import TalkoVendorConfigValidator
 from src.core.doc_db import TalkoDocDatabaseSessionManager
 from src.core.environment import TalkoENV
 from src.core.redis import TalkoRedisCache
-from src.grpc_client.constants import TalkoGrpcServices
-from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
+from src.grpc_client.telephony_bridge import TalkoTelephonyBridge
 from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.datetime_util import TalkoDateTimeUtil
-from src.components.call_management.agent_dialplan_resolver import TalkoAgentDialPlanResolver
 
 logger = TalkoServiceLogger.get_logger()
 
 
 class TalkoContainer(containers.DeclarativeContainer):
-
     @staticmethod
     def __add_wiring():
         return containers.WiringConfiguration(
@@ -111,15 +107,6 @@ class TalkoContainer(containers.DeclarativeContainer):
 
     db = providers.Singleton(TalkoDocDatabaseSessionManager, logger=logger)
 
-    email_service = providers.Singleton(
-        TalkoEmailService,
-        logger=logger,
-        api_url=TalkoENV.MAILMG_API_URL,
-        channel_key=TalkoENV.MAILMG_CHANNEL_KEY,
-        sender_email=TalkoENV.MAILMG_CLIENT_NAME,
-        template_env="",
-    )
-
     redis_pool = providers.Resource(
         TalkoRedisCache.init_redis_pool,
     )
@@ -135,60 +122,36 @@ class TalkoContainer(containers.DeclarativeContainer):
         logger=logger,
     )
 
-    # grpc
-    grpc_client = providers.Singleton(
-        TalkoRPCServiceFactory.get_service,
-        TalkoGrpcServices.AUTH,
-    )
-
-    # maglo client
-    maglo_client = providers.Factory(
-        TalkoMagloClient,
-        logger=logger,
-    )
+    # grpc (disabled for now — no gRPC anywhere in our code; providers kept
+    # as None so wiring stays valid and Talko-native auth keeps working)
+    # grpc_client = providers.Singleton(
+    #     TalkoRPCServiceFactory.get_service,
+    #     TalkoGrpcServices.AUTH,
+    # )
+    grpc_client = providers.Object(None)
 
     # analytics query builder
     analytics_query_builder = providers.Factory(TalkoQueryBuilder, logger=logger)
 
     # user hierarchy
-    user_hierarchy = providers.Factory(
-        TalkoUserHierarchy, grpc_client=grpc_client, logger=logger
-    )
+    user_hierarchy = providers.Factory(TalkoUserHierarchy, grpc_client=grpc_client, logger=logger)
 
     # helper
     date_range_helper = providers.Factory(TalkoDateRangeHelper, logger=logger)
 
     # Repositories
-    call_record_repo = providers.Factory(
-        TalkoCallRecordRepository, session_factory=db, logger=logger
-    )
+    call_record_repo = providers.Factory(TalkoCallRecordRepository, session_factory=db, logger=logger)
     vendor_repo = providers.Factory(TalkoVendorRepository, session_factory=db, logger=logger)
-    vendor_config_repo = providers.Factory(
-        TalkoVendorConfigRepository, db_manager=db, logger=logger
-    )
-    partner_config_repo = providers.Factory(
-        TalkoPartnerConfigRepository, db_manager=db, logger=logger
-    )
-    partner_api_key_repo = providers.Factory(
-        TalkoPartnerApiKeyRepository, db_manager=db, logger=logger
-    )
-    talko_user_repo = providers.Factory(
-        TalkoUserRepository, db_manager=db, logger=logger
-    )
-    user_auth_service = providers.Factory(
-        TalkoUserAuthService, repository=talko_user_repo, logger=logger
-    )
-    partner_webhook_repo = providers.Factory(
-        TalkoPartnerWebhookRepository, db_manager=db, logger=logger
-    )
+    vendor_config_repo = providers.Factory(TalkoVendorConfigRepository, db_manager=db, logger=logger)
+    partner_config_repo = providers.Factory(TalkoPartnerConfigRepository, db_manager=db, logger=logger)
+    partner_api_key_repo = providers.Factory(TalkoPartnerApiKeyRepository, db_manager=db, logger=logger)
+    talko_user_repo = providers.Factory(TalkoUserRepository, db_manager=db, logger=logger)
+    user_auth_service = providers.Factory(TalkoUserAuthService, repository=talko_user_repo, logger=logger)
+    partner_webhook_repo = providers.Factory(TalkoPartnerWebhookRepository, db_manager=db, logger=logger)
     cdr_repository = providers.Factory(TalkoCDRRepository, db_manager=db, logger=logger)
-    custom_field_repository = providers.Factory(
-        TalkoCustomFieldRepository, db_manager=db, logger=logger
-    )
+    custom_field_repository = providers.Factory(TalkoCustomFieldRepository, db_manager=db, logger=logger)
     call_repository = providers.Factory(TalkoCallRepository, db_manager=db, logger=logger)
-    call_agent_mapping_repository = providers.Factory(
-        TalkoAgentMappingRepository, db_manager=db, logger=logger
-    )
+    call_agent_mapping_repository = providers.Factory(TalkoAgentMappingRepository, db_manager=db, logger=logger)
     analytics_repositories = providers.Factory(
         TalkoAnalyticsRepository,
         db_manager=db,
@@ -230,9 +193,7 @@ class TalkoContainer(containers.DeclarativeContainer):
     partner_webhook_validator = providers.Factory(
         TalkoPartnerWebhookValidator, logger=logger, repository=partner_webhook_repo
     )
-    webhook_secret_cipher = providers.Singleton(
-        TalkoWebhookSecretCipher, master_key=TalkoENV.WEBHOOK_SECRET_MASTER_KEY
-    )
+    webhook_secret_cipher = providers.Singleton(TalkoWebhookSecretCipher, master_key=TalkoENV.WEBHOOK_SECRET_MASTER_KEY)
     call_agent_mapping_validation = providers.Factory(
         TalkoAgentMapperValidator, logger=logger, repository=call_agent_mapping_repository
     )
@@ -252,9 +213,7 @@ class TalkoContainer(containers.DeclarativeContainer):
     )
 
     # base
-    analytics_base = providers.Factory(
-        TalkoAnalyticsBase, analytics_processor=analytics_processor, logger=logger
-    )
+    analytics_base = providers.Factory(TalkoAnalyticsBase, analytics_processor=analytics_processor, logger=logger)
 
     # Services
     did_service = providers.Factory(
@@ -297,6 +256,21 @@ class TalkoContainer(containers.DeclarativeContainer):
         vendor_config_repository=vendor_config_repo,
         partner_config_validator=partner_config_validator,
         did_management_service=did_service,
+    )
+    client_repo = providers.Factory(TalkoClientRepository, db_manager=db, logger=logger)
+    client_service = providers.Factory(
+        TalkoClientService,
+        repository=client_repo,
+        logger=logger,
+        datetime_util=TalkoDateTimeUtil,
+    )
+    billing_repo = providers.Factory(TalkoBillingRepository, db_manager=db, logger=logger)
+    billing_service = providers.Factory(
+        TalkoBillingService,
+        repository=billing_repo,
+        call_repository=call_repository,
+        logger=logger,
+        datetime_util=TalkoDateTimeUtil,
     )
     partner_api_key_service = providers.Factory(
         TalkoPartnerApiKeyService,
@@ -371,6 +345,26 @@ class TalkoContainer(containers.DeclarativeContainer):
     )
 
     # CALL SERVICE
+    channel_pool_service = providers.Factory(
+        TalkoChannelPoolService,
+        vendor_config_repository=vendor_config_repo,
+        logger=logger,
+    )
+    # telephony gRPC client disabled for now (no gRPC anywhere in our code).
+    # telephony_client = providers.Factory(
+    #     TalkoRPCServiceFactory.get_service,
+    #     TalkoGrpcServices.TELEPHONY,
+    # )
+    telephony_client = providers.Object(None)
+    telephony_bridge = providers.Factory(
+        TalkoTelephonyBridge,
+        logger=logger,
+    )
+    supervision_service = providers.Factory(
+        TalkoSupervisionService,
+        logger=logger,
+        event_publisher=inbound_call_event_publisher,
+    )
     call_service = providers.Factory(
         TalkoCallService,
         repository=call_repository,
@@ -387,11 +381,13 @@ class TalkoContainer(containers.DeclarativeContainer):
         call_redis_helper=call_redis_helper,
         did_repository=did_repositories,
         inbound_call_event_publisher=inbound_call_event_publisher,
+        channel_pool_service=channel_pool_service,
+        telephony_client=telephony_client,
+        telephony_bridge=telephony_bridge,
+        billing_service=billing_service,
     )
 
-    analytics_service = providers.Factory(
-        TalkoAnalyticsService, analytics_base=analytics_base, logger=logger
-    )
+    analytics_service = providers.Factory(TalkoAnalyticsService, analytics_base=analytics_base, logger=logger)
     dialer_service = providers.Factory(
         TalkoDialerService,
         partner_config_repository=partner_config_repo,
@@ -399,37 +395,13 @@ class TalkoContainer(containers.DeclarativeContainer):
         logger=logger,
     )
 
-    lead_connection_report_service = providers.Factory(
-        TalkoLeadConnectionReportService,
-        maglo_client=maglo_client,
-        db=db,
-        logger=logger,
-    )
-
     call_assets_helper = providers.Factory(TalkoAssetsHelper, logger=logger)
 
-    save_and_update_unsaved_recorings_task = providers.Factory(
-        TalkoRecordingsUpdateTask,
-        logger=logger,
-        cdr_repository=cdr_repository,
-        call_repository=call_repository,
-        assets_repository=assets_repository,
-        assets_helper=call_assets_helper,
-    )
-
-    assets_service = providers.Factory(
-        TalkoAssetService, repository=assets_repository, logger=logger
-    )
-
-    digital_asset_repository = providers.Factory(
-        TalkoDigitalAssetRepository,
-        session_factory=db.provided.session,
-    )
-
-    digital_asset_service = providers.Factory(
-        TalkoDigitalAssetService,
-        digital_asset_repository=digital_asset_repository,
-    )
+    # NOTE: recordings_task (below) is the single TalkoRecordingsUpdateTask
+    # provider — the old duplicate save_and_update_unsaved_recorings_task
+    # (note the typo) was removed. The celery task referencing it is
+    # commented out in call_assets/tasks.py.
+    assets_service = providers.Factory(TalkoAssetService, repository=assets_repository, logger=logger)
 
     recordings_task = providers.Factory(
         TalkoRecordingsUpdateTask,
@@ -442,7 +414,6 @@ class TalkoContainer(containers.DeclarativeContainer):
 
     agent_dialplan_resolver = providers.Factory(
         TalkoAgentDialPlanResolver,
-        maglo_client=maglo_client,
         agent_mapping_repo=call_agent_mapping_repository,
         logger=logger,
     )

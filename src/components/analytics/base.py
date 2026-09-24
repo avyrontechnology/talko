@@ -1,5 +1,6 @@
 import json
-from typing import Any, Awaitable, Callable, Dict, Type, Union
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
@@ -30,14 +31,14 @@ class TalkoAnalyticsBase:
         self,
         current_user_id: int,
         partner_id: int,
-        analytics_request: Dict[str, Any],
+        analytics_request: dict[str, Any],
         limit: int,
         offset: int,
     ) -> TalkoAnalyticsResponse:
-        analytics_type: Union[str, None] = analytics_request.get("analytics_type")
-        data: Dict[str, Any] = analytics_request.get("data", {})
+        analytics_type: str | None = analytics_request.get("analytics_type")
+        data: dict[str, Any] = analytics_request.get("data", {})
 
-        mappings: Dict[str, Dict[str, Any]] = {
+        mappings: dict[str, dict[str, Any]] = {
             TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value: {
                 "schema": TalkoAgentCallAnalyticsRequest,
                 "method": self.__analytics_processor._get_agent_call_analytics,
@@ -61,30 +62,18 @@ class TalkoAnalyticsBase:
         }
 
         try:
-            mapping: Union[Dict[str, Any], None] = mappings.get(analytics_type)
+            mapping: dict[str, Any] | None = mappings.get(analytics_type)
             if not mapping:
-                self.__talko_service_logger.error(
-                    "Invalid analytics type: {}".format(analytics_type)
-                )
-                raise TalkoInvalidAnalyticTypeError(
-                    "Invalid analytics type: {}".format(analytics_type)
-                )
+                self.__talko_service_logger.error(f"Invalid analytics type: {analytics_type}")
+                raise TalkoInvalidAnalyticTypeError(f"Invalid analytics type: {analytics_type}")
 
             try:
                 validate_data: BaseModel = mapping["schema"](**data)
             except ValidationError as e:
-                example_payload: Dict[str, Any] = (
-                    mapping["schema"].model_json_schema().get("example", {})
-                )
-                self.__talko_service_logger.error(
-                    "Invalid payload for analytics type {}: {}".format(
-                        analytics_type, str(e)
-                    )
-                )
+                example_payload: dict[str, Any] = mapping["schema"].model_json_schema().get("example", {})
+                self.__talko_service_logger.error(f"Invalid payload for analytics type {analytics_type}: {str(e)}")
                 raise TalkoPayloadValidationError(
-                    message="Invalid payload for analytics type '{}'. Expected schema: {}".format(
-                        analytics_type, json.dumps(example_payload)
-                    ),
+                    message=f"Invalid payload for analytics type '{analytics_type}'. Expected schema: {json.dumps(example_payload)}",
                     example_payload=example_payload,
                 )
 
@@ -96,18 +85,12 @@ class TalkoAnalyticsBase:
                 limit=limit,
                 offset=offset,
             )
-            self.__talko_service_logger.debug(
-                "Analytics data: {}".format(analytics_data)
-            )
-            self.__talko_service_logger.info(
-                "Successfully generated analytics for {}".format(analytics_type)
-            )
+            self.__talko_service_logger.debug(f"Analytics data: {analytics_data}")
+            self.__talko_service_logger.info(f"Successfully generated analytics for {analytics_type}")
             return TalkoAnalyticsResponse(
                 analytics_type=analytics_type,
                 data=analytics_data,
             )
         except Exception as e:
-            self.__talko_service_logger.error(
-                "Error processing analytics {}: {}".format(analytics_type, str(e))
-            )
+            self.__talko_service_logger.error(f"Error processing analytics {analytics_type}: {str(e)}")
             raise

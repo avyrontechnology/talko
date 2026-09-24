@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 
 
 class TalkoTitleCaseUtil:
@@ -13,7 +13,7 @@ class TalkoTitleCaseUtil:
         return " ".join(x.capitalize() for x in components)
 
     @staticmethod
-    def convert_values_to_title_case(obj: Any, exclude_keys: List[str] = None) -> Any:
+    def convert_values_to_title_case(obj: Any, exclude_keys: list[str] = None) -> Any:
         """
         Recursively convert string values in a dictionary or object to title case.
         Keys remain unchanged unless excluded.
@@ -23,8 +23,7 @@ class TalkoTitleCaseUtil:
 
         if isinstance(obj, dict):
             return {
-                k: (obj[k] if k in exclude_keys
-                    else TalkoTitleCaseUtil.convert_values_to_title_case(v, exclude_keys))
+                k: (obj[k] if k in exclude_keys else TalkoTitleCaseUtil.convert_values_to_title_case(v, exclude_keys))
                 for k, v in obj.items()
             }
         elif isinstance(obj, list):

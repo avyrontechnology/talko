@@ -1,7 +1,7 @@
+import os
+
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware import Middleware
-
-import os
 
 # from .auth import JWTMiddleware
 from src.middlewares.context import TalkoContextMiddleware

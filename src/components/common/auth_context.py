@@ -1,4 +1,4 @@
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from fastapi import Request
 
@@ -13,8 +13,8 @@ class TalkoCurrentAuthContext(NamedTuple):
     For API-KEY auth            -> only partner_id is populated; user_id is None.
     """
 
-    user_id: Optional[int]
-    partner_id: Optional[int]
+    user_id: int | None
+    partner_id: int | None
     is_api_key_auth: bool
 
 

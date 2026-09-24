@@ -30,16 +30,10 @@ task_routes = {
     # worker so 100s ETAs never queue behind minute-long bulk batches
     # (TalkoCDR reconciler, recordings). Exact names first — Celery matches
     # exact task names before globs.
-    "src.components.call_management.tasks.missed_call_callback_task": {
-        "queue": "missed_callback_queue"
-    },
-    "src.components.call_management.tasks.missed_callback_sweeper_task": {
-        "queue": "missed_callback_queue"
-    },
+    "src.components.call_management.tasks.missed_call_callback_task": {"queue": "missed_callback_queue"},
+    "src.components.call_management.tasks.missed_callback_sweeper_task": {"queue": "missed_callback_queue"},
     # Example task routing
-    "src.components.call_operation.*": {
-        "queue": "call_operation_queue"
-    },  # Dedicated queue for call operation tasks
+    "src.components.call_operation.*": {"queue": "call_operation_queue"},  # Dedicated queue for call operation tasks
     "src.components.partner_webhook.*": {"queue": "webhook_delivery_queue"},
     "src.talko_celery.*": {"queue": "default_queue"},
     "src.components.call_assets.*": {"queue": "call_assets_queue"},

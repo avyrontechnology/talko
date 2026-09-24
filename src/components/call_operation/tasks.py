@@ -4,6 +4,7 @@ from celery import group, shared_task
 
 from src.components.call_operation.cdr_update import TalkoCDRUpdateTask
 from src.core.container import TalkoContainer
+from src.exceptions import TalkoBadRequestError
 from src.loggers.talko_celery_loggers import TalkoCeleryLogger
 
 CHUNK_SIZE = 20  # tune based on average TalkoCDR processing time
@@ -30,44 +31,29 @@ def check_incomplete_cdrs_coordinator(self, vendor_type: str) -> str:
         str: Summary of how many worker tasks were dispatched.
     """
     logger = TalkoCeleryLogger.get_logger()
-    logger.info("Coordinator starting for vendor_type: {}".format(vendor_type))
+    logger.info(f"Coordinator starting for vendor_type: {vendor_type}")
 
     try:
         container = TalkoContainer()
         vendor_config_repo = container.vendor_config_repo()
 
         # Fetch ALL configs for this vendor_type — no [0] truncation
-        vendor_configs = asyncio.run(
-            vendor_config_repo.get_vendor_config_by_vendor_type(vendor_type)
-        )
+        vendor_configs = asyncio.run(vendor_config_repo.get_vendor_config_by_vendor_type(vendor_type))
 
         if not vendor_configs:
-            logger.warning(
-                "No vendor configs found for vendor_type: {}".format(vendor_type)
-            )
+            logger.warning(f"No vendor configs found for vendor_type: {vendor_type}")
             return "No vendor configs found"
 
-        logger.info(
-            "Found {} config(s) for vendor_type: {}, dispatching workers".format(
-                len(vendor_configs), vendor_type
-            )
-        )
+        logger.info(f"Found {len(vendor_configs)} config(s) for vendor_type: {vendor_type}, dispatching workers")
 
         # Fan out: one independent worker task per vendor_config
-        task_group = group(
-            process_vendor_config.s(str(config["_id"]), vendor_type)
-            for config in vendor_configs
-        )
+        task_group = group(process_vendor_config.s(str(config["_id"]), vendor_type) for config in vendor_configs)
         task_group.apply_async()
 
-        return "Dispatched {} worker task(s) for vendor_type: {}".format(
-            len(vendor_configs), vendor_type
-        )
+        return f"Dispatched {len(vendor_configs)} worker task(s) for vendor_type: {vendor_type}"
 
     except Exception as e:
-        logger.error(
-            "Coordinator failed for vendor_type {}: {}".format(vendor_type, str(e))
-        )
+        logger.error(f"Coordinator failed for vendor_type {vendor_type}: {str(e)}")
         raise self.retry(countdown=300)  # Retry in 5 minutes
 
 
@@ -89,7 +75,7 @@ def process_vendor_config(self, vendor_config_id: str, vendor_type: str) -> str:
         str: Summary of how many CDRs were updated.
     """
     logger = TalkoCeleryLogger.get_logger()
-    lock_key = "talko:process_vendor_config_lock:{}".format(vendor_config_id)
+    lock_key = f"talko:process_vendor_config_lock:{vendor_config_id}"
 
     # Everything below runs inside ONE asyncio.run() call. A prior version
     # made three separate asyncio.run() calls (acquire lock, do the work,
@@ -113,26 +99,16 @@ def process_vendor_config(self, vendor_config_id: str, vendor_type: str) -> str:
         await container.init_resources()
         try:
             redis = await container.redis_pool()
-            acquired = bool(
-                await redis.set(
-                    lock_key, "1", nx=True, ex=PROCESS_VENDOR_CONFIG_LOCK_TTL
-                )
-            )
+            acquired = bool(await redis.set(lock_key, "1", nx=True, ex=PROCESS_VENDOR_CONFIG_LOCK_TTL))
             if not acquired:
                 logger.info(
-                    "Skipping vendor_config_id {} — a previous run is still "
+                    f"Skipping vendor_config_id {vendor_config_id} — a previous run is still "
                     "in progress (coordinator fires more often than a run "
-                    "can complete)".format(vendor_config_id)
+                    "can complete)"
                 )
-                return "Skipped: already in progress for vendor_config_id {}".format(
-                    vendor_config_id
-                )
+                return f"Skipped: already in progress for vendor_config_id {vendor_config_id}"
 
-            logger.info(
-                "Worker starting for vendor_config_id: {}, vendor_type: {}".format(
-                    vendor_config_id, vendor_type
-                )
-            )
+            logger.info(f"Worker starting for vendor_config_id: {vendor_config_id}, vendor_type: {vendor_type}")
 
             cdr_update_task: TalkoCDRUpdateTask = container.cdr_update_task()
             result = await cdr_update_task.execute_for_config(
@@ -141,11 +117,7 @@ def process_vendor_config(self, vendor_config_id: str, vendor_type: str) -> str:
                 chunk_size=CHUNK_SIZE,
             )
 
-            logger.info(
-                "Worker completed for vendor_config_id {}: {}".format(
-                    vendor_config_id, result
-                )
-            )
+            logger.info(f"Worker completed for vendor_config_id {vendor_config_id}: {result}")
             return result
         finally:
             if acquired:
@@ -155,19 +127,18 @@ def process_vendor_config(self, vendor_config_id: str, vendor_type: str) -> str:
                     redis = await container.redis_pool()
                     await redis.delete(lock_key)
                 except Exception as release_exc:
-                    logger.warning(
-                        "Failed to release lock for vendor_config_id {}: {}".format(
-                            vendor_config_id, release_exc
-                        )
-                    )
+                    logger.warning(f"Failed to release lock for vendor_config_id {vendor_config_id}: {release_exc}")
             await container.shutdown_resources()
 
     try:
         return asyncio.run(_run())
+    except (TalkoBadRequestError, ValueError) as e:
+        # Non-transient (bad config / bad payload): retrying would spin
+        # forever on poison input — log and stop instead of re-queuing.
+        logger.error(f"Worker refusing retry for vendor_config_id {vendor_config_id} (non-transient): {str(e)}")
+        return f"Failed (non-transient): {str(e)}"
     except Exception as e:
-        logger.error(
-            "Worker failed for vendor_config_id {}: {}".format(vendor_config_id, str(e))
-        )
+        logger.error(f"Worker failed for vendor_config_id {vendor_config_id}: {str(e)}")
         raise self.retry(countdown=120)  # Retry in 2 minutes
 
 
@@ -191,11 +162,7 @@ def check_incomplete_cdrs(self, vendor_type: str) -> str:
         str: Confirmation that the coordinator was dispatched.
     """
     logger = TalkoCeleryLogger.get_logger()
-    logger.info(
-        "check_incomplete_cdrs (legacy) delegating to coordinator for vendor_type: {}".format(
-            vendor_type
-        )
-    )
+    logger.info(f"check_incomplete_cdrs (legacy) delegating to coordinator for vendor_type: {vendor_type}")
     try:
         # Fire-and-forget: calling .get() here would block on a task's own
         # result from within another task, which Celery forbids outright
@@ -203,9 +170,7 @@ def check_incomplete_cdrs(self, vendor_type: str) -> str:
         # "Never call result.get() within a task!" and burned through
         # retries, endlessly re-queuing itself.
         check_incomplete_cdrs_coordinator.apply_async(args=[vendor_type])
-        return "Coordinator dispatched for vendor_type: {}".format(vendor_type)
+        return f"Coordinator dispatched for vendor_type: {vendor_type}"
     except Exception as e:
-        logger.error(
-            "Legacy task failed for vendor_type {}: {}".format(vendor_type, str(e))
-        )
+        logger.error(f"Legacy task failed for vendor_type {vendor_type}: {str(e)}")
         raise self.retry(countdown=300)

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Path, Request, status
 
@@ -8,7 +6,6 @@ from src.components.common.responses import (
     TalkoAcceptedResponse,
     TalkoBadRequestResponse,
     TalkoInternalServerErrorResponse,
-    TalkoResourceCreatedResponse,
     TalkoResourceNotFoundResponse,
     TalkoSuccessResponse,
 )
@@ -51,37 +48,25 @@ class TalkoDialerController:
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
             partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
 
-            talko_service_logger.info(
-                "User: {}, partner: {}, Fetch all lead lists API initiated.".format(
-                    user_id, partner_id
-                )
-            )
+            talko_service_logger.info(f"User: {user_id}, partner: {partner_id}, Fetch all lead lists API initiated.")
 
             data: list = await dialer_service.fetch_lead_lists(partner_id)
 
-            talko_service_logger.debug(
-                "Successfully fetched {} lead lists for partner {}.".format(
-                    len(data), partner_id
-                )
-            )
-            talko_service_logger.info(
-                "Fetch all lead lists API completed for partner: {}.".format(partner_id)
-            )
+            talko_service_logger.debug(f"Successfully fetched {len(data)} lead lists for partner {partner_id}.")
+            talko_service_logger.info(f"Fetch all lead lists API completed for partner: {partner_id}.")
 
             return TalkoSuccessResponse(data={"data": data})
 
         except TalkoBadRequestError as e:
-            talko_service_logger.error("Dialer fetch error: {}".format(str(e)))
+            talko_service_logger.error(f"Dialer fetch error: {str(e)}")
             return TalkoBadRequestResponse(detail=str(e))
 
         except TalkoResourceNotFound as e:
-            talko_service_logger.error("Resource not found: {}".format(str(e)))
+            talko_service_logger.error(f"Resource not found: {str(e)}")
             return TalkoResourceNotFoundResponse(detail=str(e))
 
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error fetching lead lists: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error fetching lead lists: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @dialer_router.post(
@@ -102,16 +87,14 @@ class TalkoDialerController:
         Bulk upload/create multiple leads into the specified lead list.
         """
         try:
-            talko_service_logger.info(
-                "Bulk create leads API called for list_id: {}.".format(list_id)
-            )
+            talko_service_logger.info(f"Bulk create leads API called for list_id: {list_id}.")
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
             partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
 
             talko_service_logger.info(
-                "User: {}, partner: {}, Bulk create leads API initiated for list_id: {} "
-                "with {} leads.".format(user_id, partner_id, list_id, len(payload.data))
+                f"User: {user_id}, partner: {partner_id}, Bulk create leads API initiated for list_id: {list_id} "
+                f"with {len(payload.data)} leads."
             )
 
             result: dict = await dialer_service.bulk_create_leads(
@@ -121,15 +104,11 @@ class TalkoDialerController:
             )
 
             talko_service_logger.debug(
-                "Bulk leads creation result for list_id: {} by partner {}: {}".format(
-                    list_id, partner_id, result
-                )
+                f"Bulk leads creation result for list_id: {list_id} by partner {partner_id}: {result}"
             )
 
             talko_service_logger.info(
-                "Bulk leads successfully created for list_id: {} by partner {}.".format(
-                    list_id, partner_id
-                )
+                f"Bulk leads successfully created for list_id: {list_id} by partner {partner_id}."
             )
 
             return TalkoAcceptedResponse(
@@ -141,19 +120,13 @@ class TalkoDialerController:
             )
 
         except TalkoBadRequestError as e:
-            talko_service_logger.error(
-                "Bulk leads creation validation error: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Bulk leads creation validation error: {str(e)}")
             return TalkoBadRequestResponse(detail=str(e))
 
         except TalkoResourceNotFound as e:
-            talko_service_logger.error(
-                "Lead list not found: {} - {}".format(list_id, str(e))
-            )
+            talko_service_logger.error(f"Lead list not found: {list_id} - {str(e)}")
             return TalkoResourceNotFoundResponse(detail=INVALID_LEAD_LIST_ID)
 
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error during bulk leads creation: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error during bulk leads creation: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)

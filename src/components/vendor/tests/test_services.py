@@ -50,9 +50,7 @@ class TestVendorService:
     """Test suite for TalkoVendorService class"""
 
     @pytest.mark.asyncio
-    async def test_create_vendor_success(
-        self, vendor_service, mock_repo, mock_validator
-    ):
+    async def test_create_vendor_success(self, vendor_service, mock_repo, mock_validator):
         vendor_input = TalkoContract.VendorCreate(name="Test Vendor", vendor_type="airtel")
         mock_repo.insert_vendor.return_value = ObjectId("64ab9fbfe7f4f5b4a10ebc88")
 

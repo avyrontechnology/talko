@@ -46,11 +46,13 @@ class TalkoInvalidPermissionTypeError(Exception):
             message = "Invalid permission type provided."
         super().__init__(message)
 
+
 class TalkoDuplicateResourceError(Exception):
     def __init__(self, message: str = None) -> None:
         if message is None:
             message = "A resource with the same key already exists."
         super().__init__(message)
+
 
 class TalkoInvalidAssetTypeError(Exception):
     def __init__(self, message=None):

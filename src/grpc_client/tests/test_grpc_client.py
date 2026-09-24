@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import importlib
 import os
@@ -8,10 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import grpc
 import pytest
 from grpc.aio import UnaryUnaryClientInterceptor
-from starlette_context import context
 
-from src.grpc_client.grpc_client import TalkoGRPCClient, logger
-from src.grpc_interceptor.auth_interceptor import TalkoApiKeyClientInterceptor
+from src.grpc_client.grpc_client import TalkoGRPCClient
 
 
 class TalkoDummyAioRpcError(grpc.aio.AioRpcError):
@@ -46,11 +43,7 @@ class TestGRPCClient:
         os.environ.pop("CONSOLE_GRPC_PORT", None)
         os.environ.pop("CA", None)
         # Reload the environment module to clear cached values
-        importlib.reload(
-            sys.modules.get(
-                "src.core.environment", importlib.import_module("src.core.environment")
-            )
-        )
+        importlib.reload(sys.modules.get("src.core.environment", importlib.import_module("src.core.environment")))
         with patch("src.core.environment") as mock_env:
             mock_env.CONSOLE_GRPC_HOST = "localhost"
             mock_env.CONSOLE_GRPC_PORT = "50051"
@@ -62,11 +55,7 @@ class TestGRPCClient:
         os.environ.pop("CONSOLE_GRPC_HOST", None)
         os.environ.pop("CONSOLE_GRPC_PORT", None)
         os.environ.pop("CA", None)
-        importlib.reload(
-            sys.modules.get(
-                "src.core.environment", importlib.import_module("src.core.environment")
-            )
-        )
+        importlib.reload(sys.modules.get("src.core.environment", importlib.import_module("src.core.environment")))
         with patch("src.core.environment") as mock_env:
             mock_env.CONSOLE_GRPC_HOST = "localhost"
             mock_env.CONSOLE_GRPC_PORT = "50051"
@@ -76,9 +65,7 @@ class TestGRPCClient:
     @pytest.fixture(autouse=True)
     def mock_starlette_context(self):
         """Mock the starlette_context to avoid KeyError."""
-        with patch(
-            "starlette_context.ctx._request_scope_context_storage"
-        ) as mock_context_storage:
+        with patch("starlette_context.ctx._request_scope_context_storage") as mock_context_storage:
             mock_context_storage.get.return_value = {"X-Request-ID": "test-request-id"}
             yield mock_context_storage
 
@@ -96,9 +83,7 @@ class TestGRPCClient:
             yield mock_logger
 
     def test_create_insecure_channel(self, mock_logger, mock_env_insecure):
-        with patch(
-            "src.grpc_client.grpc_client.grpc.aio.insecure_channel"
-        ) as mock_insecure_channel:
+        with patch("src.grpc_client.grpc_client.grpc.aio.insecure_channel") as mock_insecure_channel:
             with patch(
                 "src.grpc_client.grpc_client.TalkoApiKeyClientInterceptor",
                 return_value=TalkoMockInterceptor(api_key="maglo-key"),
@@ -131,9 +116,7 @@ class TestGRPCClient:
             await client.close_channel()
 
             client.channel.close.assert_called_once()
-            mock_logger.info.assert_called_with(
-                f"Closing the gRPC channel: {client.channel}"
-            )
+            mock_logger.info.assert_called_with(f"Closing the gRPC channel: {client.channel}")
             mock_logger.debug.assert_called_with("gRPC channel closed successfully")
 
     @pytest.mark.asyncio
@@ -144,9 +127,7 @@ class TestGRPCClient:
 
         assert result == "success"
         mock_func.assert_called_once()
-        mock_logger.debug.assert_called_with(
-            f"Calling {mock_func.__name__} (attempt 1)"
-        )
+        mock_logger.debug.assert_called_with(f"Calling {mock_func.__name__} (attempt 1)")
 
     @pytest.mark.asyncio
     async def test_call_with_retry_failure(self, mock_logger):

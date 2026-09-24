@@ -1,0 +1,7 @@
+RATE_CARD_SAVED = "Rate card saved"
+TOPUP_APPLIED = "Topup applied"
+CALL_PRICED = "Call priced"
+CALL_ALREADY_PRICED = "Call already priced — skipping"
+CDR_NOT_FOUND = "TalkoCDR not found for call {}"
+INSUFFICIENT_BALANCE = "Insufficient balance for partner {} (balance={})"
+SOMETHING_WENT_WRONG = "Something went wrong"

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 from bson import ObjectId
 
@@ -6,9 +6,7 @@ from src.components.did_management.services import TalkoDidManagementService
 from src.components.partner_config.dto import TalkoContract
 from src.components.partner_config.helper import TalkoPartnerConfigHelper
 from src.components.partner_config.message import (
-    NO_AVAILABLE_DIDS_FOR_VENDOR,
     PARTNER_CONFIG_WITH_ID_NOT_FOUND,
-    PARTNER_CONFIG_WITH_PARTNER_ID_ALREADY_EXIST,
 )
 from src.components.partner_config.models import TalkoPartnerConfigModel
 from src.components.partner_config.repository import TalkoPartnerConfigRepository
@@ -17,7 +15,7 @@ from src.components.vendor.validation import TalkoVendorValidator
 from src.components.vendor_config.repository import TalkoVendorConfigRepository
 from src.components.vendor_config.services import TalkoVendorConfigService
 from src.components.vendor_config.validation import TalkoVendorConfigValidator
-from src.exceptions import TalkoBadRequestError, TalkoConflictError, TalkoResourceNotFound
+from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.datetime_util import TalkoDateTimeUtil
 
@@ -60,9 +58,7 @@ class TalkoPartnerConfigService:
         """
         try:
             self.logger.info("Creation of partner config started.")
-            self.logger.debug(
-                "Creating partner config for partner_id: {}".format(config.partner_id)
-            )
+            self.logger.debug(f"Creating partner config for partner_id: {config.partner_id}")
 
             # Validate and prepare config
             vendor_id: ObjectId = await TalkoPartnerConfigHelper.validate_and_prepare_config(
@@ -77,46 +73,34 @@ class TalkoPartnerConfigService:
             await self.vendor_config_validator.validate_vendor_config_exists(vendor_config_id)
 
             if config.ai_vendor_config_id:
-                await self.vendor_config_validator.validate_vendor_config_exists(
-                    ObjectId(config.ai_vendor_config_id)
-                )
+                await self.vendor_config_validator.validate_vendor_config_exists(ObjectId(config.ai_vendor_config_id))
 
             # Validate mutual exclusivity
             if config.enable_round_robin and config.enable_workspace:
-                raise TalkoBadRequestError(
-                    "Round-robin and workspace cannot be enabled simultaneously."
-                )
+                raise TalkoBadRequestError("Round-robin and workspace cannot be enabled simultaneously.")
 
             # Validate required fields
-            if config.enable_workspace and (
-                not config.workspace_ids or not config.workspace_did_counts
-            ):
+            if config.enable_workspace and (not config.workspace_ids or not config.workspace_did_counts):
                 raise TalkoBadRequestError(
                     "workspace_ids and workspace_did_counts are required when enable_workspace is true."
                 )
             if config.enable_agent_mapping and not config.agent_mapping_ids:
-                raise TalkoBadRequestError(
-                    "agent_mapping_ids is required when enable_agent_mapping is true."
-                )
+                raise TalkoBadRequestError("agent_mapping_ids is required when enable_agent_mapping is true.")
             if config.enable_round_robin and not config.round_robin_did_count:
-                raise TalkoBadRequestError(
-                    "round_robin_did_count is required when enable_round_robin is true."
-                )
+                raise TalkoBadRequestError("round_robin_did_count is required when enable_round_robin is true.")
 
             # Handle DID assignment
-            config_dict: Dict[str, Any] = (
-                await TalkoPartnerConfigHelper.handle_did_assignment(
-                    config,
-                    vendor_id,
-                    self.vendor_config_repository,
-                    self.vendor_config_service,
-                    self.did_management_service,
-                    self.logger,
-                )
+            config_dict: dict[str, Any] = await TalkoPartnerConfigHelper.handle_did_assignment(
+                config,
+                vendor_id,
+                self.vendor_config_repository,
+                self.vendor_config_service,
+                self.did_management_service,
+                self.logger,
             )
 
             # Merge input config with assigned data
-            full_config: Dict[str, Any] = config.model_dump()
+            full_config: dict[str, Any] = config.model_dump()
             full_config.update(config_dict)
             full_config["vendor_id"] = vendor_id
             full_config["vendor_config_id"] = str(vendor_config_id)
@@ -124,33 +108,27 @@ class TalkoPartnerConfigService:
             full_config["updated_at"] = full_config["created_at"]
 
             # Format using TalkoPartnerConfigModel
-            model_config: Dict[str, Any] = TalkoPartnerConfigModel(**full_config).model_dump(
+            model_config: dict[str, Any] = TalkoPartnerConfigModel(**full_config).model_dump(
                 by_alias=True, exclude_unset=True
             )
-            config_id: ObjectId = await self.repository.insert_partner_config(
-                model_config
-            )
+            config_id: ObjectId = await self.repository.insert_partner_config(model_config)
             model_config["id"] = str(config_id)
             model_config["message"] = "Partner config created successfully."
 
-            self.logger.info(
-                "Create partner config ended successfully with ID: {}".format(config_id)
-            )
+            self.logger.info(f"Create partner config ended successfully with ID: {config_id}")
             return TalkoContract.PartnerConfigResponse(**model_config)
         except Exception as e:
-            self.logger.error("Error creating partner config: {}".format(str(e)))
+            self.logger.error(f"Error creating partner config: {str(e)}")
             raise
 
-    async def get_all_partner_configs(self) -> List[TalkoContract.PartnerDataConfigResponse]:
+    async def get_all_partner_configs(self) -> list[TalkoContract.PartnerDataConfigResponse]:
         """
         Retrieves all partner configurations.
         """
         self.logger.info("Get all partner config data started.")
         try:
-            configs: List[Dict[str, Any]] = (
-                await self.repository.find_all_partner_configs()
-            )
-            config_responses: List[TalkoContract.PartnerDataConfigResponse] = []
+            configs: list[dict[str, Any]] = await self.repository.find_all_partner_configs()
+            config_responses: list[TalkoContract.PartnerDataConfigResponse] = []
             for config in configs:
                 config["id"] = str(config["_id"])
                 config["vendor_id"] = str(config["vendor_id"])
@@ -161,22 +139,18 @@ class TalkoPartnerConfigService:
             self.logger.info("Get all partner config data ended successfully.")
             return config_responses
         except Exception as e:
-            self.logger.error("Failed to retrieve partner configs: {}".format(str(e)))
+            self.logger.error(f"Failed to retrieve partner configs: {str(e)}")
             raise
 
-    async def get_partner_config_by_id(
-        self, id: str
-    ) -> TalkoContract.PartnerDataConfigResponse:
+    async def get_partner_config_by_id(self, id: str) -> TalkoContract.PartnerDataConfigResponse:
         """
         Retrieves a partner configuration by its ID.
         """
-        self.logger.info("Get partner config by ID started for ID: {}".format(id))
+        self.logger.info(f"Get partner config by ID started for ID: {id}")
         try:
-            config: Dict[str, Any] = await self.repository.find_partner_config_by_id(
-                ObjectId(id)
-            )
+            config: dict[str, Any] = await self.repository.find_partner_config_by_id(ObjectId(id))
             if not config:
-                self.logger.error("Partner config with ID {} not found".format(id))
+                self.logger.error(f"Partner config with ID {id} not found")
                 raise TalkoResourceNotFound(PARTNER_CONFIG_WITH_ID_NOT_FOUND)
 
             config["id"] = str(config["_id"])
@@ -184,14 +158,10 @@ class TalkoPartnerConfigService:
             if config.get("ai_vendor_config_id") is not None:
                 config["ai_vendor_config_id"] = str(config["ai_vendor_config_id"])
             del config["_id"]
-            self.logger.info(
-                "Get partner config by ID ended successfully for ID: {}".format(id)
-            )
+            self.logger.info(f"Get partner config by ID ended successfully for ID: {id}")
             return TalkoContract.PartnerDataConfigResponse(**config)
         except Exception as e:
-            self.logger.error(
-                "Failed to retrieve partner config by ID {}: {}".format(id, str(e))
-            )
+            self.logger.error(f"Failed to retrieve partner config by ID {id}: {str(e)}")
             raise
 
     async def update_partner_config(
@@ -214,9 +184,7 @@ class TalkoPartnerConfigService:
         try:
             self.logger.info(f"Updating partner config {id}")
             # Fetch existing config
-            existing_config: TalkoContract.PartnerConfigResponse = (
-                await self.get_partner_config_by_id(id)
-            )
+            existing_config: TalkoContract.PartnerConfigResponse = await self.get_partner_config_by_id(id)
             if not existing_config:
                 raise TalkoResourceNotFound(PARTNER_CONFIG_WITH_ID_NOT_FOUND)
 
@@ -226,10 +194,7 @@ class TalkoPartnerConfigService:
             updated_config_data.update(update_dict)
 
             # Handle attendance update if provided
-            if (
-                "service_default_attendance" in update_dict
-                or "round_robin_default_attendance" in update_dict
-            ):
+            if "service_default_attendance" in update_dict or "round_robin_default_attendance" in update_dict:
                 attendance_update = {
                     k: update_dict[k]
                     for k in [
@@ -250,21 +215,20 @@ class TalkoPartnerConfigService:
                         attendance_update["service_default_attendance"]
                     )
                 if "round_robin_default_attendance" in attendance_update:
-                    updated_config_data.round_robin_default_attendance[
-                        "default"
-                    ].extend(
-                        attendance_update["round_robin_default_attendance"].get(
-                            "default", []
-                        )
+                    updated_config_data.round_robin_default_attendance["default"].extend(
+                        attendance_update["round_robin_default_attendance"].get("default", [])
                     )
                 updated_config_data.update(attendance_data)
 
             # Update the config in the repository
-            model_config = TalkoPartnerConfigModel(
-                **updated_config_data.model_dump()
-            ).model_dump(by_alias=True, exclude_unset=True)
+            model_config = TalkoPartnerConfigModel(**updated_config_data.model_dump()).model_dump(
+                by_alias=True, exclude_unset=True
+            )
             model_config["updated_at"] = self.datetime_util.get_current_time()
-            updated_doc = await self.repository.update_partner_config(id, model_config)
+            # Repository raises ValueError when the document is missing, so a
+            # bare await is enough — the return value carries no extra state
+            # beyond what updated_config_data already holds.
+            await self.repository.update_partner_config(id, model_config)
             updated_config_data.id = id
             updated_config_data.updated_at = model_config["updated_at"]
             updated_config_data.vendor_id = str(vendor_id)

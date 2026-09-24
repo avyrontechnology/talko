@@ -1,5 +1,3 @@
-from typing import Dict, List, Optional
-
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -8,7 +6,7 @@ class TalkoContract:
         id: int = Field(..., description="Unique ID of the broadcast list")
         name: str = Field(..., description="Name of the broadcast list")
         description: str = Field(..., description="Description of the broadcast list")
-        field_map: List[str] = Field(..., description="Fields mapped to the list")
+        field_map: list[str] = Field(..., description="Fields mapped to the list")
 
         @field_validator("id")
         @classmethod
@@ -20,25 +18,17 @@ class TalkoContract:
     class LeadListsFetchResponse(BaseModel):
         status: str = Field(..., description="Response status")
         message: str = Field(..., description="Response message")
-        data: Dict[str, List["TalkoContract.LeadListItem"]] = Field(
-            ..., description="Data containing lists"
-        )
+        data: dict[str, list["TalkoContract.LeadListItem"]] = Field(..., description="Data containing lists")
 
     class LeadObject(BaseModel):
         field_0: str = Field(..., description="Phone number - mandatory")
-        field_1: Optional[str] = None
-        field_2: Optional[str] = None
+        field_1: str | None = None
+        field_2: str | None = None
 
     class BulkLeadsCreateRequest(BaseModel):
-        data: List["TalkoContract.LeadObject"] = Field(
-            ..., description="Required array of leads (at least one)"
-        )
-        duplicate_option: str = Field(
-            "skip", description="How to handle duplicates: skip | overwrite | clone"
-        )
-        skill_id: Optional[str] = Field(
-            None, description="Optional skill ID for outbound routing"
-        )
+        data: list["TalkoContract.LeadObject"] = Field(..., description="Required array of leads (at least one)")
+        duplicate_option: str = Field("skip", description="How to handle duplicates: skip | overwrite | clone")
+        skill_id: str | None = Field(None, description="Optional skill ID for outbound routing")
 
         @model_validator(mode="before")
         @classmethod
@@ -50,10 +40,7 @@ class TalkoContract:
 
             for index, lead in enumerate(data):
                 if not lead or not lead.get("field_0"):
-                    raise ValueError(
-                        f"Each lead must contain field_0 (phone number). "
-                        f"Error at index {index}"
-                    )
+                    raise ValueError(f"Each lead must contain field_0 (phone number). Error at index {index}")
 
             return values
 
@@ -62,16 +49,12 @@ class TalkoContract:
         def validate_duplicate_option(cls, v: str) -> str:
             allowed = {"skip", "overwrite", "clone"}
             if v not in allowed:
-                raise ValueError(
-                    f"duplicate_option must be one of: {', '.join(allowed)}"
-                )
+                raise ValueError(f"duplicate_option must be one of: {', '.join(allowed)}")
             return v
 
         @field_validator("data")
         @classmethod
-        def data_cannot_be_empty(
-            cls, v: List["TalkoContract.LeadObject"]
-        ) -> List["TalkoContract.LeadObject"]:
+        def data_cannot_be_empty(cls, v: list["TalkoContract.LeadObject"]) -> list["TalkoContract.LeadObject"]:
             if not v:
                 raise ValueError("data array cannot be empty")
             return v

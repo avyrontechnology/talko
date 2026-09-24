@@ -1,3 +1,4 @@
+import logging
 import time
 
 import cloudinary
@@ -6,12 +7,11 @@ import cloudinary.uploader
 import cloudinary.utils
 
 from src.components.digital_assets import constants
-from src.components.digital_assets.logger_adapter import TalkoLoggerAdapter
 from src.components.digital_assets.messages import NO_CRED_FOUND_CLOUDINARY
 from src.components.digital_assets.storage.base import TalkoBaseStorageManager
 from src.core.environment import TalkoENV
 
-logger = TalkoLoggerAdapter().get_logger()
+logger = logging.getLogger(__name__)
 
 # resource_type is per-asset in Cloudinary ("auto" upload resolves to
 # image/video/raw). Lookups try each kind in order.
@@ -41,14 +41,12 @@ class TalkoCloudinaryStorageManager(TalkoBaseStorageManager):
             api_secret=api_secret,
             secure=True,
         )
-        logger.info(
-            "TalkoCloudinaryStorageManager initialized with cloud: %s", cloud_name
-        )
+        logger.info("TalkoCloudinaryStorageManager initialized with cloud: %s", cloud_name)
 
     def _public_id(self, file_path: str) -> str:
         clean = (file_path or "").strip().lstrip("/")
         if self.folder:
-            clean = "{}/{}".format(self.folder, clean)
+            clean = f"{self.folder}/{clean}"
         return clean
 
     def _discover_resource_type(self, public_id: str) -> str:
@@ -89,10 +87,8 @@ class TalkoCloudinaryStorageManager(TalkoBaseStorageManager):
             logger.info("Successfully generated signed URL for file: %s", file_path)
             return url
         except Exception as e:
-            logger.error(
-                "Failed to generate signed URL for file %s: %s", file_path, e
-            )
-            raise RuntimeError("Failed to generate signed URL: {}".format(e))
+            logger.error("Failed to generate signed URL for file %s: %s", file_path, e)
+            raise RuntimeError(f"Failed to generate signed URL: {e}")
 
     async def upload_digital_asset(self, file_obj, file_path: str) -> str:
         """
@@ -113,7 +109,7 @@ class TalkoCloudinaryStorageManager(TalkoBaseStorageManager):
             )
             secure_url = result.get("secure_url")
             if not secure_url:
-                raise ValueError("Cloudinary upload returned no secure_url: {}".format(result))
+                raise ValueError(f"Cloudinary upload returned no secure_url: {result}")
             logger.info(
                 "Successfully uploaded file '%s' to public_id: %s",
                 file_obj.filename,
@@ -127,9 +123,7 @@ class TalkoCloudinaryStorageManager(TalkoBaseStorageManager):
                 file_path,
                 str(e),
             )
-            raise ValueError(
-                "An error occurred while uploading file '{}': {}".format(file_path, str(e))
-            )
+            raise ValueError(f"An error occurred while uploading file '{file_path}': {str(e)}")
 
     def delete_digital_asset(self, file_path: str) -> None:
         """
@@ -141,14 +135,12 @@ class TalkoCloudinaryStorageManager(TalkoBaseStorageManager):
         errors = []
         for resource_type in _RESOURCE_TYPES:
             try:
-                result = cloudinary.uploader.destroy(
-                    public_id, resource_type=resource_type
-                )
+                result = cloudinary.uploader.destroy(public_id, resource_type=resource_type)
                 if result.get("result") == "ok":
                     logger.info("Successfully deleted file at path: %s", file_path)
                     return
             except Exception as e:
-                errors.append("{}: {}".format(resource_type, e))
+                errors.append(f"{resource_type}: {e}")
         if errors:
             logger.warning(
                 "Cloudinary destroy attempts for %s had errors (treated as deleted): %s",

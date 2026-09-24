@@ -1,5 +1,5 @@
 from itertools import chain, cycle, islice
-from typing import Dict, Generic, List, TypeVar
+from typing import Generic, TypeVar
 
 T = TypeVar("T")  # Generic type variable
 
@@ -7,7 +7,7 @@ T = TypeVar("T")  # Generic type variable
 class TalkoBaseAssignmentStrategy(Generic[T]):
     """Base class for generic assignment strategies."""
 
-    def assign(self, items: List[T], groups: List[T]) -> Dict[T, T]:
+    def assign(self, items: list[T], groups: list[T]) -> dict[T, T]:
         """Assign items to groups."""
         pass
 
@@ -15,9 +15,7 @@ class TalkoBaseAssignmentStrategy(Generic[T]):
 class TalkoRoundRobinAssignment(TalkoBaseAssignmentStrategy[T]):
     """Assigns items in a round-robin fashion with a specified starting index."""
 
-    def assign(
-        self, items: List[T], groups: List[T], start_index: int = 0
-    ) -> Dict[T, T]:
+    def assign(self, items: list[T], groups: list[T], start_index: int = 0) -> dict[T, T]:
         if not groups:
             raise StopIteration("Cannot assign items to empty groups list")
         assigned_to_cycle = cycle(
@@ -29,7 +27,7 @@ class TalkoRoundRobinAssignment(TalkoBaseAssignmentStrategy[T]):
 class TalkoEvenDistributionAssignment(TalkoBaseAssignmentStrategy[T]):
     """Ensures an even distribution of items across groups."""
 
-    def assign(self, items: List[T], groups: List[T]) -> Dict[T, T]:
+    def assign(self, items: list[T], groups: list[T]) -> dict[T, T]:
         assignments = {}
         chunk_size = len(items) // len(groups)  # Base number of items per group
         extra = len(items) % len(groups)  # Handle remainder

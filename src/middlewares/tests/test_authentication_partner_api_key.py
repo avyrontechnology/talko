@@ -27,9 +27,7 @@ class TestHandleApiKeyPartnerBranch:
         call_next = AsyncMock(return_value="response")
         redis_pool = AsyncMock()
 
-        with patch(
-            "src.middlewares.authentication.TalkoRPCServiceFactory"
-        ) as mock_rpc_factory:
+        with patch("src.middlewares.authentication.TalkoRPCServiceFactory") as mock_rpc_factory:
             result = await middleware._handle_api_key(
                 request=request_mock,
                 api_key="tkp_live_abcdef1234567890",
@@ -87,9 +85,7 @@ class TestHandleApiKeyPartnerBranch:
         assert response.status_code == 429
         call_next.assert_not_called()
 
-    async def test_old_format_key_falls_through_to_grpc_unchanged(
-        self, middleware, request_mock
-    ):
+    async def test_old_format_key_falls_through_to_grpc_unchanged(self, middleware, request_mock):
         # Regression guard: an old-style (non "tkp_live_"-prefixed) key must
         # still take the pre-existing gRPC-backed path, byte for byte.
         partner_api_key_service = AsyncMock()
@@ -97,16 +93,14 @@ class TestHandleApiKeyPartnerBranch:
         redis_pool = AsyncMock()
         redis_pool.get.return_value = None
 
-        with patch(
-            "src.middlewares.authentication.TalkoRPCServiceFactory"
-        ) as mock_rpc_factory:
+        with patch("src.middlewares.authentication.TalkoRPCServiceFactory") as mock_rpc_factory:
             mock_grpc_client = AsyncMock()
             mock_grpc_client.validate_api_key.return_value = {
                 "id": "old-key-id",
                 "partner_id": 7,
                 "is_active": True,
             }
-            mock_rpc_factory.get_service.return_value = mock_grpc_client
+            mock_rpc_factory.get_optional_service.return_value = mock_grpc_client
 
             result = await middleware._handle_api_key(
                 request=request_mock,
@@ -119,9 +113,7 @@ class TestHandleApiKeyPartnerBranch:
 
         assert result == "response"
         redis_pool.get.assert_called_once_with("api_key:opaque-console-issued-key")
-        mock_grpc_client.validate_api_key.assert_awaited_once_with(
-            api_key="opaque-console-issued-key"
-        )
+        mock_grpc_client.validate_api_key.assert_awaited_once_with(api_key="opaque-console-issued-key")
         partner_api_key_service.validate_and_get_partner.assert_not_called()
         assert request_mock.state.user == {
             "partner_id": 7,

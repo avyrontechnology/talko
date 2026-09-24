@@ -1,5 +1,5 @@
-import base64
 import asyncio
+import base64
 import json
 from unittest.mock import MagicMock
 
@@ -185,7 +185,14 @@ class TestVoiceaiRelayOutbound:
                 await asyncio.sleep(0.01)
             yield json.dumps({"event": "stop", "streamSid": "MZ123"})
 
-        await relay.run(tata, TalkoTataTeleProvider(), make_ctx(), {"event": "start", "start": {}}, tata_idles_then_stops(), "agent_1")
+        await relay.run(
+            tata,
+            TalkoTataTeleProvider(),
+            make_ctx(),
+            {"event": "start", "start": {}},
+            tata_idles_then_stops(),
+            "agent_1",
+        )
         assert tata.closed
         assert vws.closed
 
@@ -209,13 +216,15 @@ class TestVoiceaiRelayOutbound:
             timeout=10,
         )
         elapsed = time.perf_counter() - t0
-        assert elapsed < 5, "own-mark ack must not grace-wait (took {:.2f}s)".format(elapsed)
+        assert elapsed < 5, f"own-mark ack must not grace-wait (took {elapsed:.2f}s)"
         assert all(m["event"] != "mark" for m in vws.sent)
 
     def test_ws_url(self):
         relay = TalkoVoiceaiRelay(
-            ws_base_url="wss://v.local/", api_base_url="https://v.local",
-            api_key="k", logger=MagicMock(),
+            ws_base_url="wss://v.local/",
+            api_base_url="https://v.local",
+            api_key="k",
+            logger=MagicMock(),
         )
         assert relay.ws_url("a1", "t") == "wss://v.local/chat/v1/a1?token=t"
 
@@ -260,9 +269,7 @@ def _tata_medias(tata):
 
 def _own_mark_names(tata):
     return [
-        m["mark"]["name"]
-        for m in tata.sent
-        if m["event"] == "mark" and m["mark"]["name"].startswith("voiceai-chunk-")
+        m["mark"]["name"] for m in tata.sent if m["event"] == "mark" and m["mark"]["name"].startswith("voiceai-chunk-")
     ]
 
 
@@ -380,7 +387,7 @@ class TestRealtimePacing:
         elapsed = time.monotonic() - t0
         assert [m["media"]["chunk"] for m in _tata_medias(tata)] == [1, 2, 3, 4, 5, 6]
         # first frame immediate + 5 paced intervals of 20 ms (slop allowed)
-        assert elapsed >= 0.09, "frames burst out without realtime pacing ({:.3f}s)".format(elapsed)
+        assert elapsed >= 0.09, f"frames burst out without realtime pacing ({elapsed:.3f}s)"
 
     @pytest.mark.asyncio
     async def test_marks_sent_sparsely_by_default(self):
@@ -481,9 +488,7 @@ class TestStreamTokenAuth:
 
         from src.components.pstn.voiceai_relay import TalkoVoiceaiRelay
 
-        monkeypatch.setattr(
-            "src.core.environment.TalkoENV.VOICE_STREAM_SECRET", "y" * 32
-        )
+        monkeypatch.setattr("src.core.environment.TalkoENV.VOICE_STREAM_SECRET", "y" * 32)
         opened = []
 
         async def boom_ticket():
@@ -510,8 +515,12 @@ class TestStreamTokenAuth:
 
         await asyncio.wait_for(
             relay.run(
-                tata, TalkoTataTeleProvider(), make_ctx(),
-                {"event": "start", "start": {}}, tata_idles_then_stops(), "agent_9",
+                tata,
+                TalkoTataTeleProvider(),
+                make_ctx(),
+                {"event": "start", "start": {}},
+                tata_idles_then_stops(),
+                "agent_9",
             ),
             timeout=10,
         )

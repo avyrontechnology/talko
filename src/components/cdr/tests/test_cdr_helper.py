@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from enum import Enum
 from unittest.mock import MagicMock, patch
 
@@ -70,6 +70,8 @@ def fake_filtered_cdr_dict():
         "partner_id": cdr["partner_id"],
         "agent": cdr["agent"],
         "lead_id": cdr["lead_id"],
+        "entity_type": None,
+        "entity_id": None,
         "workspace_id": cdr["workspace_id"],
         "calling_mode": cdr["calling_mode"],
         "call_status": cdr["call_status"],
@@ -87,6 +89,12 @@ def fake_filtered_cdr_dict():
         "call_connected": cdr["call_connected"],
         "lead_name": cdr["lead_name"],
         "call_type": "incoming",
+        "do_recording_url": "",
+        "call_uuid": "",
+        "call_id": "",
+        "vendor_id": "",
+        "vendor_config_id": "",
+        "custom_fields": None,
     }
 
 
@@ -111,7 +119,7 @@ def mock_dependencies():
 @pytest.fixture(autouse=True)
 def mock_datetime():
     """Mock datetime.datetime.now to return 2025-10-15 17:02 IST."""
-    mock_utc_time = datetime(2025, 10, 15, 11, 32, tzinfo=timezone.utc)  # 17:02 IST
+    mock_utc_time = datetime(2025, 10, 15, 11, 32, tzinfo=UTC)  # 17:02 IST
     mock_ist = mock_utc_time.astimezone(IST)
     mock_now = MagicMock(return_value=mock_utc_time)
     mock_now.astimezone.return_value = mock_ist
@@ -125,51 +133,35 @@ class TestCommonCDRHelper:
 
     def test_parse_mongo_timestamp_number_long(self, mock_logger):
         """Test parse_mongo_timestamp with MongoDB $numberLong format."""
-        timestamp = TalkoCommonCDRHelper.parse_mongo_timestamp(
-            {"$numberLong": "1727181060000"}, mock_logger
-        )
+        timestamp = TalkoCommonCDRHelper.parse_mongo_timestamp({"$numberLong": "1727181060000"}, mock_logger)
         assert timestamp == 1727181060000
         mock_logger.debug.assert_any_call(
             "Parsing MongoDB timestamp in common cdr helper: {'$numberLong': '1727181060000'}"
         )
-        mock_logger.debug.assert_any_call(
-            "Parsed $numberLong to timestamp in common cdr helper: 1727181060000"
-        )
+        mock_logger.debug.assert_any_call("Parsed $numberLong to timestamp in common cdr helper: 1727181060000")
         assert mock_logger.debug.call_count == 2
 
     def test_parse_mongo_timestamp_int(self, mock_logger):
         """Test parse_mongo_timestamp with integer input."""
         timestamp = TalkoCommonCDRHelper.parse_mongo_timestamp(1727181060, mock_logger)
         assert timestamp == 1727181060
-        mock_logger.debug.assert_any_call(
-            "Parsing MongoDB timestamp in common cdr helper: 1727181060"
-        )
-        mock_logger.debug.assert_any_call(
-            "Parsed numeric timestamp in common cdr helper: 1727181060"
-        )
+        mock_logger.debug.assert_any_call("Parsing MongoDB timestamp in common cdr helper: 1727181060")
+        mock_logger.debug.assert_any_call("Parsed numeric timestamp in common cdr helper: 1727181060")
         assert mock_logger.debug.call_count == 2
 
     def test_parse_mongo_timestamp_float(self, mock_logger):
         """Test parse_mongo_timestamp with float input."""
         timestamp = TalkoCommonCDRHelper.parse_mongo_timestamp(1727181060.123, mock_logger)
         assert timestamp == 1727181060
-        mock_logger.debug.assert_any_call(
-            "Parsing MongoDB timestamp in common cdr helper: 1727181060.123"
-        )
-        mock_logger.debug.assert_any_call(
-            "Parsed numeric timestamp in common cdr helper: 1727181060"
-        )
+        mock_logger.debug.assert_any_call("Parsing MongoDB timestamp in common cdr helper: 1727181060.123")
+        mock_logger.debug.assert_any_call("Parsed numeric timestamp in common cdr helper: 1727181060")
         assert mock_logger.debug.call_count == 2
 
     def test_parse_mongo_timestamp_invalid_number_long(self, mock_logger):
         """Test parse_mongo_timestamp with invalid $numberLong."""
-        timestamp = TalkoCommonCDRHelper.parse_mongo_timestamp(
-            {"$numberLong": "invalid"}, mock_logger
-        )
+        timestamp = TalkoCommonCDRHelper.parse_mongo_timestamp({"$numberLong": "invalid"}, mock_logger)
         assert timestamp is None
-        mock_logger.debug.assert_any_call(
-            "Parsing MongoDB timestamp in common cdr helper: {'$numberLong': 'invalid'}"
-        )
+        mock_logger.debug.assert_any_call("Parsing MongoDB timestamp in common cdr helper: {'$numberLong': 'invalid'}")
         mock_logger.error.assert_called_once_with(
             "Failed to parse $numberLong timestamp in common cdr helper: invalid literal for int() with base 10: 'invalid'"
         )
@@ -179,12 +171,8 @@ class TestCommonCDRHelper:
         """Test parse_mongo_timestamp with None input."""
         timestamp = TalkoCommonCDRHelper.parse_mongo_timestamp(None, mock_logger)
         assert timestamp is None
-        mock_logger.debug.assert_any_call(
-            "Parsing MongoDB timestamp in common cdr helper: None"
-        )
-        mock_logger.debug.assert_any_call(
-            "Timestamp is None or invalid in common cdr helper"
-        )
+        mock_logger.debug.assert_any_call("Parsing MongoDB timestamp in common cdr helper: None")
+        mock_logger.debug.assert_any_call("Timestamp is None or invalid in common cdr helper")
         assert mock_logger.debug.call_count == 2
 
     def test_create_filtered_cdr_full_data(self, mock_logger):
@@ -192,16 +180,10 @@ class TestCommonCDRHelper:
         cdr = fake_cdr_dict()
         filtered_cdr = TalkoCommonCDRHelper.create_filtered_cdr(cdr, mock_logger)
         assert filtered_cdr == fake_filtered_cdr_dict()
-        mock_logger.info.assert_called_once_with(
-            "Creating filtered TalkoCDR in common cdr helper"
-        )
+        mock_logger.info.assert_called_once_with("Creating filtered TalkoCDR in common cdr helper")
         mock_logger.debug.assert_any_call(f"Input TalkoCDR in common cdr helper: {cdr}")
-        mock_logger.debug.assert_any_call(
-            f"Parsed numeric timestamp in common cdr helper: 1727181060"
-        )
-        mock_logger.debug.assert_any_call(
-            f"Filtered TalkoCDR in common cdr helper: {filtered_cdr}"
-        )
+        mock_logger.debug.assert_any_call("Parsed numeric timestamp in common cdr helper: 1727181060")
+        mock_logger.debug.assert_any_call(f"Filtered TalkoCDR in common cdr helper: {filtered_cdr}")
 
     def test_create_filtered_cdr_missing_fields(self, mock_logger):
         """Test create_filtered_cdr with missing fields."""
@@ -210,8 +192,10 @@ class TestCommonCDRHelper:
             filtered_cdr = TalkoCommonCDRHelper.create_filtered_cdr(cdr, mock_logger)
         expected = {
             "partner_id": 10,
-            "agent": "",
+            "agent": 0,
             "lead_id": None,
+            "entity_type": None,
+            "entity_id": None,
             "workspace_id": None,
             "calling_mode": None,
             "call_status": None,
@@ -229,11 +213,15 @@ class TestCommonCDRHelper:
             "call_connected": "0",
             "lead_name": "",
             "call_type": "incoming",
+            "do_recording_url": "",
+            "call_uuid": "",
+            "call_id": "",
+            "vendor_id": "",
+            "vendor_config_id": "",
+            "custom_fields": None,
         }
         assert filtered_cdr == expected
-        mock_logger.info.assert_called_once_with(
-            "Creating filtered TalkoCDR in common cdr helper"
-        )
+        mock_logger.info.assert_called_once_with("Creating filtered TalkoCDR in common cdr helper")
 
     def test_create_filtered_cdr_clicktocall(self, mock_logger):
         """Test create_filtered_cdr with clicktocall calling_mode."""
@@ -241,9 +229,7 @@ class TestCommonCDRHelper:
         cdr["calling_mode"] = CLICK_TO_CALL
         filtered_cdr = TalkoCommonCDRHelper.create_filtered_cdr(cdr, mock_logger)
         assert filtered_cdr["call_type"] == "outgoing"
-        mock_logger.info.assert_called_once_with(
-            "Creating filtered TalkoCDR in common cdr helper"
-        )
+        mock_logger.info.assert_called_once_with("Creating filtered TalkoCDR in common cdr helper")
 
     def test_create_filtered_cdr_invalid_calling_mode(self, mock_logger):
         """Test create_filtered_cdr with invalid calling_mode."""
@@ -251,30 +237,33 @@ class TestCommonCDRHelper:
         cdr["calling_mode"] = "invalid"
         filtered_cdr = TalkoCommonCDRHelper.create_filtered_cdr(cdr, mock_logger)
         assert filtered_cdr["call_type"] == "incoming"
-        mock_logger.info.assert_called_once_with(
-            "Creating filtered TalkoCDR in common cdr helper"
-        )
+        mock_logger.info.assert_called_once_with("Creating filtered TalkoCDR in common cdr helper")
 
     def test_mask_sensitive_data(self, mock_logger, mock_dependencies):
         """Test mask_sensitive_data with multiple phone number fields."""
         _, mock_mask_phone_number = mock_dependencies
-        mock_mask_phone_number.side_effect = lambda x, _: (
-            f"{x[:4]}******" if isinstance(x, str) and x else x
+        mock_mask_phone_number.side_effect = lambda value, visible_last=4, visible_first=1, *args, **kwargs: (
+            (
+                "+"
+                + "".join(filter(str.isdigit, value))[:visible_first]
+                + "*" * (len("".join(filter(str.isdigit, value))) - visible_first - visible_last)
+                + "".join(filter(str.isdigit, value))[-visible_last:]
+                if value.startswith("+")
+                else value[:visible_first] + "*" * (len(value) - visible_first - visible_last) + value[-visible_last:]
+            )
+            if isinstance(value, str) and value
+            else value
         )
         cdr = {
             "customer": "9999999999",
             "caller_id_number": "8888888888",
         }
         TalkoCommonCDRHelper.mask_sensitive_data(cdr, mock_logger)
-        assert cdr["customer"] == "9999******"
-        assert cdr["caller_id_number"] == "8888******"
-        mock_logger.info.assert_called_once_with(
-            "Masking sensitive data in TalkoCDR in common cdr helper."
-        )
-        mock_logger.debug.assert_any_call("Masked customer: 9999999999 -> 9999******")
-        mock_logger.debug.assert_any_call(
-            "Masked caller_id_number: 8888888888 -> 8888******"
-        )
+        assert cdr["customer"] == "9*****9999"
+        assert cdr["caller_id_number"] == "8*****8888"
+        mock_logger.info.assert_called_once_with("Masking sensitive data in TalkoCDR in common cdr helper.")
+        mock_logger.debug.assert_any_call("Masked customer: 9999999999 -> 9*****9999")
+        mock_logger.debug.assert_any_call("Masked caller_id_number: 8888888888 -> 8*****8888")
 
     def test_attach_agent_names(self, mock_logger):
         """Test attach_agent_names with valid agent data."""
@@ -308,12 +297,8 @@ class TestCommonCDRHelper:
         )
         TalkoCommonCDRHelper.attach_agent_names([cdr_response], agent_data, mock_logger)
         assert cdr_response.action_performed_by == "John Doe"
-        mock_logger.info.assert_called_once_with(
-            "Attaching agent names to TalkoCDR responses in common cdr helper."
-        )
-        mock_logger.debug.assert_any_call(
-            "Agent data in common cdr helper: {30: {'name': 'John Doe'}}"
-        )
+        mock_logger.info.assert_called_once_with("Attaching agent names to TalkoCDR responses in common cdr helper.")
+        mock_logger.debug.assert_any_call("Agent data in common cdr helper: {30: {'name': 'John Doe'}}")
 
     def test_attach_agent_names_missing_agent(self, mock_logger):
         """Test attach_agent_names with missing agent data."""
@@ -347,18 +332,23 @@ class TestCommonCDRHelper:
         )
         TalkoCommonCDRHelper.attach_agent_names([cdr_response], agent_data, mock_logger)
         assert cdr_response.action_performed_by == ""
-        mock_logger.info.assert_called_once_with(
-            "Attaching agent names to TalkoCDR responses in common cdr helper."
-        )
-        mock_logger.debug.assert_any_call(
-            "Agent data in common cdr helper: {999: {'name': 'John Doe'}}"
-        )
+        mock_logger.info.assert_called_once_with("Attaching agent names to TalkoCDR responses in common cdr helper.")
+        mock_logger.debug.assert_any_call("Agent data in common cdr helper: {999: {'name': 'John Doe'}}")
 
     def test_mask_sensitive_data_with_lead_secret(self, mock_logger, mock_dependencies):
         """Test mask_sensitive_data with lead_secret field."""
         _, mock_mask_phone_number = mock_dependencies
-        mock_mask_phone_number.side_effect = lambda x, _: (
-            f"{x[:4]}******" if isinstance(x, str) and x else x
+        mock_mask_phone_number.side_effect = lambda value, visible_last=4, visible_first=1, *args, **kwargs: (
+            (
+                "+"
+                + "".join(filter(str.isdigit, value))[:visible_first]
+                + "*" * (len("".join(filter(str.isdigit, value))) - visible_first - visible_last)
+                + "".join(filter(str.isdigit, value))[-visible_last:]
+                if value.startswith("+")
+                else value[:visible_first] + "*" * (len(value) - visible_first - visible_last) + value[-visible_last:]
+            )
+            if isinstance(value, str) and value
+            else value
         )
         cdr = {
             "customer": "9999999999",
@@ -366,26 +356,27 @@ class TestCommonCDRHelper:
             "lead_secret": "sensitive_data_123",
         }
         TalkoCommonCDRHelper.mask_sensitive_data(cdr, mock_logger)
-        assert cdr["customer"] == "9999******"
-        assert cdr["caller_id_number"] == "8888******"
-        assert (
-            cdr["lead_secret"] == "sensitive_data_123"
-        )  # Assuming lead_secret is not masked
-        mock_logger.info.assert_called_once_with(
-            "Masking sensitive data in TalkoCDR in common cdr helper."
-        )
-        mock_logger.debug.assert_any_call("Masked customer: 9999999999 -> 9999******")
-        mock_logger.debug.assert_any_call(
-            "Masked caller_id_number: 8888888888 -> 8888******"
-        )
+        assert cdr["customer"] == "9*****9999"
+        assert cdr["caller_id_number"] == "8*****8888"
+        assert cdr["lead_secret"] == "sensitive_data_123"  # Assuming lead_secret is not masked
+        mock_logger.info.assert_called_once_with("Masking sensitive data in TalkoCDR in common cdr helper.")
+        mock_logger.debug.assert_any_call("Masked customer: 9999999999 -> 9*****9999")
+        mock_logger.debug.assert_any_call("Masked caller_id_number: 8888888888 -> 8*****8888")
 
-    def test_mask_sensitive_data_lead_secret_encrypted(
-        self, mock_logger, mock_dependencies
-    ):
+    def test_mask_sensitive_data_lead_secret_encrypted(self, mock_logger, mock_dependencies):
         """Test mask_sensitive_data with lead_secret encryption."""
         _, mock_mask_phone_number = mock_dependencies
-        mock_mask_phone_number.side_effect = lambda x, _: (
-            f"{x[:4]}******" if isinstance(x, str) and x else x
+        mock_mask_phone_number.side_effect = lambda value, visible_last=4, visible_first=1, *args, **kwargs: (
+            (
+                "+"
+                + "".join(filter(str.isdigit, value))[:visible_first]
+                + "*" * (len("".join(filter(str.isdigit, value))) - visible_first - visible_last)
+                + "".join(filter(str.isdigit, value))[-visible_last:]
+                if value.startswith("+")
+                else value[:visible_first] + "*" * (len(value) - visible_first - visible_last) + value[-visible_last:]
+            )
+            if isinstance(value, str) and value
+            else value
         )
         with patch(
             "src.utils.crypto_utils.TalkoRSAKeyHandler.encrypt_with_public_key",
@@ -397,8 +388,8 @@ class TestCommonCDRHelper:
                 "lead_secret": "sensitive_data_123",
             }
             TalkoCommonCDRHelper.mask_sensitive_data(cdr, mock_logger)
-            assert cdr["customer"] == "9999******"
-            assert cdr["caller_id_number"] == "8888******"
+            assert cdr["customer"] == "9*****9999"
+            assert cdr["caller_id_number"] == "8*****8888"
 
 
 class TestGetCDRsHelper:
@@ -418,12 +409,8 @@ class TestGetCDRsHelper:
             assert "_id" not in cdrs[0]
             mock_cdr_response.assert_called_once()
             mock_logger.info.assert_any_call("Processing CDRs for get_cdrs helper")
-            mock_logger.info.assert_any_call(
-                "Successfully processed CDRs for get_cdrs helper"
-            )
-            mock_logger.debug.assert_any_call(
-                f"Input CDRs in get cdr helper: {expected_input_log}"
-            )
+            mock_logger.info.assert_any_call("Successfully processed CDRs for get_cdrs helper")
+            mock_logger.debug.assert_any_call(f"Input CDRs in get cdr helper: {expected_input_log}")
 
     def test_process_cdrs_non_string_customer(self, mock_logger):
         """Test process_cdrs with non-string customer field."""
@@ -439,12 +426,8 @@ class TestGetCDRsHelper:
             assert result[0] == mock_instance
             assert cdrs[0]["customer"] == "9999999999"
             mock_logger.info.assert_any_call("Processing CDRs for get_cdrs helper")
-            mock_logger.debug.assert_any_call(
-                "Converting non-string customer field in get cdr helper: 9999999999"
-            )
-            mock_logger.debug.assert_any_call(
-                f"Input CDRs in get cdr helper: {expected_input_log}"
-            )
+            mock_logger.debug.assert_any_call("Converting non-string customer field in get cdr helper: 9999999999")
+            mock_logger.debug.assert_any_call(f"Input CDRs in get cdr helper: {expected_input_log}")
 
     def test_process_cdrs_exception(self, mock_logger):
         """Test process_cdrs raises exception."""
@@ -466,8 +449,17 @@ class TestGetAgentCallLogsHelper:
     def test_process_cdrs_masking_enabled(self, mock_logger, mock_dependencies):
         """Test process_cdrs with masking enabled."""
         _, mock_mask_phone_number = mock_dependencies
-        mock_mask_phone_number.side_effect = lambda x, _: (
-            f"{x[:4]}******" if isinstance(x, str) and x else x
+        mock_mask_phone_number.side_effect = lambda value, visible_last=4, visible_first=1, *args, **kwargs: (
+            (
+                "+"
+                + "".join(filter(str.isdigit, value))[:visible_first]
+                + "*" * (len("".join(filter(str.isdigit, value))) - visible_first - visible_last)
+                + "".join(filter(str.isdigit, value))[-visible_last:]
+                if value.startswith("+")
+                else value[:visible_first] + "*" * (len(value) - visible_first - visible_last) + value[-visible_last:]
+            )
+            if isinstance(value, str) and value
+            else value
         )
         cdrs = [fake_cdr_dict()]
         expected_input_log = [fake_cdr_dict()]
@@ -479,35 +471,29 @@ class TestGetAgentCallLogsHelper:
                 "src.utils.enums.TalkoReasonKey.from_raw",
                 side_effect=Exception("Invalid reason key"),
             ):
-                with patch(
-                    "src.components.cdr.dto.TalkoContract.CallLogResponse"
-                ) as mock_call_log_response:
+                with patch("src.components.cdr.dto.TalkoContract.CallLogResponse") as mock_call_log_response:
                     mock_instance = {"id": "12345"}
                     mock_call_log_response.return_value = mock_instance
-                    agent_ids, responses = TalkoGetAgentCallLogsHelper.process_cdrs(
-                        cdrs, True, mock_logger
-                    )
+                    agent_ids, responses = TalkoGetAgentCallLogsHelper.process_cdrs(cdrs, True, mock_logger)
         assert agent_ids == [1]
         assert len(responses) == 1
         assert responses[0] == mock_instance
-        assert cdrs[0]["customer"] == "9999******"
+        assert cdrs[0]["customer"] == "9*****9999"
         assert cdrs[0]["hangup_cause"] == "Unknown Status"
         assert cdrs[0]["reason_key"] == "Unknown Status"
         assert "call_flow" not in cdrs[0]
         assert cdrs[0]["action_performed_by"] == ""
         assert "agent_name" not in cdrs[0]
         assert cdrs[0]["event_type"] == "call"
-        mock_logger.info.assert_any_call(
-            "Processing CDRs for get_agent_call_logs helper"
-        )
+        mock_logger.info.assert_any_call("Processing CDRs for get_agent_call_logs helper")
         mock_logger.debug.assert_any_call(
             f"Input CDRs: {expected_input_log}, is_masking_enabled: True in get agent call logs helper"
         )
         mock_logger.error.assert_any_call(
-            "Failed to convert hangup_cause: Invalid hangup cause in get agent call logs helper"
+            "Failed to convert hangup_cause in get agent call logs helper: Invalid hangup cause"
         )
         mock_logger.error.assert_any_call(
-            "Failed to convert reason_key: Invalid reason key in get agent call logs helper"
+            "Failed to convert reason_key in get agent call logs helper: Invalid reason key"
         )
 
     def test_process_cdrs_no_masking(self, mock_logger):
@@ -522,14 +508,10 @@ class TestGetAgentCallLogsHelper:
                 "src.utils.enums.TalkoReasonKey.from_raw",
                 side_effect=Exception("Invalid reason key"),
             ):
-                with patch(
-                    "src.components.cdr.dto.TalkoContract.CallLogResponse"
-                ) as mock_call_log_response:
+                with patch("src.components.cdr.dto.TalkoContract.CallLogResponse") as mock_call_log_response:
                     mock_instance = {"id": "12345"}
                     mock_call_log_response.return_value = mock_instance
-                    agent_ids, responses = TalkoGetAgentCallLogsHelper.process_cdrs(
-                        cdrs, False, mock_logger
-                    )
+                    agent_ids, responses = TalkoGetAgentCallLogsHelper.process_cdrs(cdrs, False, mock_logger)
         assert agent_ids == [1]
         assert len(responses) == 1
         assert responses[0] == mock_instance
@@ -541,24 +523,31 @@ class TestGetAgentCallLogsHelper:
         assert cdrs[0]["action_performed_by"] == ""
         assert "agent_name" not in cdrs[0]
         assert cdrs[0]["event_type"] == "call"
-        mock_logger.info.assert_any_call(
-            "Processing CDRs for get_agent_call_logs helper"
-        )
+        mock_logger.info.assert_any_call("Processing CDRs for get_agent_call_logs helper")
         mock_logger.debug.assert_any_call(
             f"Input CDRs: {expected_input_log}, is_masking_enabled: False in get agent call logs helper"
         )
         mock_logger.error.assert_any_call(
-            "Failed to convert hangup_cause: Invalid hangup cause in get agent call logs helper"
+            "Failed to convert hangup_cause in get agent call logs helper: Invalid hangup cause"
         )
         mock_logger.error.assert_any_call(
-            "Failed to convert reason_key: Invalid reason key in get agent call logs helper"
+            "Failed to convert reason_key in get agent call logs helper: Invalid reason key"
         )
 
     def test_process_cdrs_non_string_customer(self, mock_logger, mock_dependencies):
         """Test process_cdrs with non-string customer field."""
         _, mock_mask_phone_number = mock_dependencies
-        mock_mask_phone_number.side_effect = lambda x, _: (
-            f"{x[:4]}******" if isinstance(x, str) and x else x
+        mock_mask_phone_number.side_effect = lambda value, visible_last=4, visible_first=1, *args, **kwargs: (
+            (
+                "+"
+                + "".join(filter(str.isdigit, value))[:visible_first]
+                + "*" * (len("".join(filter(str.isdigit, value))) - visible_first - visible_last)
+                + "".join(filter(str.isdigit, value))[-visible_last:]
+                if value.startswith("+")
+                else value[:visible_first] + "*" * (len(value) - visible_first - visible_last) + value[-visible_last:]
+            )
+            if isinstance(value, str) and value
+            else value
         )
         cdrs = [fake_cdr_dict()]
         cdrs[0]["customer"] = 9999999999
@@ -572,23 +561,17 @@ class TestGetAgentCallLogsHelper:
                 "src.utils.enums.TalkoReasonKey.from_raw",
                 side_effect=Exception("Invalid reason key"),
             ):
-                with patch(
-                    "src.components.cdr.dto.TalkoContract.CallLogResponse"
-                ) as mock_call_log_response:
+                with patch("src.components.cdr.dto.TalkoContract.CallLogResponse") as mock_call_log_response:
                     mock_instance = {"id": "12345"}
                     mock_call_log_response.return_value = mock_instance
-                    agent_ids, responses = TalkoGetAgentCallLogsHelper.process_cdrs(
-                        cdrs, True, mock_logger
-                    )
+                    agent_ids, responses = TalkoGetAgentCallLogsHelper.process_cdrs(cdrs, True, mock_logger)
         assert agent_ids == [1]
         assert len(responses) == 1
         assert responses[0] == mock_instance
-        assert cdrs[0]["customer"] == "9999******"
-        mock_logger.info.assert_any_call(
-            "Processing CDRs for get_agent_call_logs helper"
-        )
+        assert cdrs[0]["customer"] == "9*****9999"
+        mock_logger.info.assert_any_call("Processing CDRs for get_agent_call_logs helper")
         mock_logger.debug.assert_any_call(
-            "Converting non-string customer field: 9999999999, in get agent call logs helper"
+            "Converting non-string customer field in get agent call logs helper: 9999999999"
         )
         mock_logger.debug.assert_any_call(
             f"Input CDRs: {expected_input_log}, is_masking_enabled: True in get agent call logs helper"
@@ -608,23 +591,14 @@ class TestGetAgentCallLogsHelper:
                 "src.utils.enums.TalkoReasonKey.from_raw",
                 side_effect=Exception("Invalid reason key"),
             ):
-                with patch(
-                    "src.components.cdr.dto.TalkoContract.CallLogResponse"
-                ) as mock_call_log_response:
+                with patch("src.components.cdr.dto.TalkoContract.CallLogResponse") as mock_call_log_response:
                     mock_instance = {"id": "12345"}
                     mock_call_log_response.return_value = mock_instance
-                    agent_ids, responses = TalkoGetAgentCallLogsHelper.process_cdrs(
-                        cdrs, False, mock_logger
-                    )
-        assert agent_ids == [None]
+                    agent_ids, responses = TalkoGetAgentCallLogsHelper.process_cdrs(cdrs, False, mock_logger)
+        assert agent_ids == []
         assert len(responses) == 1
         assert responses[0] == mock_instance
-        mock_logger.info.assert_any_call(
-            "Processing CDRs for get_agent_call_logs helper"
-        )
-        mock_logger.debug.assert_any_call(
-            "Collected agent_id in get agent call logs helper: None"
-        )
+        mock_logger.info.assert_any_call("Processing CDRs for get_agent_call_logs helper")
         mock_logger.debug.assert_any_call(
             f"Input CDRs: {expected_input_log}, is_masking_enabled: False in get agent call logs helper"
         )
@@ -632,17 +606,11 @@ class TestGetAgentCallLogsHelper:
     def test_handle_hangup_cause_success(self, mock_logger):
         """Test handle_hangup_cause success."""
         cdr = {"hangup_cause": "USER_BUSY"}
-        with patch(
-            "src.utils.enums.TalkoHangupCause.from_raw", return_value=MagicMock(value="Busy")
-        ):
+        with patch("src.utils.enums.TalkoHangupCause.from_raw", return_value=MagicMock(value="Busy")):
             result = TalkoGetAgentCallLogsHelper.handle_hangup_cause(cdr, mock_logger)
             assert result == "Busy"
-            mock_logger.info.assert_called_once_with(
-                "Handling hangup_cause in get agent call logs helper"
-            )
-            mock_logger.debug.assert_called_once_with(
-                "Converted hangup_cause: Busy in get agent call logs helper"
-            )
+            mock_logger.info.assert_called_once_with("Handling hangup_cause in get agent call logs helper")
+            mock_logger.debug.assert_called_once_with("Converted hangup_cause in get agent call logs helper: Busy")
 
     def test_handle_hangup_cause_exception(self, mock_logger):
         """Test handle_hangup_cause exception."""
@@ -654,27 +622,19 @@ class TestGetAgentCallLogsHelper:
             result = TalkoGetAgentCallLogsHelper.handle_hangup_cause(cdr, mock_logger)
             assert result == "Unknown Status"
             assert cdr["hangup_cause"] == "Unknown Status"
-            mock_logger.info.assert_called_once_with(
-                "Handling hangup_cause in get agent call logs helper"
-            )
+            mock_logger.info.assert_called_once_with("Handling hangup_cause in get agent call logs helper")
             mock_logger.error.assert_called_once_with(
-                "Failed to convert hangup_cause: Invalid hangup cause in get agent call logs helper"
+                "Failed to convert hangup_cause in get agent call logs helper: Invalid hangup cause"
             )
 
     def test_handle_reason_key_success(self, mock_logger):
         """Test handle_reason_key success."""
         cdr = {"reason_key": "BUSY"}
-        with patch(
-            "src.utils.enums.TalkoReasonKey.from_raw", return_value=MagicMock(value="Busy")
-        ):
+        with patch("src.utils.enums.TalkoReasonKey.from_raw", return_value=MagicMock(value="Busy")):
             result = TalkoGetAgentCallLogsHelper.handle_reason_key(cdr, mock_logger)
             assert result == "Busy"
-            mock_logger.info.assert_called_once_with(
-                "Handling reason_key in get agent call logs helper"
-            )
-            mock_logger.debug.assert_called_once_with(
-                "Converted reason_key: Busy in get agent call logs helper"
-            )
+            mock_logger.info.assert_called_once_with("Handling reason_key in get agent call logs helper")
+            mock_logger.debug.assert_called_once_with("Converted reason_key in get agent call logs helper: Busy")
 
     def test_handle_reason_key_exception(self, mock_logger):
         """Test handle_reason_key exception."""
@@ -686,11 +646,9 @@ class TestGetAgentCallLogsHelper:
             result = TalkoGetAgentCallLogsHelper.handle_reason_key(cdr, mock_logger)
             assert result == "Unknown Status"
             assert cdr["reason_key"] == "Unknown Status"
-            mock_logger.info.assert_called_once_with(
-                "Handling reason_key in get agent call logs helper"
-            )
+            mock_logger.info.assert_called_once_with("Handling reason_key in get agent call logs helper")
             mock_logger.error.assert_called_once_with(
-                "Failed to convert reason_key: Invalid reason key in get agent call logs helper"
+                "Failed to convert reason_key in get agent call logs helper: Invalid reason key"
             )
 
     def test_agent_call_log_response(self, mock_logger, mock_dependencies):
@@ -727,12 +685,8 @@ class TestGetAgentCallLogsHelper:
             "call_histories": [cdr_response],
             "total_count": 1,
         }
-        mock_title_case_util.convert_values_to_title_case.return_value = (
-            expected_response
-        )
-        result = TalkoGetAgentCallLogsHelper.agent_call_log_response(
-            [cdr_response], 1, mock_logger
-        )
+        mock_title_case_util.convert_values_to_title_case.return_value = expected_response
+        result = TalkoGetAgentCallLogsHelper.agent_call_log_response([cdr_response], 1, mock_logger)
         assert result["total_count"] == 1
         assert len(result["call_histories"]) == 1
         assert result["call_histories"][0]["created_at"] == 1760440089989
@@ -740,8 +694,17 @@ class TestGetAgentCallLogsHelper:
     def test_process_cdrs_exception_handling(self, mock_logger, mock_dependencies):
         """Test process_cdrs exception handling when CallLogResponse creation fails."""
         _, mock_mask_phone_number = mock_dependencies
-        mock_mask_phone_number.side_effect = lambda x, _: (
-            f"{x[:4]}******" if isinstance(x, str) and x else x
+        mock_mask_phone_number.side_effect = lambda value, visible_last=4, visible_first=1, *args, **kwargs: (
+            (
+                "+"
+                + "".join(filter(str.isdigit, value))[:visible_first]
+                + "*" * (len("".join(filter(str.isdigit, value))) - visible_first - visible_last)
+                + "".join(filter(str.isdigit, value))[-visible_last:]
+                if value.startswith("+")
+                else value[:visible_first] + "*" * (len(value) - visible_first - visible_last) + value[-visible_last:]
+            )
+            if isinstance(value, str) and value
+            else value
         )
 
         cdr = {
@@ -781,9 +744,7 @@ class TestGetAgentCallLogsHelper:
             "call_uuid": "",
         }
 
-        with patch(
-            "src.utils.enums.TalkoHangupCause.from_raw", return_value=MagicMock(value="Busy")
-        ):
+        with patch("src.utils.enums.TalkoHangupCause.from_raw", return_value=MagicMock(value="Busy")):
             with patch(
                 "src.utils.enums.TalkoReasonKey.from_raw",
                 return_value=MagicMock(value="Initiated"),
@@ -841,9 +802,7 @@ class TestGetAgentCallLogsHelper:
             side_effect=Exception("Title case conversion failed"),
         ):
             with pytest.raises(Exception, match="Title case conversion failed"):
-                TalkoGetAgentCallLogsHelper.agent_call_log_response(
-                    cdr_responses, total_count, mock_logger
-                )
+                TalkoGetAgentCallLogsHelper.agent_call_log_response(cdr_responses, total_count, mock_logger)
 
         # Verify logger calls
         mock_logger.info.assert_called_once_with(
@@ -853,7 +812,7 @@ class TestGetAgentCallLogsHelper:
             f"TalkoCDR responses: {cdr_responses}, total_count: {total_count} in get agent call logs response helper"
         )
         mock_logger.error.assert_called_once_with(
-            "Failed to format agent call log response: Title case conversion failed in get agent call logs response helper"
+            "Failed to format agent call log response in get agent call logs response helper: Title case conversion failed"
         )
 
 
@@ -862,45 +821,25 @@ class TestGetCallRecordHistoryHelper:
 
     def test_validate_call_status_valid_list(self, mock_logger):
         """Test validate_call_status with a valid call status list."""
-        with patch(
-            "src.components.cdr.constants.VALID_CALL_STATUSES", ["answered", "missed"]
-        ):
-            TalkoGetCallRecordHistoryHelper.validate_call_status(
-                ["answered", "missed"], mock_logger
-            )
-            mock_logger.info.assert_called_once_with(
-                "Validating call_status in get call record history helper"
-            )
-            mock_logger.debug.assert_any_call(
-                "Call status: ['answered', 'missed'] in get call record history helper"
-            )
-            mock_logger.debug.assert_any_call(
-                "Call status validated successfully in get call record history helper"
-            )
+        with patch("src.components.cdr.constants.VALID_CALL_STATUSES", ["answered", "missed"]):
+            TalkoGetCallRecordHistoryHelper.validate_call_status(["answered", "missed"], mock_logger)
+            mock_logger.info.assert_called_once_with("Validating call_status in get call record history helper")
+            mock_logger.debug.assert_any_call("Call status in get call record history helper: ['answered', 'missed']")
+            mock_logger.debug.assert_any_call("Call status validated successfully in get call record history helper")
 
     def test_validate_call_status_invalid_type(self, mock_logger):
         """Test validate_call_status with invalid type (non-list)."""
-        with pytest.raises(
-            ValueError, match="Invalid type for call_status: str. Expected a list"
-        ):
+        with pytest.raises(ValueError, match=r"Invalid type for call_status\. Expected a list, got str\."):
             TalkoGetCallRecordHistoryHelper.validate_call_status("answered", mock_logger)
-        mock_logger.error.assert_called_once_with(
-            "Invalid type for call_status: str in get call record history helper"
-        )
+        mock_logger.error.assert_called_once_with("Invalid type for call_status in get call record history helper: str")
 
     def test_validate_call_status_invalid_status(self, mock_logger):
         """Test validate_call_status with anomalous status values."""
-        with patch(
-            "src.components.cdr.constants.VALID_CALL_STATUSES", ["answered", "missed"]
-        ):
-            with pytest.raises(
-                ValueError, match=r"Invalid call_status values: \['invalid'\]."
-            ):
-                TalkoGetCallRecordHistoryHelper.validate_call_status(
-                    ["answered", "invalid"], mock_logger
-                )
+        with patch("src.components.cdr.constants.VALID_CALL_STATUSES", ["answered", "missed"]):
+            with pytest.raises(ValueError, match=r"Invalid call_status values: \['invalid'\]."):
+                TalkoGetCallRecordHistoryHelper.validate_call_status(["answered", "invalid"], mock_logger)
             mock_logger.error.assert_called_once_with(
-                "Invalid call_status values: ['invalid'] in get call record history helper"
+                "Invalid call_status values in get call record history helper: ['invalid']"
             )
 
     def test_get_call_record_history_projection(self):
@@ -910,6 +849,8 @@ class TestGetCallRecordHistoryHelper:
             "partner_id": 1,
             "agent": 1,
             "lead_id": 1,
+            "entity_type": 1,
+            "entity_id": 1,
             "workspace_id": 1,
             "calling_mode": 1,
             "call_status": 1,
@@ -926,6 +867,12 @@ class TestGetCallRecordHistoryHelper:
             "hangup_by": 1,
             "created_at": 1,
             "lead_name": 1,
+            "path_for_recording": 1,
+            "call_uuid": 1,
+            "call_id": 1,
+            "vendor_id": 1,
+            "vendor_config_id": 1,
+            "custom_fields": 1,
             "_id": 1,
         }
         assert projection == expected
@@ -936,16 +883,12 @@ class TestGetCallRecordHistoryHelper:
             mock_connection_status.CONNECTED.value = "connected"
             mock_connection_status.NOT_CONNECTED.value = "not connected"
             cdr_data = {"total_call_duration": 120}
-            status = TalkoGetCallRecordHistoryHelper.get_agent_status(
-                cdr_data, CLICK_TO_CALL, mock_logger
-            )
+            status = TalkoGetCallRecordHistoryHelper.get_agent_status(cdr_data, CLICK_TO_CALL, mock_logger)
             assert status == "connected"
             mock_logger.debug.assert_any_call(
-                f"Determining agent status for mode: {CLICK_TO_CALL}, TalkoCDR data: {cdr_data} in get call record history agent status helper"
+                f"Determining agent status for mode {CLICK_TO_CALL}, TalkoCDR data in get call record history agent status helper: {cdr_data}"
             )
-            mock_logger.debug.assert_any_call(
-                "Agent status: connected in get call record history agent status helper"
-            )
+            mock_logger.debug.assert_any_call("Agent status in get call record history agent status helper: connected")
 
     def test_get_agent_status_clicktocall_not_connected(self, mock_logger):
         """Test get_agent_status for clicktocall with not connected call."""
@@ -953,12 +896,10 @@ class TestGetCallRecordHistoryHelper:
             mock_connection_status.CONNECTED.value = "connected"
             mock_connection_status.NOT_CONNECTED.value = "not connected"
             cdr_data = {"total_call_duration": 0}
-            status = TalkoGetCallRecordHistoryHelper.get_agent_status(
-                cdr_data, CLICK_TO_CALL, mock_logger
-            )
+            status = TalkoGetCallRecordHistoryHelper.get_agent_status(cdr_data, CLICK_TO_CALL, mock_logger)
             assert status == "not connected"
             mock_logger.debug.assert_any_call(
-                "Agent status: not connected in get call record history agent status helper"
+                "Agent status in get call record history agent status helper: not connected"
             )
 
     def test_get_agent_status_inbound_connected_call_connected(self, mock_logger):
@@ -967,13 +908,9 @@ class TestGetCallRecordHistoryHelper:
             mock_connection_status.CONNECTED.value = "connected"
             mock_connection_status.NOT_CONNECTED.value = "not connected"
             cdr_data = {"call_connected": "1", "talk_time": 0}
-            status = TalkoGetCallRecordHistoryHelper.get_agent_status(
-                cdr_data, INBOUND, mock_logger
-            )
+            status = TalkoGetCallRecordHistoryHelper.get_agent_status(cdr_data, INBOUND, mock_logger)
             assert status == "connected"
-            mock_logger.debug.assert_any_call(
-                "Agent status: connected in get call record history agent status helper"
-            )
+            mock_logger.debug.assert_any_call("Agent status in get call record history agent status helper: connected")
 
     def test_get_agent_status_inbound_connected_talk_time(self, mock_logger):
         """Test get_agent_status for inbound with talk_time>0."""
@@ -981,13 +918,9 @@ class TestGetCallRecordHistoryHelper:
             mock_connection_status.CONNECTED.value = "connected"
             mock_connection_status.NOT_CONNECTED.value = "not connected"
             cdr_data = {"call_connected": "0", "talk_time": 100}
-            status = TalkoGetCallRecordHistoryHelper.get_agent_status(
-                cdr_data, INBOUND, mock_logger
-            )
+            status = TalkoGetCallRecordHistoryHelper.get_agent_status(cdr_data, INBOUND, mock_logger)
             assert status == "connected"
-            mock_logger.debug.assert_any_call(
-                "Agent status: connected in get call record history agent status helper"
-            )
+            mock_logger.debug.assert_any_call("Agent status in get call record history agent status helper: connected")
 
     def test_get_agent_status_inbound_not_connected(self, mock_logger):
         """Test get_agent_status for inbound with not connected call."""
@@ -995,12 +928,10 @@ class TestGetCallRecordHistoryHelper:
             mock_connection_status.CONNECTED.value = "connected"
             mock_connection_status.NOT_CONNECTED.value = "not connected"
             cdr_data = {"call_connected": "0", "talk_time": 0}
-            status = TalkoGetCallRecordHistoryHelper.get_agent_status(
-                cdr_data, INBOUND, mock_logger
-            )
+            status = TalkoGetCallRecordHistoryHelper.get_agent_status(cdr_data, INBOUND, mock_logger)
             assert status == "not connected"
             mock_logger.debug.assert_any_call(
-                "Agent status: not connected in get call record history agent status helper"
+                "Agent status in get call record history agent status helper: not connected"
             )
 
     def test_get_lead_status_clicktocall_connected(self, mock_logger):
@@ -1009,13 +940,9 @@ class TestGetCallRecordHistoryHelper:
             mock_connection_status.CONNECTED.value = "connected"
             mock_connection_status.NOT_CONNECTED.value = "not connected"
             cdr_data = {"talk_time": 100}
-            status = TalkoGetCallRecordHistoryHelper.get_lead_status(
-                cdr_data, CLICK_TO_CALL, mock_logger
-            )
+            status = TalkoGetCallRecordHistoryHelper.get_lead_status(cdr_data, CLICK_TO_CALL, mock_logger)
             assert status == "connected"
-            mock_logger.debug.assert_any_call(
-                "Lead status: connected in get call record history lead status helper"
-            )
+            mock_logger.debug.assert_any_call("Lead status in get call record history lead status helper: connected")
 
     def test_get_lead_status_clicktocall_not_connected(self, mock_logger):
         """Test get_lead_status for clicktocall with not connected call."""
@@ -1023,12 +950,10 @@ class TestGetCallRecordHistoryHelper:
             mock_connection_status.CONNECTED.value = "connected"
             mock_connection_status.NOT_CONNECTED.value = "not connected"
             cdr_data = {"talk_time": 0}
-            status = TalkoGetCallRecordHistoryHelper.get_lead_status(
-                cdr_data, CLICK_TO_CALL, mock_logger
-            )
+            status = TalkoGetCallRecordHistoryHelper.get_lead_status(cdr_data, CLICK_TO_CALL, mock_logger)
             assert status == "not connected"
             mock_logger.debug.assert_any_call(
-                "Lead status: not connected in get call record history lead status helper"
+                "Lead status in get call record history lead status helper: not connected"
             )
 
     def test_get_lead_status_inbound_connected(self, mock_logger):
@@ -1037,13 +962,9 @@ class TestGetCallRecordHistoryHelper:
             mock_connection_status.CONNECTED.value = "connected"
             mock_connection_status.NOT_CONNECTED.value = "not connected"
             cdr_data = {"total_call_duration": 120}
-            status = TalkoGetCallRecordHistoryHelper.get_lead_status(
-                cdr_data, INBOUND, mock_logger
-            )
+            status = TalkoGetCallRecordHistoryHelper.get_lead_status(cdr_data, INBOUND, mock_logger)
             assert status == "connected"
-            mock_logger.debug.assert_any_call(
-                "Lead status: connected in get call record history lead status helper"
-            )
+            mock_logger.debug.assert_any_call("Lead status in get call record history lead status helper: connected")
 
     def test_get_lead_status_inbound_not_connected(self, mock_logger):
         """Test get_lead_status for inbound with not connected call."""
@@ -1051,12 +972,10 @@ class TestGetCallRecordHistoryHelper:
             mock_connection_status.CONNECTED.value = "connected"
             mock_connection_status.NOT_CONNECTED.value = "not connected"
             cdr_data = {"total_call_duration": 0}
-            status = TalkoGetCallRecordHistoryHelper.get_lead_status(
-                cdr_data, INBOUND, mock_logger
-            )
+            status = TalkoGetCallRecordHistoryHelper.get_lead_status(cdr_data, INBOUND, mock_logger)
             assert status == "not connected"
             mock_logger.debug.assert_any_call(
-                "Lead status: not connected in get call record history lead status helper"
+                "Lead status in get call record history lead status helper: not connected"
             )
 
     def test_handle_call_record_history_data_no_filter(self, mock_logger):
@@ -1077,16 +996,15 @@ class TestGetCallRecordHistoryHelper:
                         return_value=fake_filtered_cdr_dict(),
                     ):
                         cdr = fake_cdr_dict()
-                        result = (
-                            TalkoGetCallRecordHistoryHelper.handle_call_record_history_data(
-                                cdr, [], True, mock_logger
-                            )
+                        result = TalkoGetCallRecordHistoryHelper.handle_call_record_history_data(
+                            cdr, [], True, mock_logger
                         )
                         expected = fake_filtered_cdr_dict()
                         expected["agent_call_status"] = "connected"
                         expected["lead_call_status"] = "connected"
                         expected["number_type"] = TalkoNumberType.PRIMARY_NUMBER.value
                         expected["lead_secret"] = "encrypted"
+                        assert result == expected
 
     def test_handle_call_record_history_data_with_filter_match(self, mock_logger):
         """Test handle_call_record_history_data with matching call_status filter."""
@@ -1106,13 +1024,11 @@ class TestGetCallRecordHistoryHelper:
                         return_value=fake_filtered_cdr_dict(),
                     ):
                         cdr = fake_cdr_dict()
-                        result = (
-                            TalkoGetCallRecordHistoryHelper.handle_call_record_history_data(
-                                cdr,
-                                ["agent_connected", "lead_connected"],
-                                False,
-                                mock_logger,
-                            )
+                        result = TalkoGetCallRecordHistoryHelper.handle_call_record_history_data(
+                            cdr,
+                            ["agent_connected", "lead_connected"],
+                            False,
+                            mock_logger,
                         )
                         expected = fake_filtered_cdr_dict()
                         expected["agent_call_status"] = "connected"
@@ -1124,7 +1040,7 @@ class TestGetCallRecordHistoryHelper:
                             "Processing TalkoCDR for call record history in get call record history data helper"
                         )
                         mock_logger.debug.assert_any_call(
-                            f"Processed TalkoCDR: {expected} in get call record history data helper"
+                            f"Processed TalkoCDR in get call record history data helper: {expected}"
                         )
 
     def test_handle_call_record_history_data_with_filter_no_match(self, mock_logger):
@@ -1152,12 +1068,18 @@ class TestGetCallRecordHistoryHelper:
                         "src.components.cdr.helper.TalkoCommonCDRHelper.create_filtered_cdr",
                         return_value=filtered_cdr,
                     ):
-                        result = (
-                            TalkoGetCallRecordHistoryHelper.handle_call_record_history_data(
-                                cdr, ["agent_connected"], False, mock_logger
-                            )
+                        result = TalkoGetCallRecordHistoryHelper.handle_call_record_history_data(
+                            cdr, ["agent_connected"], False, mock_logger
                         )
-                        assert result == []
+                        # Derived-status filtering now happens at DB level via
+                        # build_status_match(); this helper always returns the
+                        # enriched record with computed statuses.
+                        expected = dict(filtered_cdr)
+                        expected["agent_call_status"] = "not connected"
+                        expected["lead_call_status"] = "not connected"
+                        expected["number_type"] = TalkoNumberType.PRIMARY_NUMBER.value
+                        expected["lead_secret"] = "encrypted"
+                        assert result == expected
                         mock_logger.info.assert_any_call(
                             "Processing TalkoCDR for call record history in get call record history data helper"
                         )
@@ -1179,14 +1101,12 @@ class TestGetCallRecordHistoryHelper:
                         fake_cdr_dict(), [], False, mock_logger
                     )
                 mock_logger.error.assert_called_once_with(
-                    "Failed to encrypt phone number data: Encryption error in get call record history data helper"
+                    "Failed to encrypt phone number data in get call record history data helper: Encryption error"
                 )
 
     def test_build_call_record_history_query_full_filters(self, mock_logger):
         """Test build_call_record_history_query with all filters."""
-        with patch(
-            "src.components.cdr.constants.TALK_TIME_RANGES", MOCK_TALK_TIME_RANGES
-        ):
+        with patch("src.components.cdr.constants.TALK_TIME_RANGES", MOCK_TALK_TIME_RANGES):
             with patch("src.components.cdr.constants.TalkoTalkTimeRange", TalkoMockTalkTimeRange):
                 query = TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
                     lead_id=5,
@@ -1204,23 +1124,31 @@ class TestGetCallRecordHistoryHelper:
                 )
                 expected = {
                     "partner_id": 10,
-                    "lead_id": 5,
+                    "is_dialer_call": False,
+                    "$and": [
+                        {
+                            "$or": [
+                                {"entity_type": "Lead", "entity_id": 5},
+                                {
+                                    "lead_id": 5,
+                                    "entity_type": {"$in": [None, ""]},
+                                },
+                            ]
+                        },
+                        {"$or": [{"talk_time": {"$gte": 0, "$lte": 60}}]},
+                    ],
                     "workspace_id": 20,
                     "agent": {"$in": [1, 2]},
                     "created_at": {"$gte": 1727181060000, "$lte": 1727184660000},
                     "call_status": {"$in": ["answered", "missed"]},
                     "customer": {"$regex": "9999999999", "$options": "i"},
-                    "caller_id_number": {"$regex": "8888888888", "$options": "i"},
-                    "$or": [{"talk_time": {"$gte": 0, "$lte": 60}}],
+                    "did_number": {"$regex": "8888888888", "$options": "i"},
                     "calling_mode": INBOUND,
                 }
                 assert query == expected
                 mock_logger.info.assert_any_call("Building call record history query")
                 mock_logger.debug.assert_any_call(
-                    f"Parameters - lead_id: 5, workspace_id: 20, call_status: ['answered', 'missed'], workspace_agent_ids: [1, 2], phone_number: 9999999999, start_time: 1727181060000, end_time: 1727184660000, partner_id: 10, talk_time_range: ['0_1'], call_type: incoming, did_number: 8888888888"
-                )
-                mock_logger.debug.assert_any_call(
-                    f"Constructed query: {expected} in get call record history query helper"
+                    f"Constructed query in get call record history query helper: {expected}"
                 )
 
     def test_build_call_record_history_query_partial_filters(self, mock_logger):
@@ -1241,13 +1169,11 @@ class TestGetCallRecordHistoryHelper:
         )
         expected = {
             "partner_id": 10,
+            "is_dialer_call": False,
             "created_at": {"$gte": 1727181060000},
         }
         assert query == expected
         mock_logger.info.assert_any_call("Building call record history query")
-        mock_logger.debug.assert_any_call(
-            "Parameters - lead_id: None, workspace_id: None, call_status: None, workspace_agent_ids: None, phone_number: None, start_time: 1727181060000, end_time: None, partner_id: 10, talk_time_range: None, call_type: None, did_number: None"
-        )
 
     def test_build_call_record_history_query_invalid_call_type(self, mock_logger):
         """Test build_call_record_history_query with invalid call_type."""
@@ -1259,19 +1185,13 @@ class TestGetCallRecordHistoryHelper:
                 partner_id=10,
                 logger=mock_logger,
             )
-        mock_logger.error.assert_called_once_with(
-            "Invalid call_type: invalid in get call record history query helper"
-        )
+        mock_logger.error.assert_called_once_with("Invalid call_type in get call record history query helper: invalid")
 
     def test_build_call_record_history_query_invalid_talk_time_range(self, mock_logger):
         """Test build_call_record_history_query with invalid talk_time_range."""
-        with patch(
-            "src.components.cdr.constants.TALK_TIME_RANGES", MOCK_TALK_TIME_RANGES
-        ):
+        with patch("src.components.cdr.constants.TALK_TIME_RANGES", MOCK_TALK_TIME_RANGES):
             with patch("src.components.cdr.constants.TalkoTalkTimeRange", TalkoMockTalkTimeRange):
-                with pytest.raises(
-                    ValueError, match=r"Invalid talk_time_range: invalid.*"
-                ):
+                with pytest.raises(ValueError, match=r"Invalid talk_time_range: invalid.*"):
                     TalkoGetCallRecordHistoryHelper.build_call_record_history_query(
                         lead_id=5,
                         workspace_id=20,
@@ -1280,13 +1200,13 @@ class TestGetCallRecordHistoryHelper:
                         logger=mock_logger,
                     )
                 mock_logger.error.assert_called_once_with(
-                    "Invalid talk_time_range: invalid in get call record history query helper"
+                    "Invalid talk_time_range in get call record history query helper: invalid"
                 )
 
     def test_add_basic_filters_all(self, mock_logger):
         """Test _add_basic_filters with all parameters."""
         query = {"partner_id": 10}
-        TalkoGetCallRecordHistoryHelper._add_basic_filters(
+        TalkoGetCallRecordHistoryHelper.add_basic_filters(
             query,
             lead_id=5,
             workspace_id=20,
@@ -1297,30 +1217,34 @@ class TestGetCallRecordHistoryHelper:
         )
         expected = {
             "partner_id": 10,
-            "lead_id": 5,
+            "is_dialer_call": False,
+            "$and": [
+                {
+                    "$or": [
+                        {"entity_type": "Lead", "entity_id": 5},
+                        {"lead_id": 5, "entity_type": {"$in": [None, ""]}},
+                    ]
+                }
+            ],
             "workspace_id": 20,
             "agent": {"$in": [1, 2]},
             "created_at": {"$gte": 1727181060000, "$lte": 1727184660000},
         }
         assert query == expected
         mock_logger.info.assert_called_once_with("Adding basic filters to query")
+        mock_logger.debug.assert_any_call("Added is_dialer_call=False filter")
+        mock_logger.debug.assert_any_call("Added workspace_id filter in get call record history query helper: 20")
         mock_logger.debug.assert_any_call(
-            "Added lead_id filter: 5 in get call record history query helper"
+            "Added workspace_agent_ids filter in get call record history query helper: [1, 2]"
         )
         mock_logger.debug.assert_any_call(
-            "Added workspace_id filter: 20 in get call record history query helper"
-        )
-        mock_logger.debug.assert_any_call(
-            "Added workspace_agent_ids filter: [1, 2] in get call record history query helper"
-        )
-        mock_logger.debug.assert_any_call(
-            "Added time range filter: 1727181060000 to 1727184660000 in get call record history query helper"
+            "Added time range filter in get call record history query helper: 1727181060000, 1727184660000"
         )
 
     def test_add_basic_filters_start_time_only(self, mock_logger):
         """Test _add_basic_filters with only start_time."""
         query = {"partner_id": 10}
-        TalkoGetCallRecordHistoryHelper._add_basic_filters(
+        TalkoGetCallRecordHistoryHelper.add_basic_filters(
             query,
             lead_id=None,
             workspace_id=None,
@@ -1331,18 +1255,19 @@ class TestGetCallRecordHistoryHelper:
         )
         expected = {
             "partner_id": 10,
+            "is_dialer_call": False,
             "created_at": {"$gte": 1727181060000},
         }
         assert query == expected
         mock_logger.info.assert_called_once_with("Adding basic filters to query")
         mock_logger.debug.assert_any_call(
-            "Added start_time filter: 1727181060000 in get call record history query helper"
+            "Added start_time filter in get call record history query helper: 1727181060000"
         )
 
     def test_add_basic_filters_end_time_only(self, mock_logger):
         """Test _add_basic_filters with only end_time."""
         query = {"partner_id": 10}
-        TalkoGetCallRecordHistoryHelper._add_basic_filters(
+        TalkoGetCallRecordHistoryHelper.add_basic_filters(
             query,
             lead_id=None,
             workspace_id=None,
@@ -1353,20 +1278,19 @@ class TestGetCallRecordHistoryHelper:
         )
         expected = {
             "partner_id": 10,
+            "is_dialer_call": False,
             "created_at": {"$lte": 1727184660000},
         }
         assert query == expected
         mock_logger.info.assert_called_once_with("Adding basic filters to query")
         mock_logger.debug.assert_any_call(
-            "Added end_time filter: 1727184660000 in get call record history query helper"
+            "Added end_time filter in get call record history query helper: 1727184660000"
         )
 
     def test_add_call_status_filter(self, mock_logger):
         """Test _add_call_status_filter with valid call_status."""
         query = {"partner_id": 10}
-        TalkoGetCallRecordHistoryHelper._add_call_status_filter(
-            query, ["answered", "missed"], mock_logger
-        )
+        TalkoGetCallRecordHistoryHelper.add_call_status_filter(query, ["answered", "missed"], mock_logger)
         expected = {
             "partner_id": 10,
             "call_status": {"$in": ["answered", "missed"]},
@@ -1374,22 +1298,20 @@ class TestGetCallRecordHistoryHelper:
         assert query == expected
         mock_logger.info.assert_called_once_with("Adding call status filter to query")
         mock_logger.debug.assert_any_call(
-            "Added call_status filter: ['answered', 'missed'] in get call record history query helper"
+            "Added call_status filter in get call record history query helper: ['answered', 'missed']"
         )
 
     def test_add_call_status_filter_none(self, mock_logger):
         """Test _add_call_status_filter with None call_status."""
         query = {"partner_id": 10}
-        TalkoGetCallRecordHistoryHelper._add_call_status_filter(query, None, mock_logger)
+        TalkoGetCallRecordHistoryHelper.add_call_status_filter(query, None, mock_logger)
         assert query == {"partner_id": 10}
         mock_logger.info.assert_called_once_with("Adding call status filter to query")
 
     def test_add_call_status_filter_invalid_status(self, mock_logger):
         """Test _add_call_status_filter with invalid call_status."""
         query = {"partner_id": 10}
-        TalkoGetCallRecordHistoryHelper._add_call_status_filter(
-            query, ["answered", "invalid"], mock_logger
-        )
+        TalkoGetCallRecordHistoryHelper.add_call_status_filter(query, ["answered", "invalid"], mock_logger)
         expected = {
             "partner_id": 10,
             "call_status": {"$in": ["answered"]},
@@ -1397,13 +1319,13 @@ class TestGetCallRecordHistoryHelper:
         assert query == expected
         mock_logger.info.assert_called_once_with("Adding call status filter to query")
         mock_logger.debug.assert_any_call(
-            "Added call_status filter: ['answered'] in get call record history query helper"
+            "Added call_status filter in get call record history query helper: ['answered']"
         )
 
     def test_add_number_filter_phone_number(self, mock_logger):
         """Test _add_number_filter with phone_number."""
         query = {"partner_id": 10}
-        TalkoGetCallRecordHistoryHelper._add_number_filter(
+        TalkoGetCallRecordHistoryHelper.add_number_filter(
             query, phone_number="9999999999", did_number=None, logger=mock_logger
         )
         expected = {
@@ -1413,58 +1335,50 @@ class TestGetCallRecordHistoryHelper:
         assert query == expected
         mock_logger.info.assert_called_once_with("Adding number filters to query")
         mock_logger.debug.assert_any_call(
-            "Added phone_number filter: 9999999999 in get call record history query helper"
+            "Added phone_number filter in get call record history query helper: 9999999999"
         )
 
     def test_add_number_filter_did_number(self, mock_logger):
         """Test _add_number_filter with did_number."""
         query = {"partner_id": 10}
-        TalkoGetCallRecordHistoryHelper._add_number_filter(
+        TalkoGetCallRecordHistoryHelper.add_number_filter(
             query, phone_number=None, did_number="8888888888", logger=mock_logger
         )
         expected = {
             "partner_id": 10,
-            "caller_id_number": {"$regex": "8888888888", "$options": "i"},
+            "did_number": {"$regex": "8888888888", "$options": "i"},
         }
         assert query == expected
         mock_logger.info.assert_called_once_with("Adding number filters to query")
-        mock_logger.debug.assert_any_call(
-            "Added did_number filter: 8888888888 in get call record history query helper"
-        )
+        mock_logger.debug.assert_any_call("Added did_number filter in get call record history query helper: 8888888888")
 
     def test_add_talk_time_filter_valid(self, mock_logger):
         """Test _add_talk_time_filter with valid talk_time_range."""
         query = {"partner_id": 10}
-        with patch(
-            "src.components.cdr.constants.TALK_TIME_RANGES", MOCK_TALK_TIME_RANGES
-        ):
+        with patch("src.components.cdr.constants.TALK_TIME_RANGES", MOCK_TALK_TIME_RANGES):
             with patch("src.components.cdr.constants.TalkoTalkTimeRange", TalkoMockTalkTimeRange):
-                TalkoGetCallRecordHistoryHelper._add_talk_time_filter(
-                    query, ["0_1", "1_3"], mock_logger
-                )
+                TalkoGetCallRecordHistoryHelper.add_talk_time_filter(query, ["0_1", "1_3"], mock_logger)
         expected = {
             "partner_id": 10,
-            "$or": [
-                {"talk_time": {"$gte": 0, "$lte": 60}},
-                {"talk_time": {"$gte": 61, "$lte": 180}},
+            "$and": [
+                {
+                    "$or": [
+                        {"talk_time": {"$gte": 0, "$lte": 60}},
+                        {"talk_time": {"$gte": 61, "$lte": 180}},
+                    ]
+                }
             ],
         }
         assert query == expected
         mock_logger.info.assert_called_once_with("Adding talk time filter to query")
-        mock_logger.debug.assert_any_call(
-            "Added talk_time filter: 0 to 60 in get call record history query helper"
-        )
-        mock_logger.debug.assert_any_call(
-            "Added talk_time filter: 61 to 180 in get call record history query helper"
-        )
+        mock_logger.debug.assert_any_call("Added talk_time filter in get call record history query helper: 0, 60")
+        mock_logger.debug.assert_any_call("Added talk_time filter in get call record history query helper: 61, 180")
 
     def test_add_talk_time_filter_invalid_type(self, mock_logger):
         """Test _add_talk_time_filter with invalid type."""
         query = {"partner_id": 10}
-        with pytest.raises(
-            ValueError, match="talk_time_range must be a list of valid ranges"
-        ):
-            TalkoGetCallRecordHistoryHelper._add_talk_time_filter(query, "0_1", mock_logger)
+        with pytest.raises(ValueError, match="talk_time_range must be a list of valid ranges"):
+            TalkoGetCallRecordHistoryHelper.add_talk_time_filter(query, "0_1", mock_logger)
         mock_logger.error.assert_called_once_with(
             "talk_time_range must be a list of valid ranges in get call record history query helper"
         )
@@ -1472,24 +1386,18 @@ class TestGetCallRecordHistoryHelper:
     def test_add_talk_time_filter_invalid_range(self, mock_logger):
         """Test _add_talk_time_filter with invalid talk_time_range."""
         query = {"partner_id": 10}
-        with patch(
-            "src.components.cdr.constants.TALK_TIME_RANGES", MOCK_TALK_TIME_RANGES
-        ):
+        with patch("src.components.cdr.constants.TALK_TIME_RANGES", MOCK_TALK_TIME_RANGES):
             with patch("src.components.cdr.constants.TalkoTalkTimeRange", TalkoMockTalkTimeRange):
-                with pytest.raises(
-                    ValueError, match=r"Invalid talk_time_range: invalid.*"
-                ):
-                    TalkoGetCallRecordHistoryHelper._add_talk_time_filter(
-                        query, ["invalid"], mock_logger
-                    )
+                with pytest.raises(ValueError, match=r"Invalid talk_time_range: invalid.*"):
+                    TalkoGetCallRecordHistoryHelper.add_talk_time_filter(query, ["invalid"], mock_logger)
                 mock_logger.error.assert_called_once_with(
-                    "Invalid talk_time_range: invalid in get call record history query helper"
+                    "Invalid talk_time_range in get call record history query helper: invalid"
                 )
 
     def test_add_call_type_filter_valid(self, mock_logger):
         """Test _add_call_type_filter with valid call_type."""
         query = {"partner_id": 10}
-        TalkoGetCallRecordHistoryHelper._add_call_type_filter(query, "incoming", mock_logger)
+        TalkoGetCallRecordHistoryHelper.add_call_type_filter(query, "incoming", mock_logger)
         expected = {
             "partner_id": 10,
             "calling_mode": INBOUND,
@@ -1497,19 +1405,15 @@ class TestGetCallRecordHistoryHelper:
         assert query == expected
         mock_logger.info.assert_called_once_with("Adding call type filter to query")
         mock_logger.debug.assert_any_call(
-            f"Added call_type filter: incoming -> {INBOUND} in get call record history query helper"
+            f"Added call_type filter in get call record history query helper: incoming -> {INBOUND}"
         )
 
     def test_add_call_type_filter_invalid(self, mock_logger):
         """Test _add_call_type_filter with invalid call_type."""
         query = {"partner_id": 10}
         with pytest.raises(ValueError, match="Invalid call_type: invalid"):
-            TalkoGetCallRecordHistoryHelper._add_call_type_filter(
-                query, "invalid", mock_logger
-            )
-        mock_logger.error.assert_called_once_with(
-            "Invalid call_type: invalid in get call record history query helper"
-        )
+            TalkoGetCallRecordHistoryHelper.add_call_type_filter(query, "invalid", mock_logger)
+        mock_logger.error.assert_called_once_with("Invalid call_type in get call record history query helper: invalid")
 
     def test_agent_call_record_history_response(self, mock_logger, mock_dependencies):
         """Test agent_call_record_history_response with valid timestamps."""
@@ -1545,19 +1449,13 @@ class TestGetCallRecordHistoryHelper:
             "call_record": [cdr_response],
             "total_count": 1,
         }
-        mock_title_case_util.convert_values_to_title_case.return_value = (
-            expected_response
-        )
-        result = TalkoGetCallRecordHistoryHelper.agent_call_record_history_response(
-            [cdr_response], 1, mock_logger
-        )
+        mock_title_case_util.convert_values_to_title_case.return_value = expected_response
+        result = TalkoGetCallRecordHistoryHelper.agent_call_record_history_response([cdr_response], 1, mock_logger)
         assert result["total_count"] == 1
         assert len(result["call_record"]) == 1
         assert result["call_record"][0]["created_at"] == 1727181060000
 
-    def test_agent_call_record_history_response_none_timestamp(
-        self, mock_logger, mock_dependencies
-    ):
+    def test_agent_call_record_history_response_none_timestamp(self, mock_logger, mock_dependencies):
         """Test agent_call_record_history_response with None timestamp."""
         mock_title_case_util, _ = mock_dependencies
         cdr_response = cdr_response = TalkoContract.CallRecordHistoryResponse(
@@ -1591,18 +1489,12 @@ class TestGetCallRecordHistoryHelper:
             "call_record": [],
             "total_count": 1,
         }
-        mock_title_case_util.convert_values_to_title_case.return_value = (
-            expected_response
-        )
-        result = TalkoGetCallRecordHistoryHelper.agent_call_record_history_response(
-            [cdr_response], 1, mock_logger
-        )
+        mock_title_case_util.convert_values_to_title_case.return_value = expected_response
+        result = TalkoGetCallRecordHistoryHelper.agent_call_record_history_response([cdr_response], 1, mock_logger)
         assert result["total_count"] == 1
         assert len(result["call_record"]) == 0
 
-    def test_agent_call_record_history_response_mixed_timestamps(
-        self, mock_logger, mock_dependencies
-    ):
+    def test_agent_call_record_history_response_mixed_timestamps(self, mock_logger, mock_dependencies):
         """Test agent_call_record_history_response with mixed timestamps."""
         mock_title_case_util, _ = mock_dependencies
         cdr_response1 = TalkoContract.CallRecordHistoryResponse(
@@ -1690,9 +1582,7 @@ class TestGetCallRecordHistoryHelper:
             "call_record": [cdr_response2, {"created_at": 1727181060000}],
             "total_count": 3,
         }
-        mock_title_case_util.convert_values_to_title_case.return_value = (
-            expected_response
-        )
+        mock_title_case_util.convert_values_to_title_case.return_value = expected_response
         result = TalkoGetCallRecordHistoryHelper.agent_call_record_history_response(
             [cdr_response1, cdr_response2, cdr_response3], 3, mock_logger
         )
@@ -1714,12 +1604,10 @@ class TestCallLogQueryHelper:
     def expected_timestamps(self, mock_datetime):
         """Calculate expected timestamps dynamically to match implementation."""
         # Convert mocked IST time (2025-10-15 17:02 IST) to UTC (2025-10-15 11:32 UTC)
-        mock_utc_time = mock_datetime.astimezone(timezone.utc)
+        mock_utc_time = mock_datetime.astimezone(UTC)
 
         # Calculate timestamps using the exact mocked time
-        today_timestamp = int(
-            mock_utc_time.timestamp() * 1000
-        )  # 2025-10-15 17:02 IST = 1760553000000
+        today_timestamp = int(mock_utc_time.timestamp() * 1000)  # 2025-10-15 17:02 IST = 1760553000000
         last_week_timestamp = int(
             (mock_utc_time - timedelta(days=7)).timestamp() * 1000
         )  # 2025-10-08 17:02 IST = 1759948200000
@@ -1743,9 +1631,7 @@ class TestCallLogQueryHelper:
         ],
         ids=["no_filter", "today", "last_week", "last_month"],
     )
-    def test_get_time_filter_query(
-        self, filter_by, expected_key, expected_timestamps, mock_logger, mock_datetime
-    ):
+    def test_get_time_filter_query(self, filter_by, expected_key, expected_timestamps, mock_logger, mock_datetime):
         """Test get_time_filter_query for different TalkoTimeFilter values."""
         with patch("time.time", return_value=mock_datetime.timestamp()):
             TalkoCallLogQueryHelper.get_time_filter_query(filter_by, mock_logger)
@@ -1788,48 +1674,49 @@ class TestCallLogQueryHelper:
             if isinstance(expected_timestamp_key, str)
             else expected_timestamp_key
         )
-        expected = {"lead_id": lead_id}
+        mocked_time_filter = (
+            {"$gte": expected_timestamps[expected_timestamp_key]}
+            if filter_by and isinstance(expected_timestamp_key, str)
+            else None
+        )
+        entity_filter = {
+            "$or": [
+                {"entity_type": "Lead", "entity_id": lead_id},
+                {"lead_id": lead_id, "entity_type": {"$in": [None, ""]}},
+            ]
+        }
+        expected = {"$and": [entity_filter]}
         if expected_timestamp is not None:
-            # Use $gte when filter_by is provided, $gt when created_at is provided
-            operator = "$gte" if filter_by and created_at is None else "$gt"
-            expected["created_at"] = {operator: expected_timestamp}
+            if mocked_time_filter is not None and created_at is not None:
+                expected["created_at"] = {"$gte": max(created_at, mocked_time_filter["$gte"])}
+            elif mocked_time_filter is not None:
+                expected["created_at"] = mocked_time_filter
+            else:
+                expected["created_at"] = {"$gt": created_at}
 
         with patch("time.time", return_value=mock_datetime.timestamp()):
             with patch(
                 "src.components.cdr.helper.TalkoCallLogQueryHelper.get_time_filter_query"
             ) as mock_get_time_filter:
-                mock_get_time_filter.return_value = (
-                    {"$gte": expected_timestamps[expected_timestamp_key]}
-                    if filter_by and isinstance(expected_timestamp_key, str)
-                    else None
-                )
-                result = TalkoCallLogQueryHelper.build_call_log_query(
-                    lead_id, created_at, filter_by, mock_logger
-                )
+                mock_get_time_filter.return_value = mocked_time_filter
+                result = TalkoCallLogQueryHelper.build_call_log_query(lead_id, created_at, filter_by, mock_logger)
 
         assert result == expected
-        mock_logger.info.assert_called_once_with(
-            "Building call log query in call log query helper"
-        )
+        mock_logger.info.assert_any_call("Building call log query in call log query helper")
         # Allow multiple debug calls as per implementation
         debug_calls = mock_logger.debug.call_args_list
-        assert any(
-            f"Constructed query: {expected}" in str(call) for call in debug_calls
-        )
+        assert any(f"Constructed query in call log query helper: {expected}" in str(call) for call in debug_calls)
 
     def test_build_call_log_query_no_lead_id(self, mock_logger, mock_datetime):
         """Test build_call_log_query with no lead_id."""
         with patch("time.time", return_value=mock_datetime.timestamp()):
-            result = TalkoCallLogQueryHelper.build_call_log_query(
-                None, None, None, mock_logger
-            )
-            assert result == {"lead_id": None}
+            result = TalkoCallLogQueryHelper.build_call_log_query(None, None, None, mock_logger)
+            assert result == {}
         # Check that the expected info log message is among the calls
         info_calls = mock_logger.info.call_args_list
-        assert any(
-            call.args == ("Building call log query in call log query helper",)
-            for call in info_calls
-        ), f"Expected 'Building call log query in call log query helper' in info calls: {info_calls}"
+        assert any(call.args == ("Building call log query in call log query helper",) for call in info_calls), (
+            f"Expected 'Building call log query in call log query helper' in info calls: {info_calls}"
+        )
 
     def test_build_call_log_query_with_invalid_filter(self, mock_logger, mock_datetime):
         """Test build_call_log_query with invalid filter_by value."""
@@ -1837,20 +1724,12 @@ class TestCallLogQueryHelper:
             with patch(
                 "src.components.cdr.helper.TalkoCallLogQueryHelper.get_time_filter_query"
             ) as mock_get_time_filter:
-                mock_get_time_filter.side_effect = ValueError(
-                    "Invalid filter_by value: invalid"
-                )
-                with pytest.raises(
-                    ValueError, match="Invalid filter_by value: invalid"
-                ):
-                    TalkoCallLogQueryHelper.build_call_log_query(
-                        123, None, "invalid", mock_logger
-                    )
+                mock_get_time_filter.side_effect = ValueError("Invalid filter_by value: invalid")
+                with pytest.raises(ValueError, match="Invalid filter_by value: invalid"):
+                    TalkoCallLogQueryHelper.build_call_log_query(123, None, "invalid", mock_logger)
         # Check if error log is called (adjust if implementation doesn't log)
         if mock_logger.error.called:
-            mock_logger.error.assert_called_with(
-                "Invalid filter_by value: invalid in call log query helper"
-            )
+            mock_logger.error.assert_called_with("Invalid filter_by value: invalid in call log query helper")
 
 
 class TestBuildEntityFilterMultiId:

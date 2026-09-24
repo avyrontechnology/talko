@@ -8,7 +8,6 @@ from src.components.did_management.helpers import TalkoDidStatusUpdateHelper
 
 
 class TestDidStatusUpdateHelper:
-
     @pytest.fixture
     def mock_payload(self):
         """Creates a mock AdminDIDAction payload."""
@@ -30,21 +29,15 @@ class TestDidStatusUpdateHelper:
         ],
     )
     def test_handle_set_available_success(self, status, mock_payload, now_ts):
-        result = TalkoDidStatusUpdateHelper.handle_set_available(
-            status, mock_payload, now_ts
-        )
+        result = TalkoDidStatusUpdateHelper.handle_set_available(status, mock_payload, now_ts)
         assert result == {"status": TalkoDIDStatus.AVAILABLE.value}
 
     def test_handle_set_available_invalid_status(self, mock_payload, now_ts):
         with pytest.raises(ValueError, match="INVALID_TRANSITION"):
-            TalkoDidStatusUpdateHelper.handle_set_available(
-                TalkoDIDStatus.COOLING_PERIOD.value, mock_payload, now_ts
-            )
+            TalkoDidStatusUpdateHelper.handle_set_available(TalkoDIDStatus.COOLING_PERIOD.value, mock_payload, now_ts)
 
     def test_handle_set_mapped_success_with_agent(self, mock_payload, now_ts):
-        result = TalkoDidStatusUpdateHelper.handle_set_mapped(
-            TalkoDIDStatus.AVAILABLE.value, mock_payload, now_ts
-        )
+        result = TalkoDidStatusUpdateHelper.handle_set_mapped(TalkoDIDStatus.AVAILABLE.value, mock_payload, now_ts)
         assert result["status"] == TalkoDIDStatus.MAPPED.value
         assert result["agent_id"] == "agent_123"
         assert result["mapped_date"] == now_ts
@@ -59,26 +52,18 @@ class TestDidStatusUpdateHelper:
 
     def test_handle_set_mapped_invalid_status(self, mock_payload, now_ts):
         with pytest.raises(ValueError, match="INVALID_TRANSITION"):
-            TalkoDidStatusUpdateHelper.handle_set_mapped(
-                TalkoDIDStatus.COOLING_PERIOD.value, mock_payload, now_ts
-            )
+            TalkoDidStatusUpdateHelper.handle_set_mapped(TalkoDIDStatus.COOLING_PERIOD.value, mock_payload, now_ts)
 
     def test_handle_mark_spammed_success(self, mock_payload, now_ts):
-        result = TalkoDidStatusUpdateHelper.handle_mark_spammed(
-            TalkoDIDStatus.MAPPED.value, mock_payload, now_ts
-        )
+        result = TalkoDidStatusUpdateHelper.handle_mark_spammed(TalkoDIDStatus.MAPPED.value, mock_payload, now_ts)
         assert result["status"] == TalkoDIDStatus.COOLING_PERIOD.value
         assert result["cooldown_until"] == now_ts + COOLDOWN_MS
         assert result["last_spam_detected_at"] == now_ts
 
-    def test_handle_mark_spammed_raises_when_already_available(
-        self, mock_payload, now_ts
-    ):
+    def test_handle_mark_spammed_raises_when_already_available(self, mock_payload, now_ts):
         """Covers line 61 — AVAILABLE status raises INVALID_STATUS ValueError."""
         with pytest.raises(ValueError, match="INVALID_STATUS"):
-            TalkoDidStatusUpdateHelper.handle_mark_spammed(
-                TalkoDIDStatus.AVAILABLE.value, mock_payload, now_ts
-            )
+            TalkoDidStatusUpdateHelper.handle_mark_spammed(TalkoDIDStatus.AVAILABLE.value, mock_payload, now_ts)
 
     def test_error_result_default_code(self):
         result = TalkoDidStatusUpdateHelper.error_result("919999999999", "DID not found")
@@ -90,23 +75,17 @@ class TestDidStatusUpdateHelper:
         }
 
     def test_error_result_custom_code(self):
-        result = TalkoDidStatusUpdateHelper.error_result(
-            "919999999999", "DID not found", "DID_NOT_FOUND"
-        )
+        result = TalkoDidStatusUpdateHelper.error_result("919999999999", "DID not found", "DID_NOT_FOUND")
         assert result["error"]["code"] == "DID_NOT_FOUND"
         assert result["error"]["message"] == "DID not found"
 
     def test_validate_did_returns_none_when_valid(self):
         doc = {"did_number": "12345", "status": TalkoDIDStatus.AVAILABLE.value}
-        result = TalkoDidStatusUpdateHelper.validate_did(
-            doc, "12345", TalkoDIDStatus.AVAILABLE.value, "set_available"
-        )
+        result = TalkoDidStatusUpdateHelper.validate_did(doc, "12345", TalkoDIDStatus.AVAILABLE.value, "set_available")
         assert result is None
 
     def test_validate_did_not_found(self):
-        result = TalkoDidStatusUpdateHelper.validate_did(
-            None, "12345", TalkoDIDStatus.AVAILABLE.value, "set_available"
-        )
+        result = TalkoDidStatusUpdateHelper.validate_did(None, "12345", TalkoDIDStatus.AVAILABLE.value, "set_available")
         assert result["error"]["code"] == "DID_NOT_FOUND"
         assert result["success"] is False
 
@@ -119,9 +98,7 @@ class TestDidStatusUpdateHelper:
 
     def test_validate_did_invalid_action(self):
         doc = {"did_number": "12345"}
-        result = TalkoDidStatusUpdateHelper.validate_did(
-            doc, "12345", TalkoDIDStatus.AVAILABLE.value, "invalid_action"
-        )
+        result = TalkoDidStatusUpdateHelper.validate_did(doc, "12345", TalkoDIDStatus.AVAILABLE.value, "invalid_action")
         assert result["error"]["code"] == "INVALID_ACTION"
 
     def test_prepare_update_data_without_workspace(self, mock_payload, now_ts):
@@ -151,9 +128,7 @@ class TestDidStatusUpdateHelper:
         assert result["error"]["message"] == "Transition not allowed"
 
     def test_parse_value_error_without_pipe(self):
-        result = TalkoDidStatusUpdateHelper.parse_value_error(
-            "12345", ValueError("plain error message")
-        )
+        result = TalkoDidStatusUpdateHelper.parse_value_error("12345", ValueError("plain error message"))
         assert result["error"]["code"] == "VALIDATION_ERROR"
         assert result["error"]["message"] == "plain error message"
 

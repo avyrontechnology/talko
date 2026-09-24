@@ -1,3 +1,4 @@
+import logging
 import mimetypes
 
 import boto3
@@ -5,12 +6,11 @@ from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from src.components.digital_assets import constants
-from src.components.digital_assets.logger_adapter import TalkoLoggerAdapter
 from src.components.digital_assets.messages import NO_CRED_FOUND_DO
 from src.components.digital_assets.storage.base import TalkoBaseStorageManager
 from src.core.environment import TalkoENV
 
-logger = TalkoLoggerAdapter().get_logger()
+logger = logging.getLogger(__name__)
 
 
 class TalkoDOStorageManager(TalkoBaseStorageManager):
@@ -69,9 +69,7 @@ class TalkoDOStorageManager(TalkoBaseStorageManager):
             raise RuntimeError(NO_CRED_FOUND_DO)
 
         except ClientError as e:
-            logger.error(
-                "Failed to generate presigned URL for file %s: %s", file_path, e
-            )
+            logger.error("Failed to generate presigned URL for file %s: %s", file_path, e)
             raise RuntimeError(f"Failed to generate presigned URL: {e}")
 
     async def upload_digital_asset(self, file_obj, file_path: str) -> str:
@@ -120,9 +118,7 @@ class TalkoDOStorageManager(TalkoBaseStorageManager):
                 file_obj.filename,
                 e.response["Error"]["Message"],
             )
-            raise ValueError(
-                f"Failed to upload file '{file_path}': {e.response['Error']['Message']}"
-            )
+            raise ValueError(f"Failed to upload file '{file_path}': {e.response['Error']['Message']}")
         except Exception as e:
             logger.error(
                 "An error occurred while uploading file '%s' to path '%s': %s",
@@ -130,9 +126,7 @@ class TalkoDOStorageManager(TalkoBaseStorageManager):
                 file_path,
                 str(e),
             )
-            raise ValueError(
-                f"An error occurred while uploading file '{file_path}': {str(e)}"
-            )
+            raise ValueError(f"An error occurred while uploading file '{file_path}': {str(e)}")
 
     def delete_digital_asset(self, file_path: str) -> None:
         """

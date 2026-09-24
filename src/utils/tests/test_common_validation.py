@@ -15,9 +15,7 @@ class TestValidateRequiredFields:
         }
         required_fields = ["name", "vendor_type"]
 
-        with pytest.raises(
-            ValueError, match=r"Missing required fields: \['vendor_type'\]"
-        ):
+        with pytest.raises(ValueError, match=r"Missing required fields: \['vendor_type'\]"):
             validate_required_fields(data, required_fields, self.mock_logger)
 
         self.mock_logger.error.assert_called_once()
@@ -27,15 +25,11 @@ class TestValidateRequiredFields:
         data = {}
         required_fields = ["name", "vendor_type"]
 
-        with pytest.raises(
-            ValueError, match=r"Missing required fields: \['name', 'vendor_type'\]"
-        ):
+        with pytest.raises(ValueError, match=r"Missing required fields: \['name', 'vendor_type'\]"):
             validate_required_fields(data, required_fields, self.mock_logger)
 
         self.mock_logger.error.assert_called_once()
-        self.mock_logger.info.assert_called_once_with(
-            "Missing field: ['name', 'vendor_type']."
-        )
+        self.mock_logger.info.assert_called_once_with("Missing field: ['name', 'vendor_type'].")
 
     def test_field_with_none_value(self):
         data = {

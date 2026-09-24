@@ -50,13 +50,13 @@ class TestResolveDidVoiceaiMapped:
     @pytest.mark.asyncio
     async def test_ai_agent_without_bot_id_passes_when_mapped(self, monkeypatch):
         monkeypatch.setattr(
-            TalkoENV, "VOICEAI_INBOUND_AGENT_MAP",
-            '{"+917965263087": "agent_1"}', raising=False,
+            TalkoENV,
+            "VOICEAI_INBOUND_AGENT_MAP",
+            '{"+917965263087": "agent_1"}',
+            raising=False,
         )
         service, deps = make_service()
-        deps["did_repository"].get_did_by_number = AsyncMock(
-            return_value=ai_agent_did_record()
-        )
+        deps["did_repository"].get_did_by_number = AsyncMock(return_value=ai_agent_did_record())
         ctx = await service._resolve_did(make_ctx())
         assert ctx.partner_id == 2
         assert ctx.makunai_agent_id is None  # voiceai Step 4b resolves the agent
@@ -64,13 +64,13 @@ class TestResolveDidVoiceaiMapped:
     @pytest.mark.asyncio
     async def test_plus_prefix_tolerated(self, monkeypatch):
         monkeypatch.setattr(
-            TalkoENV, "VOICEAI_INBOUND_AGENT_MAP",
-            '{"917965263087": "agent_9"}', raising=False,
+            TalkoENV,
+            "VOICEAI_INBOUND_AGENT_MAP",
+            '{"917965263087": "agent_9"}',
+            raising=False,
         )
         service, deps = make_service()
-        deps["did_repository"].get_did_by_number = AsyncMock(
-            return_value=ai_agent_did_record()
-        )
+        deps["did_repository"].get_did_by_number = AsyncMock(return_value=ai_agent_did_record())
         ctx = await service._resolve_did(make_ctx(did_number="+917965263087"))
         assert ctx.partner_id == 2
 
@@ -78,17 +78,17 @@ class TestResolveDidVoiceaiMapped:
     async def test_ai_agent_without_bot_id_still_raises_when_unmapped(self, monkeypatch):
         monkeypatch.setattr(TalkoENV, "VOICEAI_INBOUND_AGENT_MAP", "", raising=False)
         service, deps = make_service()
-        deps["did_repository"].get_did_by_number = AsyncMock(
-            return_value=ai_agent_did_record()
-        )
+        deps["did_repository"].get_did_by_number = AsyncMock(return_value=ai_agent_did_record())
         with pytest.raises(ValueError, match="agent_bot_id is missing"):
             await service._resolve_did(make_ctx())
 
     def test_resolve_by_did_map(self, monkeypatch):
         service, _ = make_service()
         monkeypatch.setattr(
-            TalkoENV, "VOICEAI_INBOUND_AGENT_MAP",
-            '{"917965263087": "agent_9"}', raising=False,
+            TalkoENV,
+            "VOICEAI_INBOUND_AGENT_MAP",
+            '{"917965263087": "agent_9"}',
+            raising=False,
         )
         assert service._resolve_voiceai_agent_id_for_did("+917965263087") == "agent_9"
         assert service._resolve_voiceai_agent_id_for_did("910000000000") is None
@@ -96,8 +96,10 @@ class TestResolveDidVoiceaiMapped:
     @pytest.mark.asyncio
     async def test_create_session_skipped_for_mapped_did(self, monkeypatch):
         monkeypatch.setattr(
-            TalkoENV, "VOICEAI_INBOUND_AGENT_MAP",
-            '{"+917965263087": "agent_1"}', raising=False,
+            TalkoENV,
+            "VOICEAI_INBOUND_AGENT_MAP",
+            '{"+917965263087": "agent_1"}',
+            raising=False,
         )
         service, _ = make_service()
         ctx = make_ctx(context_data=None)

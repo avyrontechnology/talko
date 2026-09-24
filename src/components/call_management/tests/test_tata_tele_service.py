@@ -13,7 +13,6 @@ from src.components.call_management.tata_tele.call_service import TalkoTataTeleC
 
 @pytest.mark.asyncio
 class TestTataTeleCallHandler:
-
     @pytest.fixture
     def handler(self):
         mock_logger = MagicMock()
@@ -35,9 +34,7 @@ class TestTataTeleCallHandler:
                 "headers": {"accept": "application/json"},
             },
         }
-        return TalkoTataTeleCallHandler(
-            config=config, logger=mock_logger, vendor_type="TATA"
-        )
+        return TalkoTataTeleCallHandler(config=config, logger=mock_logger, vendor_type="TATA")
 
     async def test_make_call_success(self, handler):
         response_data = {"status": "success", "call_id": "abc123"}
@@ -59,13 +56,9 @@ class TestTataTeleCallHandler:
 
     async def test_make_call_missing_agent_number(self, handler):
         with pytest.raises(ValueError) as exc_info:
-            await handler.make_call(
-                to_number="9876543210", from_number="1234567890", agent_number=None
-            )
+            await handler.make_call(to_number="9876543210", from_number="1234567890", agent_number=None)
         assert AGENT_NUMBER_IS_REQUIRED in str(exc_info.value)
-        handler.logger.error.assert_called_with(
-            f"Failed to make TATA API call: {AGENT_NUMBER_IS_REQUIRED}"
-        )
+        handler.logger.error.assert_called_with(f"Failed to make TATA API call: {AGENT_NUMBER_IS_REQUIRED}")
 
     async def test_make_call_invalid_parameter(self, handler):
         error_message = "Invalid phone number"
@@ -132,9 +125,7 @@ class TestTataTeleCallHandler:
             assert result == response_data
             called_kwargs = mock_post.call_args.kwargs
             assert called_kwargs["json"] == {"call_id": "1627373566.350603"}
-            assert (
-                called_kwargs["headers"]["Authorization"] == "Bearer fake-hangup-token"
-            )
+            assert called_kwargs["headers"]["Authorization"] == "Bearer fake-hangup-token"
 
     async def test_hangup_call_missing_config(self):
         mock_logger = MagicMock()
@@ -230,9 +221,7 @@ class TestTataTeleCallHandler:
         found_response = AsyncMock()
         found_response.status_code = 200
         found_response.json = MagicMock(
-            return_value={
-                "results": [{"customer_number": "918103492952", "call_id": "CAXX-456"}]
-            }
+            return_value={"results": [{"customer_number": "918103492952", "call_id": "CAXX-456"}]}
         )
 
         with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
@@ -275,9 +264,7 @@ class TestTataTeleCallHandler:
         )
 
         with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-            result = await handler.find_live_call_id(
-                did_number="917965802977", customer_number="918103492952"
-            )
+            result = await handler.find_live_call_id(did_number="917965802977", customer_number="918103492952")
 
             assert result is None
             mock_get.assert_not_called()

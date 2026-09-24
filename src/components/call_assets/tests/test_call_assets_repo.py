@@ -1,18 +1,17 @@
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from pymongo.results import InsertOneResult
 
-from src.components.call_assets.repository import TalkoAssetRepository
-from src.components.call_assets.models import TalkoAssetsModel
 from src.components.call_assets.messages import DUPLICATE_ASSET_INSERTION
+from src.components.call_assets.models import TalkoAssetsModel
+from src.components.call_assets.repository import TalkoAssetRepository
 from src.exceptions import TalkoBadRequestError
 from src.loggers.talko_service_logger import TalkoServiceLogger
-from pymongo.results import InsertOneResult
 
 
 @pytest.mark.asyncio
 class TestCallAssetsRepository:
-
     @pytest.fixture
     def setup(self):
         mock_db_manager = MagicMock()
@@ -40,12 +39,9 @@ class TestCallAssetsRepository:
         assert isinstance(result, dict)
         assert result["id"] == str(mock_doc["_id"])
         assert result["name"] == "sample.mp3"
-        mock_logger.info.assert_any_call(
-            f"Found digital asset: {mock_doc}"
-        )
+        mock_logger.info.assert_any_call(f"Found digital asset: {mock_doc}")
         mock_collection.find_one.assert_awaited_once_with(
-            {"partner_id": partner_id, "asset_type": asset_type},
-            sort=[("created_at", -1)]
+            {"partner_id": partner_id, "asset_type": asset_type}, sort=[("created_at", -1)]
         )
 
     async def test_get_digital_asset_by_partner_id_not_found(self, setup):
@@ -69,7 +65,6 @@ class TestCallAssetsRepository:
         lead_number = 101
         call_time = 123456
         agent_id = 5
-
 
         mock_collection = AsyncMock()
         mock_collection.find_one.return_value = None
@@ -100,7 +95,6 @@ class TestCallAssetsRepository:
         file_name = "sample.mp3"
         user_id = 12
         lead_number = 101
-
 
         mock_collection = AsyncMock()
         mock_collection.find_one.return_value = {"version": 2}

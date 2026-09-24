@@ -7,7 +7,6 @@ from src.components.call_agent_map.validation import TalkoAgentMapperValidator
 
 @pytest.mark.asyncio
 class TestAgentMapperValidator:
-
     @pytest.fixture
     def mock_repository(self):
         repo = Mock()
@@ -22,9 +21,7 @@ class TestAgentMapperValidator:
     def validator(self, mock_repository, mock_logger):
         return TalkoAgentMapperValidator(repository=mock_repository, logger=mock_logger)
 
-    async def test_validate_agent_not_already_mapped_success(
-        self, validator, mock_repository, mock_logger
-    ):
+    async def test_validate_agent_not_already_mapped_success(self, validator, mock_repository, mock_logger):
         """
         Test case where the agent is not already mapped.
         """
@@ -35,9 +32,7 @@ class TestAgentMapperValidator:
         mock_repository.get_agent_did_mapping.assert_awaited_once_with(101)
         mock_logger.error.assert_not_called()
 
-    async def test_validate_agent_already_mapped_raises_error(
-        self, validator, mock_repository, mock_logger
-    ):
+    async def test_validate_agent_already_mapped_raises_error(self, validator, mock_repository, mock_logger):
         """
         Test case where the agent is already mapped and should raise ValueError.
         """
@@ -46,9 +41,7 @@ class TestAgentMapperValidator:
             "partner_id": 2001,
         }
 
-        with pytest.raises(
-            ValueError, match="Agent ID is already mapped to another partner."
-        ):
+        with pytest.raises(ValueError, match="Agent ID is already mapped to another partner."):
             await validator.validate_agent_not_already_mapped(agent_id=101)
 
         mock_repository.get_agent_did_mapping.assert_awaited_once_with(101)

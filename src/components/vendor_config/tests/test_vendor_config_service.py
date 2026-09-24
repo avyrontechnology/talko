@@ -56,12 +56,8 @@ class TestVendorConfigService:
             "created_at": 1735689600,
             "updated_at": 1735689600,
         }
-        self.get_private(
-            service, "did_management_service"
-        ).get_assigned_dids.return_value = ["+911"]
-        self.get_private(
-            service, "did_management_service"
-        ).get_available_dids.return_value = ["+912"]
+        self.get_private(service, "did_management_service").get_assigned_dids.return_value = ["+911"]
+        self.get_private(service, "did_management_service").get_available_dids.return_value = ["+912"]
 
         result = await service.get_config_by_id(str(config_id))
         assert result.id == str(config_id)
@@ -80,16 +76,10 @@ class TestVendorConfigService:
             "created_at": 1735689600,
             "updated_at": 1735689600,
         }
-        self.get_private(
-            service, "did_management_service"
-        ).get_assigned_dids.return_value = []
-        self.get_private(
-            service, "did_management_service"
-        ).get_available_dids.return_value = ["+91000"]
+        self.get_private(service, "did_management_service").get_assigned_dids.return_value = []
+        self.get_private(service, "did_management_service").get_available_dids.return_value = ["+91000"]
 
-        result = await service.update_did_lists(
-            str(vendor_id), add_to_available=["+91000"]
-        )
+        result = await service.update_did_lists(str(vendor_id), add_to_available=["+91000"])
 
         assert result.name == "Airtel-Config"
         assert result.available_did == ["+91000"]
@@ -102,15 +92,11 @@ class TestVendorConfigService:
             generic_url_handler={"endpoint": "test"},
         )
 
-        self.get_private(
-            service, "vendor_repository"
-        ).find_vendor_by_id_all.return_value = {"vendor_type": "knowlarity"}
-        self.get_private(
-            service, "repository"
-        ).find_configs_by_vendor_id.return_value = []
-        self.get_private(service, "repository").insert_vendor_config.return_value = (
-            ObjectId()
-        )
+        self.get_private(service, "vendor_repository").find_vendor_by_id_all.return_value = {
+            "vendor_type": "knowlarity"
+        }
+        self.get_private(service, "repository").find_configs_by_vendor_id.return_value = []
+        self.get_private(service, "repository").insert_vendor_config.return_value = ObjectId()
 
         result = await service.create_vendor_config(config_dto)
         assert result.message == VENDOR_CONFIG_CREATED_SUCCESSFULLY
@@ -145,26 +131,15 @@ class TestVendorConfigServiceCoverage:
             available_did=["+911", "+912"],
             generic_url_handler={"url": "test"},
         )
-        self.get_private(
-            service, "vendor_repository"
-        ).find_vendor_by_id_all.return_value = {"vendor_type": "test"}
-        self.get_private(
-            service, "repository"
-        ).find_configs_by_vendor_id.return_value = []
-        self.get_private(service, "repository").insert_vendor_config.return_value = (
-            ObjectId()
-        )
+        self.get_private(service, "vendor_repository").find_vendor_by_id_all.return_value = {"vendor_type": "test"}
+        self.get_private(service, "repository").find_configs_by_vendor_id.return_value = []
+        self.get_private(service, "repository").insert_vendor_config.return_value = ObjectId()
 
         await service.create_vendor_config(config)
-        assert (
-            self.get_private(service, "did_management_service").assign_did.call_count
-            == 2
-        )
+        assert self.get_private(service, "did_management_service").assign_did.call_count == 2
 
     async def test_get_all_configs_exception(self, service):
-        self.get_private(service, "repository").find_all_configs.side_effect = (
-            Exception("DB Fail")
-        )
+        self.get_private(service, "repository").find_all_configs.side_effect = Exception("DB Fail")
         with pytest.raises(Exception, match="DB Fail"):
             await service.get_all_configs()
         self.get_private(service, "logger").error.assert_called()
@@ -179,9 +154,7 @@ class TestVendorConfigServiceCoverage:
             await service.get_config_by_id(str(ObjectId()))
 
     async def test_get_config_by_id_exception_logging(self, service):
-        self.get_private(service, "repository").find_config_by_id.side_effect = (
-            Exception("Fail")
-        )
+        self.get_private(service, "repository").find_config_by_id.side_effect = Exception("Fail")
         with pytest.raises(Exception):
             await service.get_config_by_id(str(ObjectId()))
 
@@ -199,9 +172,7 @@ class TestVendorConfigServiceCoverage:
             dialer_url_handler=None,
         )
 
-        self.get_private(
-            service, "validator"
-        ).validate_vendor_config_exists.return_value = None
+        self.get_private(service, "validator").validate_vendor_config_exists.return_value = None
 
         with pytest.raises(TalkoBadRequestError, match=NO_FIELDS_PROVIDED_FOR_UPDATE):
             await service.update_vendor_config(config_id, update_dto)
@@ -220,9 +191,7 @@ class TestVendorConfigServiceCoverage:
         self.get_private(service, "did_management_service").assign_did.assert_awaited()
 
     async def test_update_vendor_config_exception(self, service):
-        self.get_private(service, "repository").update_vendor_config.side_effect = (
-            Exception("Update Fail")
-        )
+        self.get_private(service, "repository").update_vendor_config.side_effect = Exception("Update Fail")
         update = MagicMock()
         update.model_dump.return_value = {"name": "test"}
         with pytest.raises(Exception):

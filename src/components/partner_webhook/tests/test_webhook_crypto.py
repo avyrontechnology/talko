@@ -1,3 +1,4 @@
+import pytest
 from cryptography.fernet import Fernet
 
 from src.components.partner_webhook.crypto import TalkoWebhookSecretCipher
@@ -19,8 +20,5 @@ class TestTalkoWebhookSecretCipher:
         cipher_b = TalkoWebhookSecretCipher(Fernet.generate_key().decode())
 
         encrypted = cipher_a.encrypt("secret")
-        try:
+        with pytest.raises(Exception, match=""):
             cipher_b.decrypt(encrypted)
-            assert False, "decrypting with the wrong key should raise"
-        except Exception:
-            pass

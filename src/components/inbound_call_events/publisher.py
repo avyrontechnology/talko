@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from src.components.inbound_call_events.connection_manager import TalkoInboundCallEventBroker
 from src.components.inbound_call_events.constants import (
     INBOUND_CALL_EVENT_TYPE,
@@ -26,18 +24,16 @@ class TalkoInboundCallEventPublisher:
 
     async def publish_inbound_call(
         self,
-        partner_id: Optional[int],
-        workspace_id: Optional[int],
-        dedicated_did: Optional[str],
-        agent_id: Optional[int],
-        agent_ids: Optional[List[int]] = None,
-        display_name: Optional[str] = None,
-        customer_number: Optional[str] = None,
+        partner_id: int | None,
+        workspace_id: int | None,
+        dedicated_did: str | None,
+        agent_id: int | None,
+        agent_ids: list[int] | None = None,
+        display_name: str | None = None,
+        customer_number: str | None = None,
     ) -> None:
         if not partner_id:
-            self.__logger.debug(
-                "Skipping inbound call event publish — no partner_id resolved"
-            )
+            self.__logger.debug("Skipping inbound call event publish — no partner_id resolved")
             return
 
         payload = {
@@ -54,28 +50,22 @@ class TalkoInboundCallEventPublisher:
 
         try:
             await self.__broker.publish(payload)
-            self.__logger.debug("Published inbound call event: {}".format(payload))
+            self.__logger.debug(f"Published inbound call event: {payload}")
         except Exception as e:
-            self.__logger.error(
-                "Failed to publish inbound call event for partner {}: {}".format(
-                    partner_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to publish inbound call event for partner {partner_id}: {str(e)}")
 
     async def publish_outbound_call(
         self,
-        partner_id: Optional[int],
-        workspace_id: Optional[int],
-        dedicated_did: Optional[str],
-        agent_id: Optional[int],
-        agent_ids: Optional[List[int]] = None,
-        display_name: Optional[str] = None,
-        customer_number: Optional[str] = None,
+        partner_id: int | None,
+        workspace_id: int | None,
+        dedicated_did: str | None,
+        agent_id: int | None,
+        agent_ids: list[int] | None = None,
+        display_name: str | None = None,
+        customer_number: str | None = None,
     ) -> None:
         if not partner_id:
-            self.__logger.debug(
-                "Skipping outbound call event publish — no partner_id resolved"
-            )
+            self.__logger.debug("Skipping outbound call event publish — no partner_id resolved")
             return
 
         payload = {
@@ -92,10 +82,37 @@ class TalkoInboundCallEventPublisher:
 
         try:
             await self.__broker.publish(payload)
-            self.__logger.debug("Published outbound call event: {}".format(payload))
+            self.__logger.debug(f"Published outbound call event: {payload}")
         except Exception as e:
-            self.__logger.error(
-                "Failed to publish outbound call event for partner {}: {}".format(
-                    partner_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to publish outbound call event for partner {partner_id}: {str(e)}")
+
+    async def publish_supervisor_event(
+        self,
+        event: str,
+        partner_id: int,
+        call_id: str,
+        supervisor_id: str = "",
+        mode: str = "",
+        room_name: str = "",
+        extra: dict | None = None,
+    ) -> None:
+        """Supervisor / attended-transfer signalling over the same WS channel."""
+        if not partner_id:
+            self.__logger.debug("Skipping supervisor event publish — no partner_id resolved")
+            return
+        payload = {
+            "event": event,
+            "partner_id": partner_id,
+            "call_id": call_id,
+            "supervisor_id": supervisor_id,
+            "mode": mode,
+            "room_name": room_name,
+            "timestamp": TalkoDateTimeUtil.get_current_time(),
+        }
+        if extra:
+            payload.update(extra)
+        try:
+            await self.__broker.publish(payload)
+            self.__logger.debug(f"Published supervisor event: {payload}")
+        except Exception as e:
+            self.__logger.error(f"Failed to publish supervisor event for partner {partner_id}: {str(e)}")

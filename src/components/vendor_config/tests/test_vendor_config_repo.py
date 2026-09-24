@@ -1,11 +1,8 @@
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from bson import ObjectId
 
-from src.components.vendor.models import TalkoVendorModel
-from src.components.vendor_config.models import TalkoVendorConfigModel
 from src.components.vendor_config.repository import TalkoVendorConfigRepository
 from src.core.doc_db import TalkoDocDatabaseSessionManager
 from src.loggers.talko_service_logger import TalkoServiceLogger
@@ -42,16 +39,12 @@ class TestVendorConfigRepository:
     def repository(self, mock_db_manager, mock_logger):
         return TalkoVendorConfigRepository(mock_db_manager, mock_logger)
 
-    async def test_insert_vendor_config_success(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_insert_vendor_config_success(self, repository, mock_db_manager, mock_logger):
         # Arrange
         config_dict = {"vendor_id": ObjectId(), "data": "test"}
         mock_collection = AsyncMock()
         mock_collection.insert_one.return_value = MagicMock(inserted_id=ObjectId())
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
         result = await repository.insert_vendor_config(config_dict)
@@ -61,16 +54,12 @@ class TestVendorConfigRepository:
         mock_logger.info.assert_called_once()
         assert isinstance(result, str)
 
-    async def test_insert_vendor_config_failure(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_insert_vendor_config_failure(self, repository, mock_db_manager, mock_logger):
         # Arrange
         config_dict = {"vendor_id": ObjectId(), "data": "test"}
         mock_collection = AsyncMock()
         mock_collection.insert_one.side_effect = Exception("DB Error")
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(Exception, match="DB Error"):
@@ -84,14 +73,10 @@ class TestVendorConfigRepository:
         vendor_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.find_one.return_value = {"_id": ObjectId()}
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
-        result = await repository.check_vendor_config_exists_for_existing_vendor(
-            vendor_id
-        )
+        result = await repository.check_vendor_config_exists_for_existing_vendor(vendor_id)
 
         # Assert
         mock_collection.find_one.assert_called_once_with({"vendor_id": vendor_id})
@@ -105,14 +90,10 @@ class TestVendorConfigRepository:
         vendor_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.find_one.return_value = None
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
-        result = await repository.check_vendor_config_exists_for_existing_vendor(
-            vendor_id
-        )
+        result = await repository.check_vendor_config_exists_for_existing_vendor(vendor_id)
 
         # Assert
         mock_collection.find_one.assert_called_once_with({"vendor_id": vendor_id})
@@ -126,18 +107,14 @@ class TestVendorConfigRepository:
         vendor_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.find_one.side_effect = Exception("DB Error")
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(Exception, match="DB Error"):
             await repository.check_vendor_config_exists_for_existing_vendor(vendor_id)
         mock_logger.error.assert_called_once()
 
-    async def test_find_all_configs_include_inactive(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_all_configs_include_inactive(self, repository, mock_db_manager, mock_logger):
         # Arrange
         mock_collection = AsyncMock()
         mock_configs = [
@@ -155,9 +132,7 @@ class TestVendorConfigRepository:
         mock_collection.aggregate = MagicMock(
             return_value=TalkoAsyncIterator(mock_configs)
         )  # Use MagicMock instead of AsyncMock
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
         result = await repository.find_all_configs(include_inactive_vendors=True)
@@ -167,9 +142,7 @@ class TestVendorConfigRepository:
         assert len(result) == 2
         mock_logger.error.assert_not_called()
 
-    async def test_find_all_configs_exclude_inactive(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_all_configs_exclude_inactive(self, repository, mock_db_manager, mock_logger):
         # Arrange
         mock_collection = AsyncMock()
         mock_configs = [
@@ -182,9 +155,7 @@ class TestVendorConfigRepository:
         mock_collection.aggregate = MagicMock(
             return_value=TalkoAsyncIterator(mock_configs)
         )  # Use MagicMock instead of AsyncMock
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
         result = await repository.find_all_configs(include_inactive_vendors=False)
@@ -194,9 +165,7 @@ class TestVendorConfigRepository:
         assert len(result) == 1
         mock_logger.error.assert_not_called()
 
-    async def test_find_config_by_id_success(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_config_by_id_success(self, repository, mock_db_manager, mock_logger):
         # Arrange
         config_id = ObjectId()
         mock_collection = AsyncMock()
@@ -211,9 +180,7 @@ class TestVendorConfigRepository:
             "updated_at": "2023-01-02",
         }
         mock_collection.aggregate = MagicMock(return_value=TalkoAsyncIterator([mock_config]))
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
         result = await repository.find_config_by_id(config_id)
@@ -223,18 +190,12 @@ class TestVendorConfigRepository:
         assert result == mock_config
         mock_logger.error.assert_not_called()
 
-    async def test_find_config_by_id_not_found(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_config_by_id_not_found(self, repository, mock_db_manager, mock_logger):
         # Arrange
         config_id = ObjectId()
         mock_collection = AsyncMock()
-        mock_collection.aggregate = MagicMock(
-            return_value=TalkoAsyncIterator([])
-        )  # Use MagicMock instead of AsyncMock
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_collection.aggregate = MagicMock(return_value=TalkoAsyncIterator([]))  # Use MagicMock instead of AsyncMock
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
         result = await repository.find_config_by_id(config_id)
@@ -244,18 +205,14 @@ class TestVendorConfigRepository:
         assert result is None
         mock_logger.error.assert_not_called()
 
-    async def test_update_vendor_config_success(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_update_vendor_config_success(self, repository, mock_db_manager, mock_logger):
         # Arrange
         config_id = ObjectId()
         update_dict = {"data": "updated"}
         mock_collection = AsyncMock()
         mock_updated_config = {"_id": config_id, "data": "updated"}
         mock_collection.find_one_and_update.return_value = mock_updated_config
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
         result = await repository.update_vendor_config(config_id, update_dict)
@@ -267,41 +224,29 @@ class TestVendorConfigRepository:
         mock_logger.info.assert_called_once()
         assert result == mock_updated_config
 
-    async def test_update_vendor_config_not_found(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_update_vendor_config_not_found(self, repository, mock_db_manager, mock_logger):
         # Arrange
         config_id = ObjectId()
         update_dict = {"data": "updated"}
         mock_collection = AsyncMock()
         mock_collection.find_one_and_update.return_value = None
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
-        with pytest.raises(
-            ValueError, match=f"Vendor config for vendor_id {config_id} not found"
-        ):
+        with pytest.raises(ValueError, match=f"Vendor config for vendor_id {config_id} not found"):
             await repository.update_vendor_config(config_id, update_dict)
-        assert (
-            mock_logger.error.call_count == 2
-        )  # Expect two error logs due to current implementation
+        assert mock_logger.error.call_count == 2  # Expect two error logs due to current implementation
         mock_collection.find_one_and_update.assert_called_once_with(
             {"_id": config_id}, {"$set": update_dict}, return_document=True
         )
 
-    async def test_update_vendor_config_failure(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_update_vendor_config_failure(self, repository, mock_db_manager, mock_logger):
         # Arrange
         config_id = ObjectId()
         update_dict = {"data": "updated"}
         mock_collection = AsyncMock()
         mock_collection.find_one_and_update.side_effect = Exception("DB Error")
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(Exception, match="DB Error"):
@@ -313,15 +258,11 @@ class TestVendorConfigRepository:
     ):
         # Arrange
         config_id = ObjectId()
-        mock_db_manager.collection.return_value.__aenter__.side_effect = Exception(
-            "Collection Access Error"
-        )
+        mock_db_manager.collection.return_value.__aenter__.side_effect = Exception("Collection Access Error")
 
         # Act/Assert
         with pytest.raises(Exception, match="Collection Access Error"):
-            await repository.check_vendor_config_exists_for_existing_vendor_using_pk_id(
-                config_id
-            )
+            await repository.check_vendor_config_exists_for_existing_vendor_using_pk_id(config_id)
         mock_logger.error.assert_called_once_with(
             f"Failed to check vendor config existence for vendor_id {config_id}: Collection Access Error"
         )
@@ -333,15 +274,11 @@ class TestVendorConfigRepository:
         config_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.find_one.side_effect = Exception("DB Error")
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(Exception, match="DB Error"):
-            await repository.check_vendor_config_exists_for_existing_vendor_using_pk_id(
-                config_id
-            )
+            await repository.check_vendor_config_exists_for_existing_vendor_using_pk_id(config_id)
         mock_logger.error.assert_called_once_with(
             f"Failed to check vendor config existence for vendor_id {config_id}: DB Error"
         )
@@ -353,22 +290,14 @@ class TestVendorConfigRepository:
         config_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.find_one.return_value = {"_id": config_id}
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
-        result = (
-            await repository.check_vendor_config_exists_for_existing_vendor_using_pk_id(
-                config_id
-            )
-        )
+        result = await repository.check_vendor_config_exists_for_existing_vendor_using_pk_id(config_id)
 
         # Assert
         mock_collection.find_one.assert_called_once_with({"_id": config_id})
-        mock_logger.info.assert_called_once_with(
-            f"Vendor config exists for vendor_id {config_id}: True"
-        )
+        mock_logger.info.assert_called_once_with(f"Vendor config exists for vendor_id {config_id}: True")
         assert result is True
 
     async def test_check_vendor_config_exists_for_existing_vendor_using_pk_id_not_found(
@@ -378,105 +307,65 @@ class TestVendorConfigRepository:
         config_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.find_one.return_value = None
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
-        result = (
-            await repository.check_vendor_config_exists_for_existing_vendor_using_pk_id(
-                config_id
-            )
-        )
+        result = await repository.check_vendor_config_exists_for_existing_vendor_using_pk_id(config_id)
 
         # Assert
         mock_collection.find_one.assert_called_once_with({"_id": config_id})
-        mock_logger.info.assert_called_once_with(
-            f"Vendor config exists for vendor_id {config_id}: False"
-        )
+        mock_logger.info.assert_called_once_with(f"Vendor config exists for vendor_id {config_id}: False")
         assert result is False
 
-    async def test_find_all_configs_failure(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_all_configs_failure(self, repository, mock_db_manager, mock_logger):
         # Arrange
         mock_collection = AsyncMock()
         mock_collection.aggregate = MagicMock(side_effect=Exception("DB Error"))
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(Exception, match="DB Error"):
             await repository.find_all_configs(include_inactive_vendors=True)
-        mock_logger.error.assert_called_once_with(
-            "Failed to retrieve vendor configs: DB Error"
-        )
+        mock_logger.error.assert_called_once_with("Failed to retrieve vendor configs: DB Error")
 
-    async def test_find_all_configs_db_error(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_all_configs_db_error(self, repository, mock_db_manager, mock_logger):
         # Arrange
         mock_collection = AsyncMock()
-        mock_collection.aggregate = MagicMock(
-            side_effect=RuntimeError("Database Failure")
-        )
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_collection.aggregate = MagicMock(side_effect=RuntimeError("Database Failure"))
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(RuntimeError, match="Database Failure"):
             await repository.find_all_configs(include_inactive_vendors=False)
-        mock_logger.error.assert_called_once_with(
-            "Failed to retrieve vendor configs: Database Failure"
-        )
+        mock_logger.error.assert_called_once_with("Failed to retrieve vendor configs: Database Failure")
 
-    async def test_find_all_configs_collection_failure(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_all_configs_collection_failure(self, repository, mock_db_manager, mock_logger):
         # Arrange
-        mock_db_manager.collection.return_value.__aenter__.side_effect = Exception(
-            "Collection Access Error"
-        )
+        mock_db_manager.collection.return_value.__aenter__.side_effect = Exception("Collection Access Error")
 
         # Act/Assert
         with pytest.raises(Exception, match="Collection Access Error"):
             await repository.find_all_configs(include_inactive_vendors=True)
-        mock_logger.error.assert_called_once_with(
-            "Failed to retrieve vendor configs: Collection Access Error"
-        )
+        mock_logger.error.assert_called_once_with("Failed to retrieve vendor configs: Collection Access Error")
 
-    async def test_find_config_by_id_failure(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_config_by_id_failure(self, repository, mock_db_manager, mock_logger):
         # Arrange
         config_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.aggregate = MagicMock(side_effect=Exception("DB Error"))
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(Exception, match="DB Error"):
             await repository.find_config_by_id(config_id)
-        mock_logger.error.assert_called_once_with(
-            f"Failed to find vendor config for config_id {config_id}: DB Error"
-        )
+        mock_logger.error.assert_called_once_with(f"Failed to find vendor config for config_id {config_id}: DB Error")
 
-    async def test_find_config_by_id_db_error(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_config_by_id_db_error(self, repository, mock_db_manager, mock_logger):
         # Arrange
         config_id = ObjectId()
         mock_collection = AsyncMock()
-        mock_collection.aggregate = MagicMock(
-            side_effect=RuntimeError("Database Failure")
-        )
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_collection.aggregate = MagicMock(side_effect=RuntimeError("Database Failure"))
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(RuntimeError, match="Database Failure"):
@@ -485,14 +374,10 @@ class TestVendorConfigRepository:
             f"Failed to find vendor config for config_id {config_id}: Database Failure"
         )
 
-    async def test_find_config_by_id_collection_failure(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_config_by_id_collection_failure(self, repository, mock_db_manager, mock_logger):
         # Arrange
         config_id = ObjectId()
-        mock_db_manager.collection.return_value.__aenter__.side_effect = Exception(
-            "Collection Access Error"
-        )
+        mock_db_manager.collection.return_value.__aenter__.side_effect = Exception("Collection Access Error")
 
         # Act/Assert
         with pytest.raises(Exception, match="Collection Access Error"):
@@ -501,9 +386,7 @@ class TestVendorConfigRepository:
             f"Failed to find vendor config for config_id {config_id}: Collection Access Error"
         )
 
-    async def test_find_configs_by_vendor_id_success(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_configs_by_vendor_id_success(self, repository, mock_db_manager, mock_logger):
         # Arrange
         vendor_id = ObjectId()
         mock_collection = AsyncMock()
@@ -516,9 +399,7 @@ class TestVendorConfigRepository:
             }
         ]
         mock_collection.aggregate = MagicMock(return_value=TalkoAsyncIterator(mock_configs))
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
         result = await repository.find_configs_by_vendor_id(vendor_id)
@@ -528,27 +409,19 @@ class TestVendorConfigRepository:
         assert result == mock_configs
         mock_logger.error.assert_not_called()
 
-    async def test_find_configs_by_vendor_id_failure(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_find_configs_by_vendor_id_failure(self, repository, mock_db_manager, mock_logger):
         # Arrange
         vendor_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.aggregate = MagicMock(side_effect=Exception("DB Error"))
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(Exception, match="DB Error"):
             await repository.find_configs_by_vendor_id(vendor_id)
-        mock_logger.error.assert_called_once_with(
-            f"Failed to find vendor configs for vendor_id {vendor_id}: DB Error"
-        )
+        mock_logger.error.assert_called_once_with(f"Failed to find vendor configs for vendor_id {vendor_id}: DB Error")
 
-    async def test_update_did_lists_success(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_update_did_lists_success(self, repository, mock_db_manager, mock_logger):
         # Arrange
         vendor_id = ObjectId()
         mock_collection = AsyncMock()
@@ -558,9 +431,7 @@ class TestVendorConfigRepository:
             "assigned_did": [],
         }
         mock_collection.find_one_and_update.return_value = updated_document
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
         result = await repository.update_did_lists(
@@ -575,20 +446,14 @@ class TestVendorConfigRepository:
         # Assert
         assert result == updated_document
         mock_collection.find_one_and_update.assert_called_once()
-        mock_logger.info.assert_called_once_with(
-            f"Updated DID lists for vendor_id {vendor_id}"
-        )
+        mock_logger.info.assert_called_once_with(f"Updated DID lists for vendor_id {vendor_id}")
 
-    async def test_update_did_lists_failure(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_update_did_lists_failure(self, repository, mock_db_manager, mock_logger):
         # Arrange
         vendor_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.find_one_and_update.side_effect = Exception("DB Error")
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(Exception, match="DB Error"):
@@ -600,13 +465,9 @@ class TestVendorConfigRepository:
                 add_to_assigned=[],
                 updated_at=1234567890,
             )
-        mock_logger.error.assert_called_once_with(
-            f"Failed to update DID lists for vendor_id {vendor_id}: DB Error"
-        )
+        mock_logger.error.assert_called_once_with(f"Failed to update DID lists for vendor_id {vendor_id}: DB Error")
 
-    async def test_update_vendor_config_by_vendor_id_success(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_update_vendor_config_by_vendor_id_success(self, repository, mock_db_manager, mock_logger):
         # Arrange
         vendor_id = ObjectId()
         update_dict = {"$set": {"generic_url_handler": "https://new-url.com"}}
@@ -616,66 +477,46 @@ class TestVendorConfigRepository:
             "generic_url_handler": "https://new-url.com",
         }
         mock_collection.find_one_and_update.return_value = updated_doc
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
-        result = await repository.update_vendor_config_by_vendor_id(
-            vendor_id, update_dict
-        )
+        result = await repository.update_vendor_config_by_vendor_id(vendor_id, update_dict)
 
         # Assert
         assert result == updated_doc
-        mock_logger.info.assert_called_once_with(
-            f"Updated vendor config for vendor_id: {vendor_id}"
-        )
+        mock_logger.info.assert_called_once_with(f"Updated vendor config for vendor_id: {vendor_id}")
 
-    async def test_update_vendor_config_by_vendor_id_not_found(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_update_vendor_config_by_vendor_id_not_found(self, repository, mock_db_manager, mock_logger):
         # Arrange
         vendor_id = ObjectId()
         update_dict = {"$set": {"generic_url_handler": "https://new-url.com"}}
         mock_collection = AsyncMock()
         mock_collection.find_one_and_update.return_value = None
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(ValueError, match="No vendor config found for vendor_id."):
             await repository.update_vendor_config_by_vendor_id(vendor_id, update_dict)
 
-    async def test_update_vendor_config_by_vendor_id_failure(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_update_vendor_config_by_vendor_id_failure(self, repository, mock_db_manager, mock_logger):
         # Arrange
         vendor_id = ObjectId()
         update_dict = {"$set": {"generic_url_handler": "https://new-url.com"}}
         mock_collection = AsyncMock()
         mock_collection.find_one_and_update.side_effect = Exception("DB Error")
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(Exception, match="DB Error"):
             await repository.update_vendor_config_by_vendor_id(vendor_id, update_dict)
-        mock_logger.error.assert_called_once_with(
-            f"Failed to update vendor config for vendor_id {vendor_id}: DB Error"
-        )
+        mock_logger.error.assert_called_once_with(f"Failed to update vendor config for vendor_id {vendor_id}: DB Error")
 
-    async def test_update_did_lists_not_found(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_update_did_lists_not_found(self, repository, mock_db_manager, mock_logger):
         # Arrange
         vendor_id = ObjectId()
         mock_collection = AsyncMock()
         mock_collection.find_one_and_update.return_value = None
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(ValueError, match="Vendor config for vendor_id not found."):
@@ -689,16 +530,12 @@ class TestVendorConfigRepository:
             )
 
         assert mock_logger.error.call_count == 2
-        mock_logger.error.assert_any_call(
-            f"Vendor config for vendor_id {vendor_id} not found"
-        )
+        mock_logger.error.assert_any_call(f"Vendor config for vendor_id {vendor_id} not found")
         mock_logger.error.assert_any_call(
             f"Failed to update DID lists for vendor_id {vendor_id}: Vendor config for vendor_id not found."
         )
 
-    async def test_get_vendor_config_by_vendor_type_success(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_get_vendor_config_by_vendor_type_success(self, repository, mock_db_manager, mock_logger):
         # Arrange
         vendor_type = "tata_tele"
         mock_collection = AsyncMock()
@@ -725,9 +562,7 @@ class TestVendorConfigRepository:
             },
         ]
         mock_collection.aggregate = MagicMock(return_value=TalkoAsyncIterator(mock_configs))
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act
         result = await repository.get_vendor_config_by_vendor_type(vendor_type)
@@ -737,16 +572,12 @@ class TestVendorConfigRepository:
         assert result == mock_configs
         mock_logger.error.assert_not_called()
 
-    async def test_get_vendor_config_by_vendor_type_failure(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_get_vendor_config_by_vendor_type_failure(self, repository, mock_db_manager, mock_logger):
         # Arrange
         vendor_type = "tata_tele"
         mock_collection = AsyncMock()
         mock_collection.aggregate = MagicMock(side_effect=Exception("DB Error"))
-        mock_db_manager.collection.return_value.__aenter__.return_value = (
-            mock_collection
-        )
+        mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection
 
         # Act/Assert
         with pytest.raises(Exception, match="DB Error"):

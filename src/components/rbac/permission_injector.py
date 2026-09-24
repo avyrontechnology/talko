@@ -1,5 +1,7 @@
-from fastapi import Request
 from functools import wraps
+
+from fastapi import Request
+
 from src.components.rbac.constants import TalkoServiceName
 
 

@@ -8,7 +8,6 @@ from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 
 @pytest.mark.asyncio
 class TestCDRUpdateTask:
-
     def setup_method(self):
         """Initialize mocks and TalkoCDRUpdateTask instance before each test"""
         self.mock_cdr_repo = MagicMock()
@@ -33,9 +32,7 @@ class TestCDRUpdateTask:
         self.mock_logger.info.assert_called()
 
     async def test_fetch_vendor_config_not_found(self):
-        self.mock_vendor_repo.get_vendor_config_by_vendor_type = AsyncMock(
-            return_value=[]
-        )
+        self.mock_vendor_repo.get_vendor_config_by_vendor_type = AsyncMock(return_value=[])
         with pytest.raises(TalkoResourceNotFound):
             await self.task.fetch_vendor_config()
         self.mock_logger.error.assert_called()
@@ -56,30 +53,20 @@ class TestCDRUpdateTask:
         assert cdrs[0]["call_id"] == "123"
 
     async def test_execute_no_incomplete_cdrs(self):
-        self.task.fetch_vendor_config = AsyncMock(
-            return_value={"cdr_url_handler": {"endpoint": "http://api"}}
-        )
+        self.task.fetch_vendor_config = AsyncMock(return_value={"cdr_url_handler": {"endpoint": "http://api"}})
         self.task.get_incomplete_cdrs = AsyncMock(return_value=[])
 
         result = await self.task.execute("tata_tele")
         assert result == "No updates needed"
 
     async def test_execute_updates_cdrs_success(self):
-        self.task.fetch_vendor_config = AsyncMock(
-            return_value={"cdr_url_handler": {"endpoint": "http://api"}}
-        )
-        self.task.get_incomplete_cdrs = AsyncMock(
-            return_value=[{"call_id": "123", "call_uuid": "abc"}]
-        )
+        self.task.fetch_vendor_config = AsyncMock(return_value={"cdr_url_handler": {"endpoint": "http://api"}})
+        self.task.get_incomplete_cdrs = AsyncMock(return_value=[{"call_id": "123", "call_uuid": "abc"}])
         self.task.fetch_cdr_data = AsyncMock(return_value={"status": "success"})
 
-        with patch(
-            "src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler"
-        ) as mock_handler_class:
+        with patch("src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler") as mock_handler_class:
             mock_handler = mock_handler_class.return_value
-            mock_handler.process_cdr_api_payload = AsyncMock(
-                return_value={"status": "success", "call_id": "123"}
-            )
+            mock_handler.process_cdr_api_payload = AsyncMock(return_value={"status": "success", "call_id": "123"})
 
             result = await self.task.execute("tata_tele")
             assert "Updated 1 CDRs" in result
@@ -91,21 +78,13 @@ class TestCDRUpdateTask:
         self.mock_logger.error.assert_called()
 
     async def test_execute_cdr_processing_exception(self):
-        self.task.fetch_vendor_config = AsyncMock(
-            return_value={"cdr_url_handler": {"endpoint": "http://api"}}
-        )
-        self.task.get_incomplete_cdrs = AsyncMock(
-            return_value=[{"call_id": "123", "call_uuid": "abc"}]
-        )
+        self.task.fetch_vendor_config = AsyncMock(return_value={"cdr_url_handler": {"endpoint": "http://api"}})
+        self.task.get_incomplete_cdrs = AsyncMock(return_value=[{"call_id": "123", "call_uuid": "abc"}])
         self.task.fetch_cdr_data = AsyncMock(return_value={"status": "success"})
 
-        with patch(
-            "src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler"
-        ) as mock_handler_class:
+        with patch("src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler") as mock_handler_class:
             mock_handler = mock_handler_class.return_value
-            mock_handler.process_cdr_api_payload = AsyncMock(
-                side_effect=Exception("fail")
-            )
+            mock_handler.process_cdr_api_payload = AsyncMock(side_effect=Exception("fail"))
 
             result = await self.task.execute("tata_tele")
             assert "Updated 0 CDRs" in result
@@ -140,13 +119,9 @@ class TestCDRUpdateTask:
         self.task.fetch_cdr_data = AsyncMock(return_value=mock_payload)
 
         # Mock TalkoTataTeleWebhookHandler
-        with patch(
-            "src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler"
-        ) as mock_handler_class:
+        with patch("src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler") as mock_handler_class:
             mock_handler = mock_handler_class.return_value
-            mock_handler.process_cdr_api_payload = AsyncMock(
-                return_value=mock_processed_result
-            )
+            mock_handler.process_cdr_api_payload = AsyncMock(return_value=mock_processed_result)
 
             result = await self.task.fetch_single_cdr(
                 call_id="TT123456789", cdr_config=cdr_config, vendor_type="tata_tele"
@@ -159,30 +134,20 @@ class TestCDRUpdateTask:
             assert "TalkoCDR fetched and processed successfully" in result["message"]
 
             # Verify logging
-            self.mock_logger.info.assert_any_call(
-                "Fetching single TalkoCDR for call_id: TT123456789 using vendor_config_id flow"
-            )
+            self.mock_logger.info.assert_any_call("Fetching single TalkoCDR using call_id: TT123456789")
 
     async def test_fetch_single_cdr_fallback_to_fetch_vendor_config(self):
         """Test that fetch_single_cdr falls back to fetch_vendor_config when cdr_config is None"""
-        self.task.fetch_vendor_config = AsyncMock(
-            return_value={"cdr_url_handler": {"endpoint": "http://fallback-api"}}
-        )
+        self.task.fetch_vendor_config = AsyncMock(return_value={"cdr_url_handler": {"endpoint": "http://fallback-api"}})
 
         mock_payload = {"call_id": "99999", "status": "answered"}
         self.task.fetch_cdr_data = AsyncMock(return_value=mock_payload)
 
-        with patch(
-            "src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler"
-        ) as mock_handler_class:
+        with patch("src.components.call_operation.cdr_update.TalkoTataTeleWebhookHandler") as mock_handler_class:
             mock_handler = mock_handler_class.return_value
-            mock_handler.process_cdr_api_payload = AsyncMock(
-                return_value={"status": "success", "call_id": "99999"}
-            )
+            mock_handler.process_cdr_api_payload = AsyncMock(return_value={"status": "success", "call_id": "99999"})
 
-            result = await self.task.fetch_single_cdr(
-                call_id="99999", cdr_config=None, vendor_type="tata_tele"
-            )
+            result = await self.task.fetch_single_cdr(call_id="99999", cdr_config=None, vendor_type="tata_tele")
 
             assert result["status"] == "success"
             self.task.fetch_vendor_config.assert_called_once()
@@ -191,7 +156,9 @@ class TestCDRUpdateTask:
         """Test that TalkoBadRequestError is raised when cdr_config is empty"""
         with pytest.raises(TalkoBadRequestError):
             await self.task.fetch_single_cdr(
-                call_id="12345", cdr_config={}, vendor_type="tata_tele"  # empty config
+                call_id="12345",
+                cdr_config={},
+                vendor_type="tata_tele",  # empty config
             )
 
     async def test_fetch_single_cdr_handles_exception_gracefully(self):

@@ -1,9 +1,8 @@
 import re
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
-import requests
 from bson import ObjectId
 
 from src.components.dialer import messages as dialer_messages
@@ -44,28 +43,19 @@ def dialer_service(mock_partner_config_repo, mock_vendor_config_repo, mock_logge
 
 
 class TestDialerService:
-
     # -------------------------------------------------------------------------
     # fetch_lead_lists Tests
     # -------------------------------------------------------------------------
 
     @pytest.mark.asyncio
-    async def test_fetch_lead_lists_dialer_disabled(
-        self, dialer_service, mock_partner_config_repo
-    ):
-        mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(
-            return_value={"dialer_enabled": False}
-        )
+    async def test_fetch_lead_lists_dialer_disabled(self, dialer_service, mock_partner_config_repo):
+        mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(return_value={"dialer_enabled": False})
         with pytest.raises(TalkoBadRequestError, match=dialer_messages.DIALER_NOT_ENABLED):
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
-    async def test_fetch_lead_lists_missing_vendor_id(
-        self, dialer_service, mock_partner_config_repo
-    ):
-        mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(
-            return_value={"dialer_enabled": True}
-        )
+    async def test_fetch_lead_lists_missing_vendor_id(self, dialer_service, mock_partner_config_repo):
+        mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(return_value={"dialer_enabled": True})
         with pytest.raises(
             TalkoBadRequestError,
             match=dialer_messages.NO_VENDOR_CONFIGURATION_LINKED_PARTNER,
@@ -73,9 +63,7 @@ class TestDialerService:
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
-    async def test_fetch_lead_lists_invalid_objectid(
-        self, dialer_service, mock_partner_config_repo
-    ):
+    async def test_fetch_lead_lists_invalid_objectid(self, dialer_service, mock_partner_config_repo):
         mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(
             return_value={"dialer_enabled": True, "vendor_config_id": "invalid-id"}
         )
@@ -94,9 +82,7 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(return_value=None)
-        with pytest.raises(
-            TalkoResourceNotFound, match=dialer_messages.VENDOR_CONFIGURATION_NOT_FOUND
-        ):
+        with pytest.raises(TalkoResourceNotFound, match=dialer_messages.VENDOR_CONFIGURATION_NOT_FOUND):
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
@@ -107,9 +93,7 @@ class TestDialerService:
         mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
-        mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={"dialer_url_handler": {}}
-        )
+        mock_vendor_config_repo.find_config_by_id = AsyncMock(return_value={"dialer_url_handler": {}})
         with pytest.raises(
             TalkoBadRequestError,
             match=dialer_messages.DIALER_URL_HANDLER_CONFIGURATION_MISSING,
@@ -117,9 +101,7 @@ class TestDialerService:
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
-    async def test_fetch_lead_lists_success(
-        self, dialer_service, mock_partner_config_repo, mock_vendor_config_repo
-    ):
+    async def test_fetch_lead_lists_success(self, dialer_service, mock_partner_config_repo, mock_vendor_config_repo):
         vid = str(ObjectId())
         mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
@@ -136,9 +118,7 @@ class TestDialerService:
         )
 
         mock_response = Mock()
-        mock_response.json.return_value = [
-            {"id": 1, "name": "List A", "description": "desc"}
-        ]
+        mock_response.json.return_value = [{"id": 1, "name": "List A", "description": "desc"}]
         mock_response.raise_for_status = Mock()
         dialer_service.client.get = AsyncMock(return_value=mock_response)
         result = await dialer_service.fetch_lead_lists(1)
@@ -158,17 +138,11 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={
-                "dialer_url_handler": {
-                    "lead_lists_fetch": {"endpoint": "h", "auth_type": "none"}
-                }
-            }
+            return_value={"dialer_url_handler": {"lead_lists_fetch": {"endpoint": "h", "auth_type": "none"}}}
         )
 
         # Mock the async client to raise an exception
-        dialer_service.client.get = AsyncMock(
-            side_effect=httpx.ConnectError("Connection Timeout")
-        )
+        dialer_service.client.get = AsyncMock(side_effect=httpx.ConnectError("Connection Timeout"))
 
         with pytest.raises(TalkoBadRequestError, match="Failed to fetch lead lists"):
             await dialer_service.fetch_lead_lists(1)
@@ -208,9 +182,7 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": str(ObjectId())}
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={
-                "dialer_url_handler": {"bulk_leads_create": {"endpoint": "h/{id}"}}
-            }
+            return_value={"dialer_url_handler": {"bulk_leads_create": {"endpoint": "h/{id}"}}}
         )
         expected_msg = f".*{dialer_messages.NO_DATA_PROVIDED_FOR_BULK_CREATE}"
 
@@ -226,11 +198,7 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={
-                "dialer_url_handler": {
-                    "bulk_leads_create": {"endpoint": "h/{id}", "auth_type": "none"}
-                }
-            }
+            return_value={"dialer_url_handler": {"bulk_leads_create": {"endpoint": "h/{id}", "auth_type": "none"}}}
         )
 
         payload = {"data": ["not-a-dict"]}
@@ -246,11 +214,7 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={
-                "dialer_url_handler": {
-                    "bulk_leads_create": {"endpoint": "h/{id}", "auth_type": "none"}
-                }
-            }
+            return_value={"dialer_url_handler": {"bulk_leads_create": {"endpoint": "h/{id}", "auth_type": "none"}}}
         )
 
         payload = {"data": [{"name": "Missing Phone"}]}
@@ -269,11 +233,7 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={
-                "dialer_url_handler": {
-                    "bulk_leads_create": {"endpoint": "h/{id}", "auth_type": "none"}
-                }
-            }
+            return_value={"dialer_url_handler": {"bulk_leads_create": {"endpoint": "h/{id}", "auth_type": "none"}}}
         )
 
         payload = {
@@ -372,28 +332,18 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={
-                "dialer_url_handler": {
-                    "lead_lists_fetch": {"endpoint": "h", "auth_type": "none"}
-                }
-            }
+            return_value={"dialer_url_handler": {"lead_lists_fetch": {"endpoint": "h", "auth_type": "none"}}}
         )
 
         # Mock connection refused
-        dialer_service.client.get = AsyncMock(
-            side_effect=httpx.ConnectError("Connection Refused")
-        )
+        dialer_service.client.get = AsyncMock(side_effect=httpx.ConnectError("Connection Refused"))
 
         with pytest.raises(TalkoBadRequestError, match="Failed to fetch lead lists"):
             await dialer_service.fetch_lead_lists(1)
 
     @pytest.mark.asyncio
-    async def test_bulk_create_leads_no_partner_config(
-        self, dialer_service, mock_partner_config_repo
-    ):
-        mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(
-            return_value=None
-        )
+    async def test_bulk_create_leads_no_partner_config(self, dialer_service, mock_partner_config_repo):
+        mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(return_value=None)
         with pytest.raises(TalkoBadRequestError, match=dialer_messages.DIALER_NOT_ENABLED):
             await dialer_service.bulk_create_leads(1, "l", {})
 
@@ -405,9 +355,7 @@ class TestDialerService:
         mock_partner_config_repo.find_partner_config_by_partner_id = AsyncMock(
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
-        mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={"other_key": "no_handler_here"}
-        )
+        mock_vendor_config_repo.find_config_by_id = AsyncMock(return_value={"other_key": "no_handler_here"})
 
         with pytest.raises(
             TalkoBadRequestError,
@@ -427,17 +375,11 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={
-                "dialer_url_handler": {
-                    "bulk_leads_create": {"endpoint": "h", "auth_type": "none"}
-                }
-            }
+            return_value={"dialer_url_handler": {"bulk_leads_create": {"endpoint": "h", "auth_type": "none"}}}
         )
 
         # Mock post failure
-        dialer_service.client.post = AsyncMock(
-            side_effect=httpx.TimeoutException("Timeout")
-        )
+        dialer_service.client.post = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
 
         payload = {"data": [{"field_0": "1234567890"}]}
         with pytest.raises(TalkoBadRequestError, match="Failed to create bulk leads"):
@@ -477,16 +419,10 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={
-                "dialer_url_handler": {
-                    "lead_lists_fetch": {"endpoint": "h", "auth_type": "none"}
-                }
-            }
+            return_value={"dialer_url_handler": {"lead_lists_fetch": {"endpoint": "h", "auth_type": "none"}}}
         )
 
-        dialer_service.client.get = AsyncMock(
-            side_effect=httpx.ConnectError("Connection failed")
-        )
+        dialer_service.client.get = AsyncMock(side_effect=httpx.ConnectError("Connection failed"))
 
         with pytest.raises(TalkoBadRequestError, match="Failed to fetch lead lists"):
             await dialer_service.fetch_lead_lists(1)
@@ -508,9 +444,7 @@ class TestDialerService:
             TalkoBadRequestError,
             match=dialer_messages.BULK_LEADS_CREATION_CONFIGURATION_NOT_FOUND,
         ):
-            await dialer_service.bulk_create_leads(
-                1, "list_123", {"data": [{"field_0": "123"}]}
-            )
+            await dialer_service.bulk_create_leads(1, "list_123", {"data": [{"field_0": "123"}]})
 
     @pytest.mark.asyncio
     async def test_bulk_create_leads_missing_bearer_token(
@@ -532,9 +466,7 @@ class TestDialerService:
             }
         )
         with pytest.raises(TalkoBadRequestError, match="Missing bearer token"):
-            await dialer_service.bulk_create_leads(
-                1, "list_123", {"data": [{"field_0": "123"}]}
-            )
+            await dialer_service.bulk_create_leads(1, "list_123", {"data": [{"field_0": "123"}]})
 
     @pytest.mark.asyncio
     async def test_fetch_lead_lists_request_exception_path(
@@ -548,16 +480,10 @@ class TestDialerService:
             return_value={"dialer_enabled": True, "vendor_config_id": vid}
         )
         mock_vendor_config_repo.find_config_by_id = AsyncMock(
-            return_value={
-                "dialer_url_handler": {
-                    "lead_lists_fetch": {"endpoint": "h", "auth_type": "none"}
-                }
-            }
+            return_value={"dialer_url_handler": {"lead_lists_fetch": {"endpoint": "h", "auth_type": "none"}}}
         )
 
-        dialer_service.client.get = AsyncMock(
-            side_effect=httpx.ConnectError("Connection error")
-        )
+        dialer_service.client.get = AsyncMock(side_effect=httpx.ConnectError("Connection error"))
 
         with pytest.raises(TalkoBadRequestError, match="Failed to fetch lead lists"):
             await dialer_service.fetch_lead_lists(1)

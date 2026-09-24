@@ -1,6 +1,3 @@
-import json
-from typing import List
-
 from dependency_injector.wiring import Provide, inject
 from fastapi import HTTPException, Request
 
@@ -30,7 +27,7 @@ class TalkoPermissionDependency:
         logger: TalkoServiceLogger = Provide[TalkoContainer.logger],
     ):
 
-        logger.debug("checking permission: {}".format(self.permission_name))
+        logger.debug(f"checking permission: {self.permission_name}")
 
         try:
             #  current_user is available in request's state (Extracted from the token)
@@ -41,9 +38,7 @@ class TalkoPermissionDependency:
             if current_user_details.get("is_api_key_auth"):
                 logger.info(
                     "API-KEY auth detected for partner_id={}. Bypassing user-permission "
-                    "check for permission: {}".format(
-                        current_user_details.get("partner_id"), self.permission_name
-                    )
+                    "check for permission: {}".format(current_user_details.get("partner_id"), self.permission_name)
                 )
                 return
             # Talko-native users carry no console permissions — resolve locally
@@ -68,9 +63,7 @@ class TalkoPermissionDependency:
                             request.method,
                         )
                     )
-                    raise HTTPException(
-                        status_code=403, detail=TalkoPermissionErrorText.PERMISSION_DENIED
-                    )
+                    raise HTTPException(status_code=403, detail=TalkoPermissionErrorText.PERMISSION_DENIED)
                 logger.info(
                     "Talko role permission granted: role={} permission={}".format(
                         current_user_details.get("user_role"), self.permission_name
@@ -78,33 +71,19 @@ class TalkoPermissionDependency:
                 )
                 return
             current_user_id = current_user_details.get("user_id")
-            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
             user_permissions = await grpc_client.get_user_permissions(current_user_id)
-            logger.info(
-                "user-{} have permissions {}".format(current_user_id, user_permissions)
-            )
+            logger.info(f"user-{current_user_id} have permissions {user_permissions}")
 
             # Check if the required permission is in the user's permissions list
             if self.permission_name not in user_permissions:
-                logger.error(
-                    "Permission denied: {} not in user's permissions".format(
-                        self.permission_name
-                    )
-                )
-                raise HTTPException(
-                    status_code=403, detail=TalkoPermissionErrorText.PERMISSION_DENIED
-                )
+                logger.error(f"Permission denied: {self.permission_name} not in user's permissions")
+                raise HTTPException(status_code=403, detail=TalkoPermissionErrorText.PERMISSION_DENIED)
 
-            logger.info(
-                "Permission granted for user: {} with permission: {}".format(
-                    current_user_id, self.permission_name
-                )
-            )
+            logger.info(f"Permission granted for user: {current_user_id} with permission: {self.permission_name}")
         except HTTPException as http_forbidden:
             raise http_forbidden
 
         except Exception as exc:
-            logger.error("Permission check failed: {}".format(str(exc)))
-            raise HTTPException(
-                status_code=404, detail=TalkoPermissionErrorText.INTERNAL_SERVER_ERROR
-            )
+            logger.error(f"Permission check failed: {str(exc)}")
+            raise HTTPException(status_code=404, detail=TalkoPermissionErrorText.INTERNAL_SERVER_ERROR)

@@ -77,9 +77,7 @@ class TestInboundCallEventBrokerDispatch:
         message = json.dumps({"partner_id": 100, "agent_id": 50})
         await broker._TalkoInboundCallEventBroker__dispatch(message)
 
-        ws_partner_100.send_json.assert_called_once_with(
-            {"partner_id": 100, "agent_id": 50}
-        )
+        ws_partner_100.send_json.assert_called_once_with({"partner_id": 100, "agent_id": 50})
         ws_partner_200.send_json.assert_not_called()
 
     @pytest.mark.asyncio

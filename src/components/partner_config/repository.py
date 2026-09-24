@@ -1,5 +1,3 @@
-from typing import Union
-
 from src.components.partner_config.models import TalkoPartnerConfigModel
 from src.core.doc_db import TalkoDocDatabaseSessionManager
 from src.loggers.talko_service_logger import TalkoServiceLogger
@@ -10,9 +8,7 @@ class TalkoPartnerConfigRepository:
     Repository class for managing CRUD operations on Partner Configuration documents.
     """
 
-    def __init__(
-        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
-    ):
+    def __init__(self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger):
         """
         Initialize the repository with a database session manager and logger.
 
@@ -37,16 +33,12 @@ class TalkoPartnerConfigRepository:
             Exception: If insertion fails.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
-            ) as collection:
+            async with self.db_manager.collection(TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG) as collection:
                 result = await collection.insert_one(config_dict)
-                self.logger.info(
-                    "Inserted partner config with ID: {}.".format(result.inserted_id)
-                )
+                self.logger.info(f"Inserted partner config with ID: {result.inserted_id}.")
                 return str(result.inserted_id)
         except Exception as e:
-            self.logger.error("Failed to insert partner config: {}".format(str(e)))
+            self.logger.error(f"Failed to insert partner config: {str(e)}")
             raise
 
     async def find_all_partner_configs(self) -> list[dict]:
@@ -60,15 +52,13 @@ class TalkoPartnerConfigRepository:
             Exception: If retrieval fails.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
-            ) as collection:
+            async with self.db_manager.collection(TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG) as collection:
                 return await collection.find().to_list(length=None)
         except Exception as e:
-            self.logger.error("Failed to retrieve partner configs: {}".format(str(e)))
+            self.logger.error(f"Failed to retrieve partner configs: {str(e)}")
             raise
 
-    async def find_partner_config_by_id(self, id: str) -> Union[dict, None]:
+    async def find_partner_config_by_id(self, id: str) -> dict | None:
         """
         Retrieve a partner configuration document by its ID.
 
@@ -82,26 +72,18 @@ class TalkoPartnerConfigRepository:
             Exception: If retrieval fails.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
-            ) as collection:
+            async with self.db_manager.collection(TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG) as collection:
                 return await collection.find_one({"_id": id})
         except Exception as e:
-            self.logger.error(
-                "Failed to find partner config by id {}: {}".format(id, str(e))
-            )
+            self.logger.error(f"Failed to find partner config by id {id}: {str(e)}")
             raise
 
-    async def find_partner_config_by_partner_id(self, id: int) -> Union[dict, None]:
+    async def find_partner_config_by_partner_id(self, id: int) -> dict | None:
         try:
-            async with self.db_manager.collection(
-                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
-            ) as collection:
+            async with self.db_manager.collection(TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG) as collection:
                 return await collection.find_one({"partner_id": id})
         except Exception as e:
-            self.logger.error(
-                "Failed to find partner config by partner_id {}: {}".format(id, str(e))
-            )
+            self.logger.error(f"Failed to find partner config by partner_id {id}: {str(e)}")
             raise
 
     async def update_partner_config(self, id: str, update_dict: dict) -> dict:
@@ -120,27 +102,15 @@ class TalkoPartnerConfigRepository:
             Exception: If update fails.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
-            ) as collection:
-                result = await collection.find_one_and_update(
-                    {"_id": id}, {"$set": update_dict}, return_document=True
-                )
+            async with self.db_manager.collection(TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG) as collection:
+                result = await collection.find_one_and_update({"_id": id}, {"$set": update_dict}, return_document=True)
                 if not result:
-                    self.logger.error(
-                        "In update partner config method partner config for id {} not found".format(
-                            id
-                        )
-                    )
-                    raise ValueError("Partner config for id {} not found".format(id))
-                self.logger.info("Updated partner config for partner_id {}".format(id))
+                    self.logger.error(f"In update partner config method partner config for id {id} not found")
+                    raise ValueError(f"Partner config for id {id} not found")
+                self.logger.info(f"Updated partner config for partner_id {id}")
                 return result
         except Exception as e:
-            self.logger.error(
-                "Failed to update partner config for partner_id {}: {}".format(
-                    id, str(e)
-                )
-            )
+            self.logger.error(f"Failed to update partner config for partner_id {id}: {str(e)}")
             raise
 
     async def assign_did_to_partner(self, id: str, did: str, updated_at: int) -> dict:
@@ -160,29 +130,19 @@ class TalkoPartnerConfigRepository:
             Exception: If assignment fails.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
-            ) as collection:
+            async with self.db_manager.collection(TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG) as collection:
                 result = await collection.find_one_and_update(
                     {"_id": id},
                     {"$set": {"did": did, "updated_at": updated_at}},
                     return_document=True,
                 )
                 if not result:
-                    self.logger.error(
-                        "In assign did to partner method partner config for partner_id {} not found.".format(
-                            id
-                        )
-                    )
-                    raise ValueError(
-                        "Partner config for partner_id {} not found".format(id)
-                    )
-                self.logger.info("Assigned DID {} to partner_id {}".format(did, id))
+                    self.logger.error(f"In assign did to partner method partner config for partner_id {id} not found.")
+                    raise ValueError(f"Partner config for partner_id {id} not found")
+                self.logger.info(f"Assigned DID {did} to partner_id {id}")
                 return result
         except Exception as e:
-            self.logger.error(
-                "Failed to assign DID to partner_id {}: {}".format(id, str(e))
-            )
+            self.logger.error(f"Failed to assign DID to partner_id {id}: {str(e)}")
             raise
 
     async def remove_did_from_partner(self, id: str, updated_at: int) -> dict:
@@ -201,27 +161,17 @@ class TalkoPartnerConfigRepository:
             Exception: If removal fails.
         """
         try:
-            async with self.db_manager.collection(
-                TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
-            ) as collection:
+            async with self.db_manager.collection(TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG) as collection:
                 result = await collection.find_one_and_update(
                     {"_id": id},
                     {"$set": {"did": None, "updated_at": updated_at}},
                     return_document=True,
                 )
                 if not result:
-                    self.logger.error(
-                        "Remove did from partner method partner config for partner_id {} not found".format(
-                            id
-                        )
-                    )
-                    raise ValueError(
-                        "Partner config for partner_id {} not found".format(id)
-                    )
-                self.logger.info("Removed DID from partner_id {}".format(id))
+                    self.logger.error(f"Remove did from partner method partner config for partner_id {id} not found")
+                    raise ValueError(f"Partner config for partner_id {id} not found")
+                self.logger.info(f"Removed DID from partner_id {id}")
                 return result
         except Exception as e:
-            self.logger.error(
-                "Failed to remove DID from partner_id {}: {}".format(id, str(e))
-            )
+            self.logger.error(f"Failed to remove DID from partner_id {id}: {str(e)}")
             raise

@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from src.components.pstn.dto import TalkoCallContext
 
@@ -42,7 +41,7 @@ class TalkoAbstractPSTNProvider(ABC):
         self,
         ws,
         audio_bytes: bytes,
-        label: Optional[str] = None,
+        label: str | None = None,
         stream_sid: str = "",
         chunk: int = 1,
     ) -> None:

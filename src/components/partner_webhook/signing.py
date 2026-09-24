@@ -11,7 +11,5 @@ class TalkoWebhookSigner:
 
     @staticmethod
     def sign(secret: str, timestamp: int, raw_body: bytes) -> str:
-        signed_payload = "{}.{}".format(timestamp, raw_body.decode("utf-8")).encode(
-            "utf-8"
-        )
+        signed_payload = "{}.{}".format(timestamp, raw_body.decode("utf-8")).encode("utf-8")
         return hmac.new(secret.encode("utf-8"), signed_payload, hashlib.sha256).hexdigest()

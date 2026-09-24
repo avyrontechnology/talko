@@ -74,9 +74,7 @@ class TestPartnerApiKeyRepository:
         assert result["is_active"] is False
         assert result["revoked_at"] == 123
 
-    async def test_touch_last_used_swallows_errors(
-        self, repository, mock_db_manager, mock_logger
-    ):
+    async def test_touch_last_used_swallows_errors(self, repository, mock_db_manager, mock_logger):
         mock_collection = AsyncMock()
         mock_collection.update_one.side_effect = Exception("DB down")
         mock_db_manager.collection.return_value.__aenter__.return_value = mock_collection

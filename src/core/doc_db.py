@@ -1,15 +1,16 @@
 import contextlib
+from collections.abc import AsyncIterator
+from typing import Any
+
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo.client_session import ClientSession
-from typing import Any, AsyncIterator
-from src.loggers.talko_service_logger import TalkoServiceLogger
+
 from src.core.environment import TalkoENV
+from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 class TalkoDocDatabaseSessionManager:
-    def __init__(
-        self, logger: TalkoServiceLogger, engine_kwargs: dict[str, Any] = None
-    ):
+    def __init__(self, logger: TalkoServiceLogger, engine_kwargs: dict[str, Any] = None):
         if engine_kwargs is None:
             engine_kwargs = {}
         self.__logger: TalkoServiceLogger = logger
@@ -28,19 +29,16 @@ class TalkoDocDatabaseSessionManager:
                 auth_source="authSource=admin",
             )
         else:
-            self._host = "mongodb://{user}:{password}@{db_host}:{port}".format(
-                user=TalkoENV.MONGO_USER,
-                password=TalkoENV.MONGO_PASSWORD,
-                db_host=TalkoENV.MONGO_HOST,
-                port=TalkoENV.MONGO_PORT,
+            self._host = (
+                f"mongodb://{TalkoENV.MONGO_USER}:{TalkoENV.MONGO_PASSWORD}@{TalkoENV.MONGO_HOST}:{TalkoENV.MONGO_PORT}"
             )
 
     def _initialize_client(self):
         """Ensures MongoDB client is initialized."""
         if self._client is None:
             self._get_connection_string()
-            self.__logger.info("MongoDB database: {}".format(self._db_name))
-            self.__logger.info("MongoDB host: {}".format(self._host))
+            self.__logger.info(f"MongoDB database: {self._db_name}")
+            self.__logger.info(f"MongoDB host: {self._host}")
             self._client = AsyncIOMotorClient(self._host, **self._engine_kwargs)
             self._db = self._client[self._db_name]
 

@@ -6,7 +6,6 @@ from src.core.environment import TalkoENV
 
 
 class TalkoRedisCache:
-
     class KeysPrefix(enum.Enum):
         CONSOLE = "console:"
         USER_SERVICE = "user_service:"
@@ -16,14 +15,7 @@ class TalkoRedisCache:
 
     @staticmethod
     async def init_redis_pool(db_index: int = TalkoENV.CACHE_DB):
-        url = "{protocol}://{username}:{password}@{host}:{port}/{db}".format(
-            protocol=TalkoENV.CACHE_PROTOCOL,
-            username=TalkoENV.CACHE_USERNAME,
-            password=TalkoENV.CACHE_PASSWORD,
-            host=TalkoENV.CACHE_HOST,
-            port=TalkoENV.CACHE_PORT,
-            db=db_index,
-        )
+        url = f"{TalkoENV.CACHE_PROTOCOL}://{TalkoENV.CACHE_USERNAME}:{TalkoENV.CACHE_PASSWORD}@{TalkoENV.CACHE_HOST}:{TalkoENV.CACHE_PORT}/{db_index}"
         # health_check_interval pings idle connections periodically so this
         # client (and anything long-lived built on it, e.g. the inbound call
         # event broker's pub/sub subscribe connection) doesn't get silently

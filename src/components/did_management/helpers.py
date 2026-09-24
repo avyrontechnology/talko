@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.components.did_management.constants import (
     ADMIN_ACTION_MARK_SPAMMED,
@@ -17,50 +17,34 @@ class TalkoDidStatusUpdateHelper:
     """
 
     @staticmethod
-    def handle_set_available(
-        current_status: str, payload: TalkoContract.AdminDIDAction, now: int
-    ) -> Dict[str, Any]:
+    def handle_set_available(current_status: str, payload: TalkoContract.AdminDIDAction, now: int) -> dict[str, Any]:
         allowed = {
             TalkoDIDStatus.AVAILABLE.value,
             TalkoDIDStatus.MAPPED.value,
             TalkoDIDStatus.COOLDOWN_COMPLETED.value,
         }
         if current_status not in allowed:
-            raise ValueError(
-                "INVALID_TRANSITION|Transition from {} to Available is not allowed.".format(
-                    current_status
-                )
-            )
+            raise ValueError(f"INVALID_TRANSITION|Transition from {current_status} to Available is not allowed.")
         return {"status": TalkoDIDStatus.AVAILABLE.value}
 
     @staticmethod
-    def handle_set_mapped(
-        current_status: str, payload: TalkoContract.AdminDIDAction, now: int
-    ) -> Dict[str, Any]:
+    def handle_set_mapped(current_status: str, payload: TalkoContract.AdminDIDAction, now: int) -> dict[str, Any]:
         allowed = {
             TalkoDIDStatus.AVAILABLE.value,
             TalkoDIDStatus.MAPPED.value,
             TalkoDIDStatus.COOLDOWN_COMPLETED.value,
         }
         if current_status not in allowed:
-            raise ValueError(
-                "INVALID_TRANSITION|Transition from {} to Mapped is not allowed.".format(
-                    current_status
-                )
-            )
+            raise ValueError(f"INVALID_TRANSITION|Transition from {current_status} to Mapped is not allowed.")
         update = {"status": TalkoDIDStatus.MAPPED.value}
         if payload.agent_id:
             update.update({"agent_id": payload.agent_id, "mapped_date": now})
         return update
 
     @staticmethod
-    def handle_mark_spammed(
-        current_status: str, payload: TalkoContract.AdminDIDAction, now: int
-    ) -> Dict[str, Any]:
+    def handle_mark_spammed(current_status: str, payload: TalkoContract.AdminDIDAction, now: int) -> dict[str, Any]:
         if current_status == TalkoDIDStatus.AVAILABLE.value:
-            raise ValueError(
-                "INVALID_STATUS|DID is already AVAILABLE; cannot move directly to Cooling Period."
-            )
+            raise ValueError("INVALID_STATUS|DID is already AVAILABLE; cannot move directly to Cooling Period.")
         return {
             "status": TalkoDIDStatus.COOLING_PERIOD.value,
             "cooldown_until": now + COOLDOWN_MS,
@@ -68,9 +52,7 @@ class TalkoDidStatusUpdateHelper:
         }
 
     @staticmethod
-    def error_result(
-        did_number: str, reason: str, code: str = "UNKNOWN_ERROR"
-    ) -> Dict[str, Any]:
+    def error_result(did_number: str, reason: str, code: str = "UNKNOWN_ERROR") -> dict[str, Any]:
         return {
             "did_number": did_number,
             "success": False,
@@ -79,17 +61,13 @@ class TalkoDidStatusUpdateHelper:
         }
 
     @staticmethod
-    def validate_did(
-        doc: Optional[Dict], did_number: str, current_status: str, action: str
-    ) -> Optional[Dict]:
+    def validate_did(doc: dict | None, did_number: str, current_status: str, action: str) -> dict | None:
         """
         Validates DID document and status before update.
         Returns error_result dict if invalid, None if valid.
         """
         if not doc:
-            return TalkoDidStatusUpdateHelper.error_result(
-                did_number, "DID not found for partner", "DID_NOT_FOUND"
-            )
+            return TalkoDidStatusUpdateHelper.error_result(did_number, "DID not found for partner", "DID_NOT_FOUND")
         if current_status == TalkoDIDStatus.COOLING_PERIOD.value:
             return TalkoDidStatusUpdateHelper.error_result(
                 did_number,
@@ -97,15 +75,13 @@ class TalkoDidStatusUpdateHelper:
                 "COOLING_PERIOD_ACTIVE",
             )
         if action not in TalkoDidStatusUpdateHelper.ACTION_HANDLERS:
-            return TalkoDidStatusUpdateHelper.error_result(
-                did_number, "Invalid action: {}".format(action), "INVALID_ACTION"
-            )
+            return TalkoDidStatusUpdateHelper.error_result(did_number, f"Invalid action: {action}", "INVALID_ACTION")
         return None
 
     @staticmethod
     def prepare_update_data(
         handler, current_status: str, payload: TalkoContract.AdminDIDAction, now: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build final update_data dict from handler output."""
         update_data = handler(current_status, payload, now)
         if payload.workspace_id is not None:
@@ -114,7 +90,7 @@ class TalkoDidStatusUpdateHelper:
         return update_data
 
     @staticmethod
-    def parse_value_error(did_number: str, e: ValueError) -> Dict[str, Any]:
+    def parse_value_error(did_number: str, e: ValueError) -> dict[str, Any]:
         """Parse code|message format from ValueError and return error_result."""
         parts = str(e).split("|", 1)
         code = parts[0] if len(parts) == 2 else "VALIDATION_ERROR"
@@ -122,7 +98,7 @@ class TalkoDidStatusUpdateHelper:
         return TalkoDidStatusUpdateHelper.error_result(did_number, message, code)
 
     @staticmethod
-    def build_summary(did_numbers: List[str], results: List[Dict]) -> Dict[str, Any]:
+    def build_summary(did_numbers: list[str], results: list[dict]) -> dict[str, Any]:
         """Build final summary + results response dict."""
         succeeded = sum(1 for r in results if r.get("success"))
         return {

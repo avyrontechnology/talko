@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
 
-from src.components.call_assets.repository import TalkoAssetRepository
 from src.components.call_management.repository import TalkoCallRepository
 from src.core.environment import TalkoENV
 from src.loggers.talko_service_logger import TalkoServiceLogger
@@ -38,7 +37,7 @@ class TalkoWebhookHandler(ABC):
         self.vendor_type: str = vendor_type
 
     @abstractmethod
-    async def process_webhook(self, payload: Dict) -> Dict:
+    async def process_webhook(self, payload: dict) -> dict:
         """
         Process a webhook payload and update the TalkoCDR.
 
@@ -55,9 +54,7 @@ class TalkoWebhookHandler(ABC):
         pass
 
     @abstractmethod
-    async def process_cdr_api_payload(
-        self, payload: Dict, call_id: Optional[str] = None, uuid: Optional[str] = None
-    ) -> Dict:
+    async def process_cdr_api_payload(self, payload: dict, call_id: str | None = None, uuid: str | None = None) -> dict:
         """
         Process a TalkoCDR API payload and update the TalkoCDR.
 
@@ -75,7 +72,7 @@ class TalkoWebhookHandler(ABC):
         """
         pass
 
-    async def _relay_to_makunai(self, partner_id: int, payload: Dict[str, Any]) -> None:
+    async def _relay_to_makunai(self, partner_id: int, payload: dict[str, Any]) -> None:
         """
         Forwards a Tata webhook payload to makun-ai's campaign webhook
         verbatim, plus partner_id. Shared by both webhook handler types —
@@ -93,9 +90,7 @@ class TalkoWebhookHandler(ABC):
         """
         relay_payload = {**payload, "partner_id": partner_id}
         try:
-            async with httpx.AsyncClient(
-                timeout=_MAKUNAI_RELAY_TIMEOUT_SECONDS
-            ) as client:
+            async with httpx.AsyncClient(timeout=_MAKUNAI_RELAY_TIMEOUT_SECONDS) as client:
                 resp = await client.post(
                     TalkoENV.MAKUNAI_CDR_WEBHOOK_URL,
                     json=relay_payload,
@@ -109,6 +104,7 @@ class TalkoWebhookHandler(ABC):
             )
         except Exception as exc:
             self.logger.error(
-                "[TalkoWebhookHandler] Failed to relay to makun-ai partner_id={} "
-                "call_id={}: {}".format(partner_id, payload.get("call_id"), exc)
+                "[TalkoWebhookHandler] Failed to relay to makun-ai partner_id={} call_id={}: {}".format(
+                    partner_id, payload.get("call_id"), exc
+                )
             )

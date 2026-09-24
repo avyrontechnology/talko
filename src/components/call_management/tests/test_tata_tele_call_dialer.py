@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -6,22 +6,7 @@ import pytest
 
 from src.components.call_management.tata_tele.call_dialer import TalkoDialerWebhookHandler
 
-_MAGLO_PATCH_PATH = "src.components.call_management.tata_tele.call_dialer.TalkoMagloClient"
-_HTTPX_PATCH_PATH = (
-    "src.components.call_management.handlers.webhook_base_handler.httpx.AsyncClient"
-)
-
-
-@pytest.fixture(autouse=True)
-def _patch_maglo_client():
-    """
-    Replaces TalkoMagloClient with a MagicMock for every test in this module.
-    This prevents __init__ from creating an aiohttp session (which needs
-    a running event loop) during both collection and execution.
-    """
-    with patch(_MAGLO_PATCH_PATH, new_callable=MagicMock) as mock_cls:
-        mock_cls.return_value = MagicMock()
-        yield mock_cls
+_HTTPX_PATCH_PATH = "src.components.call_management.handlers.webhook_base_handler.httpx.AsyncClient"
 
 
 @pytest.fixture(autouse=True)
@@ -46,7 +31,6 @@ def _make_handler() -> TalkoDialerWebhookHandler:
     """
     Build a TalkoDialerWebhookHandler with plain MagicMock dependencies.
     Must be called inside a test body (sync or async) — never at class scope.
-    The autouse fixture ensures TalkoMagloClient is already patched when this runs.
     """
     logger = MagicMock()
     call_repository = MagicMock()
@@ -59,19 +43,15 @@ def _make_handler() -> TalkoDialerWebhookHandler:
         vendor_type="tata_tele",
     )
 
-    # maglo_client was already replaced by the autouse patch; give it a fresh mock
-    handler.maglo_client = MagicMock()
     handler.datetime_util = MagicMock()
     handler.datetime_util.get_current_time.return_value = 1722945600
     # Default: return the int as-is (simulates a valid epoch ms conversion)
-    handler.datetime_util.convert_date_time.side_effect = lambda v: (
-        int(v) if isinstance(v, (int, float)) else 0
-    )
+    handler.datetime_util.convert_date_time.side_effect = lambda v: int(v) if isinstance(v, (int, float)) else 0
 
     return handler
 
 
-def _base_payload(**overrides) -> Dict[str, Any]:
+def _base_payload(**overrides) -> dict[str, Any]:
     """Minimal valid dialer webhook payload."""
     payload = {
         "call_id": "call-123",
@@ -87,28 +67,12 @@ def _base_payload(**overrides) -> Dict[str, Any]:
     return payload
 
 
-def _default_did_info() -> Dict[str, Any]:
+def _default_did_info() -> dict[str, Any]:
     return {
         "partner_id": 100,
         "workspace_id": 1,
         "vendor_id": "vendor123",
         "vendor_config_id": "config456",
-    }
-
-
-def _default_maglo_response() -> Dict[str, Any]:
-    """
-    Keys must match the string literals that TalkoMagloApiConstants resolves to:
-        FIELD_LEAD_ID               -> "lead_id"
-        FIELD_AGENT_NAME            -> "agent_name"
-        FIELD_LEAD_REQUEST_ID       -> "lead_request_id"
-        LEAD_RESPONSE_ASSIGNED_TO   -> "assigned_to"
-    """
-    return {
-        "lead_id": 9001,
-        "agent_name": "Jane Doe",
-        "lead_request_id": 5001,
-        "assigned_to": 42,
     }
 
 
@@ -118,15 +82,8 @@ class TestProcessWebhookHappyPath:
         """When no existing TalkoCDR is found a new one should be inserted."""
         handler = _make_handler()
 
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value=_default_did_info()
-        )
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value=_default_maglo_response()
-        )
-        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(
-            return_value=None
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value=_default_did_info())
+        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(return_value=None)
         handler.call_repository.insert_cdr = AsyncMock()
 
         result = await handler.process_webhook(_base_payload())
@@ -141,15 +98,8 @@ class TestProcessWebhookHappyPath:
         handler = _make_handler()
 
         existing_cdr = {"_id": "mongo-id-999", "call_id": "call-123"}
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value=_default_did_info()
-        )
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value=_default_maglo_response()
-        )
-        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(
-            return_value=existing_cdr
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value=_default_did_info())
+        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(return_value=existing_cdr)
         handler.call_repository.update_cdr = AsyncMock(return_value=True)
 
         result = await handler.process_webhook(_base_payload())
@@ -164,15 +114,8 @@ class TestProcessWebhookHappyPath:
         handler = _make_handler()
 
         existing_cdr = {"_id": "mongo-id-999"}
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value=_default_did_info()
-        )
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value=_default_maglo_response()
-        )
-        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(
-            return_value=existing_cdr
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value=_default_did_info())
+        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(return_value=existing_cdr)
         handler.call_repository.update_cdr = AsyncMock(return_value=False)
 
         result = await handler.process_webhook(_base_payload())
@@ -185,9 +128,7 @@ class TestRelayToMakunai:
     autouse _patch_makunai_relay_client fixture's mock httpx.AsyncClient."""
 
     @pytest.mark.asyncio
-    async def test_relay_posts_payload_with_partner_id_and_secret_header(
-        self, _patch_makunai_relay_client
-    ):
+    async def test_relay_posts_payload_with_partner_id_and_secret_header(self, _patch_makunai_relay_client):
         from src.core.environment import TalkoENV
 
         handler = _make_handler()
@@ -199,14 +140,10 @@ class TestRelayToMakunai:
         call_args = _patch_makunai_relay_client.post.call_args
         assert call_args[0][0] == TalkoENV.MAKUNAI_CDR_WEBHOOK_URL
         assert call_args[1]["json"] == {**payload, "partner_id": 100}
-        assert call_args[1]["headers"] == {
-            "X-Webhook-Secret": TalkoENV.CDR_WEBHOOK_RELAY_SECRET
-        }
+        assert call_args[1]["headers"] == {"X-Webhook-Secret": TalkoENV.CDR_WEBHOOK_RELAY_SECRET}
 
     @pytest.mark.asyncio
-    async def test_relay_does_not_mutate_original_payload(
-        self, _patch_makunai_relay_client
-    ):
+    async def test_relay_does_not_mutate_original_payload(self, _patch_makunai_relay_client):
         handler = _make_handler()
         payload = {"call_id": "call-123"}
 
@@ -218,9 +155,7 @@ class TestRelayToMakunai:
     async def test_relay_failure_is_swallowed(self, _patch_makunai_relay_client):
         """A relay failure must never propagate — our own TalkoCDR write already
         succeeded by the time _relay_to_makunai runs."""
-        _patch_makunai_relay_client.post = AsyncMock(
-            side_effect=httpx.ConnectError("boom")
-        )
+        _patch_makunai_relay_client.post = AsyncMock(side_effect=httpx.ConnectError("boom"))
         handler = _make_handler()
 
         await handler._relay_to_makunai(100, {"call_id": "call-123"})
@@ -228,15 +163,11 @@ class TestRelayToMakunai:
         handler.logger.error.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_relay_failure_on_bad_status_is_swallowed(
-        self, _patch_makunai_relay_client
-    ):
+    async def test_relay_failure_on_bad_status_is_swallowed(self, _patch_makunai_relay_client):
         """raise_for_status() raising (e.g. a 500 from makun-ai) must also be
         swallowed, not just transport-level connection errors."""
-        _patch_makunai_relay_client.post.return_value.raise_for_status.side_effect = (
-            httpx.HTTPStatusError(
-                "500", request=MagicMock(), response=MagicMock(status_code=500)
-            )
+        _patch_makunai_relay_client.post.return_value.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "500", request=MagicMock(), response=MagicMock(status_code=500)
         )
         handler = _make_handler()
 
@@ -245,25 +176,14 @@ class TestRelayToMakunai:
         handler.logger.error.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_process_webhook_still_succeeds_when_relay_fails(
-        self, _patch_makunai_relay_client
-    ):
+    async def test_process_webhook_still_succeeds_when_relay_fails(self, _patch_makunai_relay_client):
         """End-to-end: a broken relay must not turn a successful TalkoCDR write
         into a failed webhook response."""
-        _patch_makunai_relay_client.post = AsyncMock(
-            side_effect=httpx.ConnectError("boom")
-        )
+        _patch_makunai_relay_client.post = AsyncMock(side_effect=httpx.ConnectError("boom"))
         handler = _make_handler()
 
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value=_default_did_info()
-        )
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value=_default_maglo_response()
-        )
-        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(
-            return_value=None
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value=_default_did_info())
+        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(return_value=None)
         handler.call_repository.insert_cdr = AsyncMock()
 
         result = await handler.process_webhook(_base_payload())
@@ -297,9 +217,7 @@ class TestProcessWebhookErrorCases:
     @pytest.mark.asyncio
     async def test_did_partner_id_zero_returns_error(self):
         handler = _make_handler()
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value={"partner_id": 0, "workspace_id": 1}
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value={"partner_id": 0, "workspace_id": 1})
 
         result = await handler.process_webhook(_base_payload())
 
@@ -321,9 +239,7 @@ class TestProcessWebhookErrorCases:
     @pytest.mark.asyncio
     async def test_did_lookup_exception_returns_error(self):
         handler = _make_handler()
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            side_effect=Exception("DB connection failed")
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(side_effect=Exception("DB connection failed"))
 
         result = await handler.process_webhook(_base_payload())
 
@@ -332,29 +248,21 @@ class TestProcessWebhookErrorCases:
         handler.logger.error.assert_called()
 
     @pytest.mark.asyncio
-    async def test_maglo_upsert_exception_is_handled(self):
+    async def test_upsert_noop_still_creates_cdr(self):
         """
-        When Maglo upsert raises, _upsert_ivr_lead_if_needed returns None.
-        The handler guards for None (if upsert_res:) so lead fields default
-        to None and the TalkoCDR is still created successfully.
+        External upsert removed (_upsert_ivr_lead_if_needed is a no-op None).
+        The webhook guards for None so lead fields default and the TalkoCDR
+        is still created successfully.
         """
         handler = _make_handler()
 
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value=_default_did_info()
-        )
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            side_effect=Exception("Maglo unavailable")
-        )
-        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(
-            return_value=None
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value=_default_did_info())
+        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(return_value=None)
         handler.call_repository.insert_cdr = AsyncMock()
 
         result = await handler.process_webhook(_base_payload())
 
         assert result["status"] == "created"
-        handler.logger.error.assert_called()
 
 
 class TestSanitizePayload:
@@ -484,9 +392,7 @@ class TestExtractDidNumber:
         handler = _make_handler()
         handler._extract_did_number({"caller_id_number": "+911234567890"})
         debug_calls = [str(c) for c in handler.logger.debug.call_args_list]
-        assert any(
-            "normalized" in c.lower() or "911234567890" in c for c in debug_calls
-        )
+        assert any("normalized" in c.lower() or "911234567890" in c for c in debug_calls)
 
 
 class TestNormalizeCustomerNumber:
@@ -532,9 +438,7 @@ class TestNormalizeCustomerNumber:
 
     def test_handles_none_broadcast_lead_fields(self):
         handler = _make_handler()
-        result = handler._normalize_customer_number(
-            {"call_to_number": "", "broadcast_lead_fields": None}
-        )
+        result = handler._normalize_customer_number({"call_to_number": "", "broadcast_lead_fields": None})
         assert result == ""
 
 
@@ -568,99 +472,59 @@ class TestGetDidInfo:
     @pytest.mark.asyncio
     async def test_returns_none_when_partner_id_zero(self):
         handler = _make_handler()
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value={"partner_id": 0}
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value={"partner_id": 0})
         assert await handler._get_did_info("911234567890") is None
 
     @pytest.mark.asyncio
     async def test_returns_none_on_exception(self):
         handler = _make_handler()
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            side_effect=RuntimeError("DB error")
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(side_effect=RuntimeError("DB error"))
         assert await handler._get_did_info("911234567890") is None
         handler.logger.error.assert_called()
 
     @pytest.mark.asyncio
     async def test_vendor_ids_are_none_when_absent_from_record(self):
         handler = _make_handler()
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value={"partner_id": 100}
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value={"partner_id": 100})
         result = await handler._get_did_info("911234567890")
         assert result["vendor_id"] is None
         assert result["vendor_config_id"] is None
 
 
 class TestUpsertIvrLeadIfNeeded:
+    """External CRM integration removed — upsert is always a no-op (None)."""
+
     @pytest.mark.asyncio
     async def test_returns_none_when_customer_number_empty(self):
         handler = _make_handler()
-        handler.maglo_client.upsert_ivr_lead = AsyncMock()
 
         result = await handler._upsert_ivr_lead_if_needed("", 100, 1)
 
         assert result is None
-        handler.maglo_client.upsert_ivr_lead.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_returns_lead_data_on_success(self):
+    async def test_returns_none_without_external_lookup(self):
         handler = _make_handler()
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value=_default_maglo_response()
-        )
-
-        result = await handler._upsert_ivr_lead_if_needed("+919876543210", 100, 1)
-
-        assert result is not None
-        id_data, lead_name, assigned_agent_id = result
-        assert id_data == 5001
-        assert assigned_agent_id == 42
-
-    @pytest.mark.asyncio
-    async def test_uses_lead_id_when_lead_request_id_is_none(self):
-        handler = _make_handler()
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value={
-                "lead_id": 9001,
-                "agent_name": "Jane",
-                "lead_request_id": None,
-                "assigned_to": 10,
-            }
-        )
-
-        result = await handler._upsert_ivr_lead_if_needed("+919876543210", 100, 1)
-
-        assert result is not None
-        id_data, _, _ = result
-        # lead_request_id is None → `or None` makes it None →
-        # `id_data = lead_request_id if lead_request_id is not None else lead_id`
-        # → falls back to lead_id = 9001
-        assert id_data == None
-
-    @pytest.mark.asyncio
-    async def test_returns_none_on_exception(self):
-        handler = _make_handler()
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            side_effect=Exception("Maglo down")
-        )
 
         result = await handler._upsert_ivr_lead_if_needed("+919876543210", 100, 1)
 
         assert result is None
-        handler.logger.error.assert_called()
 
     @pytest.mark.asyncio
-    async def test_logs_warning_when_no_lead_id_returned(self):
+    async def test_returns_none_on_exception(self):
         handler = _make_handler()
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value={"lead_id": None, "agent_name": "", "assigned_to": None}
-        )
+
+        result = await handler._upsert_ivr_lead_if_needed("+919876543210", 100, 1)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_no_warning_logged_for_noop(self):
+        handler = _make_handler()
 
         await handler._upsert_ivr_lead_if_needed("+919876543210", 100, 1)
 
-        handler.logger.warning.assert_called()
+        handler.logger.warning.assert_not_called()
 
 
 class TestApplyTalkTime:
@@ -719,9 +583,7 @@ class TestApplyMissedAgents:
     def test_keeps_list_unchanged(self):
         handler = _make_handler()
         updates = {}
-        handler._apply_missed_agents(
-            updates, {"missed_agent": ["agent-001", "agent-002"]}
-        )
+        handler._apply_missed_agents(updates, {"missed_agent": ["agent-001", "agent-002"]})
         assert updates["missed_agents"] == ["agent-001", "agent-002"]
 
     def test_handles_empty_list(self):
@@ -734,10 +596,7 @@ class TestApplyMissedAgents:
 class TestExtractAnsweredAgentNumber:
     def test_extracts_last_10_digits_from_agent_number(self):
         handler = _make_handler()
-        assert (
-            handler._extract_answered_agent_number({"agent_number": "08888888888"})
-            == "8888888888"
-        )
+        assert handler._extract_answered_agent_number({"agent_number": "08888888888"}) == "8888888888"
 
     def test_answered_agent_number_field_takes_priority_over_agent_number(self):
         handler = _make_handler()
@@ -788,10 +647,8 @@ class TestApplyAgentNumbersAndType:
         handler = _make_handler()
         handler._resolve_agent_from_ivr_phone = AsyncMock(return_value=None)
 
-        updates: Dict[str, Any] = {}
-        await handler._apply_agent_numbers_and_type(
-            updates, {"extension_c2c": "12345"}, 100
-        )
+        updates: dict[str, Any] = {}
+        await handler._apply_agent_numbers_and_type(updates, {"extension_c2c": "12345"}, 100)
 
         assert updates["outbound_type"] == "soft_phone"
         assert updates["cloud_agent_number"] == "12345"
@@ -801,10 +658,8 @@ class TestApplyAgentNumbersAndType:
         handler = _make_handler()
         handler._resolve_agent_from_ivr_phone = AsyncMock(return_value=None)
 
-        updates: Dict[str, Any] = {}
-        await handler._apply_agent_numbers_and_type(
-            updates, {"extension_c2c": "  "}, 100
-        )
+        updates: dict[str, Any] = {}
+        await handler._apply_agent_numbers_and_type(updates, {"extension_c2c": "  "}, 100)
 
         assert updates["outbound_type"] == "phone_number"
 
@@ -814,10 +669,8 @@ class TestApplyAgentNumbersAndType:
         handler = _make_handler()
         handler._resolve_agent_from_ivr_phone = AsyncMock(return_value=None)
 
-        updates: Dict[str, Any] = {}
-        await handler._apply_agent_numbers_and_type(
-            updates, {"extension_c2c": None}, 100
-        )
+        updates: dict[str, Any] = {}
+        await handler._apply_agent_numbers_and_type(updates, {"extension_c2c": None}, 100)
 
         assert updates["outbound_type"] == "phone_number"
 
@@ -826,10 +679,8 @@ class TestApplyAgentNumbersAndType:
         handler = _make_handler()
         handler._resolve_agent_from_ivr_phone = AsyncMock(return_value=None)
 
-        updates: Dict[str, Any] = {}
-        await handler._apply_agent_numbers_and_type(
-            updates, {"agent_number": "919988776655"}, 100
-        )
+        updates: dict[str, Any] = {}
+        await handler._apply_agent_numbers_and_type(updates, {"agent_number": "919988776655"}, 100)
 
         assert updates["answered_agent_number"] == "9988776655"
         assert updates["agent_number"] == "9988776655"
@@ -839,7 +690,7 @@ class TestApplyAgentNumbersAndType:
         handler = _make_handler()
         handler._resolve_agent_from_ivr_phone = AsyncMock(return_value=None)
 
-        updates: Dict[str, Any] = {}
+        updates: dict[str, Any] = {}
         await handler._apply_agent_numbers_and_type(updates, {}, 100)
 
         assert "answered_agent_number" not in updates
@@ -851,21 +702,16 @@ class TestApplyAgentNumbersAndType:
         handler = _make_handler()
         handler._resolve_agent_from_ivr_phone = AsyncMock(return_value=999)
 
-        updates: Dict[str, Any] = {}
-        await handler._apply_agent_numbers_and_type(
-            updates, {"agent_number": "919988776655"}, 100
-        )
+        updates: dict[str, Any] = {}
+        await handler._apply_agent_numbers_and_type(updates, {"agent_number": "919988776655"}, 100)
 
         assert updates["agent"] == 999
 
     @pytest.mark.asyncio
     async def test_soft_phone_detection_combined_with_agent_resolution(self):
         handler = _make_handler()
-        handler.maglo_client.get_agent_by_ivr_phone = AsyncMock(
-            return_value={"agent_id": 555}
-        )
 
-        updates: Dict[str, Any] = {}
+        updates: dict[str, Any] = {}
         payload = {"extension_c2c": "101", "answered_agent_number": "919988776655"}
         await handler._apply_agent_numbers_and_type(updates, payload, 100)
 
@@ -934,9 +780,7 @@ class TestApplyTimestamps:
     def test_exception_during_conversion_sets_field_to_zero(self):
         """Generic Exception (not just ValueError) must also be caught."""
         handler = _make_handler()
-        handler.datetime_util.convert_date_time.side_effect = Exception(
-            "Invalid format"
-        )
+        handler.datetime_util.convert_date_time.side_effect = Exception("Invalid format")
         data = {"start_stamp": "bad-date"}
         handler._apply_timestamps(data)
         assert data["start_stamp"] == 0
@@ -982,10 +826,7 @@ class TestTryDetectEvent:
 
     def test_detects_hangup_via_hangup_cause_key(self):
         handler = _make_handler()
-        assert (
-            handler._try_detect_event({"uuid": "u", "hangup_cause_key": "NORMAL"})
-            == "hangup"
-        )
+        assert handler._try_detect_event({"uuid": "u", "hangup_cause_key": "NORMAL"}) == "hangup"
 
     def test_sanitized_hangup_cause_key_none_is_not_hangup(self):
         """
@@ -999,10 +840,7 @@ class TestTryDetectEvent:
 
     def test_detects_dialed_event(self):
         handler = _make_handler()
-        assert (
-            handler._try_detect_event({"call_status": "dialed_on_customer_number"})
-            == "dialed"
-        )
+        assert handler._try_detect_event({"call_status": "dialed_on_customer_number"}) == "dialed"
 
     def test_returns_none_for_unrecognised_payload(self):
         handler = _make_handler()
@@ -1034,9 +872,7 @@ class TestPersistCdr:
         result = await handler._persist_cdr(existing, {"call_id": "call-123"}, {})
 
         assert result == "updated"
-        handler.call_repository.update_cdr.assert_called_once_with(
-            "mongo-id-001", {"call_id": "call-123"}
-        )
+        handler.call_repository.update_cdr.assert_called_once_with("mongo-id-001", {"call_id": "call-123"})
 
     @pytest.mark.asyncio
     async def test_returns_update_failed_when_update_cdr_returns_false(self):
@@ -1053,7 +889,7 @@ class TestPersistCdr:
         handler = _make_handler()
         handler.call_repository.insert_cdr = AsyncMock()
 
-        final_data: Dict[str, Any] = {}
+        final_data: dict[str, Any] = {}
         await handler._persist_cdr(None, final_data, {"uuid": "u", "billsec": 10})
 
         assert final_data["action"] == "dialer_hangup"
@@ -1063,7 +899,7 @@ class TestPersistCdr:
         handler = _make_handler()
         handler.call_repository.insert_cdr = AsyncMock()
 
-        final_data: Dict[str, Any] = {}
+        final_data: dict[str, Any] = {}
         await handler._persist_cdr(None, final_data, {})
 
         assert final_data["action"] == "dialer_event"
@@ -1073,7 +909,7 @@ class TestPersistCdr:
         handler = _make_handler()
         handler.call_repository.insert_cdr = AsyncMock()
 
-        final_data: Dict[str, Any] = {}
+        final_data: dict[str, Any] = {}
         await handler._persist_cdr(None, final_data, {})
 
         assert final_data.get("created_at") == 1722945600
@@ -1083,7 +919,7 @@ class TestPersistCdr:
         handler = _make_handler()
         handler.call_repository.insert_cdr = AsyncMock()
 
-        final_data: Dict[str, Any] = {"call_id": "123"}
+        final_data: dict[str, Any] = {"call_id": "123"}
         await handler._persist_cdr(None, final_data, {"disposition": "ANSWERED"})
 
         assert final_data["action"] == "dialer_disposition"
@@ -1094,9 +930,7 @@ class TestProcessCdrApiPayload:
     async def test_always_returns_not_supported(self):
         handler = _make_handler()
 
-        result = await handler.process_cdr_api_payload(
-            {"some": "data"}, call_id="c1", uuid="u1"
-        )
+        result = await handler.process_cdr_api_payload({"some": "data"}, call_id="c1", uuid="u1")
 
         assert result == {"status": "not_supported"}
         handler.logger.warning.assert_called()
@@ -1106,15 +940,8 @@ class TestProcessWebhookResponseFields:
     @pytest.mark.asyncio
     async def test_event_type_hangup_in_response(self):
         handler = _make_handler()
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value=_default_did_info()
-        )
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value=_default_maglo_response()
-        )
-        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(
-            return_value=None
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value=_default_did_info())
+        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(return_value=None)
         handler.call_repository.insert_cdr = AsyncMock()
 
         result = await handler.process_webhook(_base_payload(billsec=60))
@@ -1124,15 +951,8 @@ class TestProcessWebhookResponseFields:
     @pytest.mark.asyncio
     async def test_event_type_unknown_when_not_detectable(self):
         handler = _make_handler()
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value=_default_did_info()
-        )
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value=_default_maglo_response()
-        )
-        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(
-            return_value=None
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value=_default_did_info())
+        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(return_value=None)
         handler.call_repository.insert_cdr = AsyncMock()
 
         result = await handler.process_webhook(_base_payload())
@@ -1142,15 +962,8 @@ class TestProcessWebhookResponseFields:
     @pytest.mark.asyncio
     async def test_call_id_falls_back_to_uuid(self):
         handler = _make_handler()
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value=_default_did_info()
-        )
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value=_default_maglo_response()
-        )
-        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(
-            return_value=None
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value=_default_did_info())
+        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(return_value=None)
         handler.call_repository.insert_cdr = AsyncMock()
 
         payload = _base_payload()
@@ -1165,15 +978,8 @@ class TestSoftphoneDetection:
     @pytest.mark.asyncio
     async def test_extension_c2c_sets_soft_phone_outbound_type(self):
         handler = _make_handler()
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value=_default_did_info()
-        )
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value=_default_maglo_response()
-        )
-        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(
-            return_value=None
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value=_default_did_info())
+        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(return_value=None)
         handler.call_repository.insert_cdr = AsyncMock()
 
         await handler.process_webhook(_base_payload(extension_c2c="9999999999"))
@@ -1184,15 +990,8 @@ class TestSoftphoneDetection:
     @pytest.mark.asyncio
     async def test_no_extension_c2c_sets_phone_number_outbound_type(self):
         handler = _make_handler()
-        handler.did_management_service.get_dids_by_number = AsyncMock(
-            return_value=_default_did_info()
-        )
-        handler.maglo_client.upsert_ivr_lead = AsyncMock(
-            return_value=_default_maglo_response()
-        )
-        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(
-            return_value=None
-        )
+        handler.did_management_service.get_dids_by_number = AsyncMock(return_value=_default_did_info())
+        handler.call_repository.get_cdr_by_call_id_or_uuid = AsyncMock(return_value=None)
         handler.call_repository.insert_cdr = AsyncMock()
 
         await handler.process_webhook(_base_payload())
@@ -1202,6 +1001,8 @@ class TestSoftphoneDetection:
 
 
 class TestAgentResolutionEdgeCases:
+    """External console lookup removed — resolution always returns None."""
+
     @pytest.mark.asyncio
     async def test_resolve_agent_with_empty_phone_returns_none(self):
         handler = _make_handler()
@@ -1211,42 +1012,26 @@ class TestAgentResolutionEdgeCases:
     @pytest.mark.asyncio
     async def test_resolve_agent_api_exception_returns_none(self):
         handler = _make_handler()
-        handler.maglo_client.get_agent_by_ivr_phone = AsyncMock(
-            side_effect=Exception("API Down")
-        )
         result = await handler._resolve_agent_from_ivr_phone(100, "9988776655")
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_resolve_agent_returns_int_on_success(self):
-        """
-        Mock _resolve_agent_from_ivr_phone directly — TalkoConsoleApiConstants.FIELD_AGENT_ID
-        is an opaque constant so we cannot reliably mock the response dict key.
-        The integration between the constant and maglo_client is tested separately.
-        """
+    async def test_resolve_agent_returns_none_without_external_lookup(self):
         handler = _make_handler()
-        handler._resolve_agent_from_ivr_phone = AsyncMock(return_value=555)
         result = await handler._resolve_agent_from_ivr_phone(100, "9988776655")
-        assert result == 555
-        assert isinstance(result, int)
+        assert result is None
 
     @pytest.mark.asyncio
     async def test_resolve_agent_returns_none_when_no_agent_in_response(self):
         handler = _make_handler()
-        # Patch maglo so get_agent_by_ivr_phone returns empty dict →
-        # agent_data.get(FIELD_AGENT_ID) is None → returns None
-        handler.maglo_client.get_agent_by_ivr_phone = AsyncMock(return_value={})
         result = await handler._resolve_agent_from_ivr_phone(100, "9988776655")
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_resolve_agent_normalizes_phone_to_e164_before_lookup(self):
-        """The ivr_phone sent to the console API must start with '+'."""
+    async def test_resolve_agent_still_normalizes_phone(self):
+        """Normalization is preserved even though lookup is gone."""
         handler = _make_handler()
-        handler.maglo_client.get_agent_by_ivr_phone = AsyncMock(return_value={})
 
-        await handler._resolve_agent_from_ivr_phone(100, "9988776655")
+        result = await handler._resolve_agent_from_ivr_phone(100, "9988776655")
 
-        call_kwargs = handler.maglo_client.get_agent_by_ivr_phone.call_args[1]
-        ivr_phone = call_kwargs.get("ivr_phone", "")
-        assert ivr_phone.startswith("+")
+        assert result is None

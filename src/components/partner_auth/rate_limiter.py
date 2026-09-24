@@ -22,17 +22,13 @@ class TalkoPartnerApiKeyRateLimiter:
 
     async def check(self, partner_id: int) -> bool:
         window = int(time.time()) // RATE_LIMIT_WINDOW_SECONDS
-        key = "partner_rl:{}:{}".format(partner_id, window)
+        key = f"partner_rl:{partner_id}:{window}"
         count = await self.__cache_helper.incr_with_ttl(
             key,
             ttl_seconds=RATE_LIMIT_WINDOW_SECONDS,
             prefix=TalkoRedisCache.KeysPrefix.TALKO,
         )
         if count is None:
-            self.__logger.error(
-                "Rate limit check failed for partner_id {}; failing open".format(
-                    partner_id
-                )
-            )
+            self.__logger.error(f"Rate limit check failed for partner_id {partner_id}; failing open")
             return True
         return count <= RATE_LIMIT_MAX_REQUESTS_PER_WINDOW

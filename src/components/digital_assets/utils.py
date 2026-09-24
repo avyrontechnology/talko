@@ -1,7 +1,8 @@
-from src.components.digital_assets.constants import TalkoDigitalAssetEnum
-from src.components.digital_assets.logger_adapter import TalkoLoggerAdapter
+import logging
 
-logger = TalkoLoggerAdapter().get_logger()
+from src.components.digital_assets.constants import TalkoDigitalAssetEnum
+
+logger = logging.getLogger(__name__)
 
 
 class TalkoDigitalAssetUtils:
@@ -22,7 +23,5 @@ class TalkoDigitalAssetUtils:
         """
 
         is_valid = asset_type in TalkoDigitalAssetEnum.__members__
-        logger.info(
-            "Validating asset type: {}. Result: {}".format(asset_type, is_valid)
-        )
+        logger.info(f"Validating asset type: {asset_type}. Result: {is_valid}")
         return is_valid

@@ -1,8 +1,8 @@
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import jwt
 
@@ -15,12 +15,8 @@ _JWT_ALGO = "HS256"
 def hash_password(raw_password: str) -> str:
     """Hash a password with a random salt. Returns a PHC-style string."""
     salt = secrets.token_bytes(16)
-    digest = hashlib.pbkdf2_hmac(
-        _PBKDF2_ALGO, raw_password.encode("utf-8"), salt, _PBKDF2_ITERATIONS
-    )
-    return "pbkdf2-sha256${}${}${}".format(
-        _PBKDF2_ITERATIONS, salt.hex(), digest.hex()
-    )
+    digest = hashlib.pbkdf2_hmac(_PBKDF2_ALGO, raw_password.encode("utf-8"), salt, _PBKDF2_ITERATIONS)
+    return f"pbkdf2-sha256${_PBKDF2_ITERATIONS}${salt.hex()}${digest.hex()}"
 
 
 def verify_password(raw_password: str, password_hash: str) -> bool:
@@ -47,12 +43,12 @@ def mint_talko_token(
     user_id: str,
     email: str,
     role: str,
-    partner_id: Optional[int],
+    partner_id: int | None,
     ttl_hours: int = 72,
 ) -> str:
     """Mint a Talko-native JWT (distinguished from console JWTs by issuer)."""
-    now = datetime.now(timezone.utc)
-    claims: Dict[str, Any] = {
+    now = datetime.now(UTC)
+    claims: dict[str, Any] = {
         "iss": "talko",
         "sub": str(user_id),
         "email": email,
@@ -66,11 +62,14 @@ def mint_talko_token(
     return jwt.encode(claims, secret, algorithm=_JWT_ALGO)
 
 
-def verify_talko_token(secret: str, token: str) -> Optional[Dict[str, Any]]:
+def verify_talko_token(secret: str, token: str) -> dict[str, Any] | None:
     """Verify a Talko-native JWT. Returns claims, or None (never raises)."""
     try:
         claims = jwt.decode(
-            token, secret, algorithms=[_JWT_ALGO], issuer="talko",
+            token,
+            secret,
+            algorithms=[_JWT_ALGO],
+            issuer="talko",
             options={"require": ["exp", "iss", "sub"]},
         )
         return dict(claims)

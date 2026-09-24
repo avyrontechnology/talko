@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from src.components.cdr.constants import AGENT_STATUS_EXPR, LEAD_STATUS_EXPR
 from src.components.cdr.models import TalkoCDR
@@ -8,29 +8,21 @@ from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 class TalkoCDRRepository:
-    def __init__(
-        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
-    ):
+    def __init__(self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger):
         self.__db_manager = db_manager
         self.__logger = logger
 
     async def insert_cdr(self, cdr_dict: dict) -> str:
         try:
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
                 result: Any = await collection.insert_one(cdr_dict)
-                self.__logger.info(
-                    "Inserted TalkoCDR with ID: {}".format(result.inserted_id)
-                )
+                self.__logger.info(f"Inserted TalkoCDR with ID: {result.inserted_id}")
                 return str(result.inserted_id)
         except Exception as e:
-            self.__logger.error("Failed to insert TalkoCDR: {}".format(str(e)))
+            self.__logger.error(f"Failed to insert TalkoCDR: {str(e)}")
             raise
 
-    async def get_cdrs_by_criteria(
-        self, query: Dict, limit: Union[int, None] = None, skip: Union[int, None] = None
-    ) -> List[Dict]:
+    async def get_cdrs_by_criteria(self, query: dict, limit: int | None = None, skip: int | None = None) -> list[dict]:
         """
         Fetch CDRs matching the provided query criteria.
 
@@ -41,9 +33,7 @@ class TalkoCDRRepository:
             List[Dict]: List of TalkoCDR documents.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
                 cursor = collection.find(query)
 
                 # Optional pagination — used by batch processes only
@@ -53,24 +43,18 @@ class TalkoCDRRepository:
                     cursor = cursor.limit(limit)
 
                 to_list_limit = limit if limit else None
-                cdrs: List[Dict[str, Any]] = await cursor.to_list(to_list_limit)
-                self.__logger.info(
-                    "Fetched {} CDRs for query: {}".format(len(cdrs), query)
-                )
+                cdrs: list[dict[str, Any]] = await cursor.to_list(to_list_limit)
+                self.__logger.info(f"Fetched {len(cdrs)} CDRs for query: {query}")
                 return cdrs
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch CDRs for query {}: {}".format(query, str(e))
-            )
+            self.__logger.error(f"Failed to fetch CDRs for query {query}: {str(e)}")
             raise
 
     async def find_all_cdrs_on_the_basis_of_partner_id(
-        self, partner_id: int, offset: int, limit: int, created_at: Optional[int] = None
+        self, partner_id: int, offset: int, limit: int, created_at: int | None = None
     ) -> list[dict]:
         try:
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
                 skip_count: int = (offset - 1) * limit
 
                 # Base filter
@@ -80,18 +64,13 @@ class TalkoCDRRepository:
                 if created_at is not None:
                     query["created_at"] = {"$gt": created_at}
 
-                cursor: Optional[dict] = (
-                    collection.find(query)
-                    .skip(skip_count)
-                    .limit(limit)
-                    .max_time_ms(250000)
-                )
+                cursor: dict | None = collection.find(query).skip(skip_count).limit(limit).max_time_ms(250000)
                 results: list = []
                 async for cdr in cursor:
                     results.append(cdr)
                 return list(results)
         except Exception as e:
-            self.__logger.error("Failed to retrieve partner CDRs: {}".format(str(e)))
+            self.__logger.error(f"Failed to retrieve partner CDRs: {str(e)}")
             raise
 
     async def find_all_call_logs_on_the_basis_of_user_id(
@@ -101,16 +80,12 @@ class TalkoCDRRepository:
         offset,
         query,
         projection=None,
-        status_match: Optional[dict] = None,
+        status_match: dict | None = None,
     ):
         try:
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
                 self.__logger.debug(
-                    "Retrieving call logs for user_id: {}, query: {}, status_match: {}, limit: {}, offset: {}".format(
-                        user_id, query, status_match, limit, offset
-                    )
+                    f"Retrieving call logs for user_id: {user_id}, query: {query}, status_match: {status_match}, limit: {limit}, offset: {offset}"
                 )
                 skip_count = (offset - 1) * limit
 
@@ -151,62 +126,46 @@ class TalkoCDRRepository:
                     }
                 ]
 
-                facet_result = await collection.aggregate(
-                    facet_pipeline, allowDiskUse=True, maxTimeMS=250000
-                ).to_list(1)
+                facet_result = await collection.aggregate(facet_pipeline, allowDiskUse=True, maxTimeMS=250000).to_list(
+                    1
+                )
 
                 if not facet_result:
                     return [], 0
 
-                total_count = (
-                    facet_result[0]["count"][0]["total"]
-                    if facet_result[0]["count"]
-                    else 0
-                )
+                total_count = facet_result[0]["count"][0]["total"] if facet_result[0]["count"] else 0
                 results = facet_result[0]["data"]
 
-                self.__logger.debug(
-                    "Total count for query: {}, skip: {}, limit: {}".format(
-                        total_count, skip_count, limit
-                    )
-                )
+                self.__logger.debug(f"Total count for query: {total_count}, skip: {skip_count}, limit: {limit}")
 
                 if total_count > 0 and skip_count >= total_count:
-                    self.__logger.warning(
-                        "Offset {} exceeds total_count {}".format(offset, total_count)
-                    )
+                    self.__logger.warning(f"Offset {offset} exceeds total_count {total_count}")
 
                 return results, total_count
         except Exception as e:
-            self.__logger.error(
-                "Failed to retrieve agent CDRs: {}. Query: {}".format(str(e), query)
-            )
+            self.__logger.error(f"Failed to retrieve agent CDRs: {str(e)}. Query: {query}")
             raise
 
     async def find_one_cdr_by_identifier(
         self,
-        call_id: Optional[str] = None,
-        call_uuid: Optional[str] = None,
-        vendor_config_id: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        call_id: str | None = None,
+        call_uuid: str | None = None,
+        vendor_config_id: str | None = None,
+    ) -> dict[str, Any] | None:
         """
         Fetch a single TalkoCDR using call_id or call_uuid and return only
         fields required for CallRecordHistoryResponse.
         """
         try:
             if call_id is None and call_uuid is None:
-                self.__logger.error(
-                    "find_call_record_history_by_identifier requires call_id or call_uuid"
-                )
+                self.__logger.error("find_call_record_history_by_identifier requires call_id or call_uuid")
                 return None
 
-            query: Dict[str, Any] = {}
-            identifier_filters: List[Dict[str, Any]] = []
+            query: dict[str, Any] = {}
+            identifier_filters: list[dict[str, Any]] = []
 
             if call_id is not None:
-                identifier_filters.append(
-                    {"call_id": {"$regex": f"^{re.escape(call_id)}$", "$options": "i"}}
-                )
+                identifier_filters.append({"call_id": {"$regex": f"^{re.escape(call_id)}$", "$options": "i"}})
 
             if call_uuid is not None:
                 identifier_filters.append(
@@ -226,7 +185,7 @@ class TalkoCDRRepository:
             if vendor_config_id is not None:
                 query["vendor_config_id"] = vendor_config_id
 
-            projection: Dict[str, int] = {
+            projection: dict[str, int] = {
                 "_id": 0,
                 "partner_id": 1,
                 "agent": 1,
@@ -261,96 +220,70 @@ class TalkoCDRRepository:
                 "custom_fields": 1,
             }
 
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                cdr: Optional[Dict[str, Any]] = await collection.find_one(
-                    query, projection
-                )
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                cdr: dict[str, Any] | None = await collection.find_one(query, projection)
 
-            self.__logger.info(
-                "Fetched call record history by identifier. query: {}".format(query)
-            )
+            self.__logger.info(f"Fetched call record history by identifier. query: {query}")
             return cdr
 
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch call record history by identifier: {}".format(str(e))
-            )
+            self.__logger.error(f"Failed to fetch call record history by identifier: {str(e)}")
             raise
 
-    async def update_one(self, filter_query: Dict, update_data: Dict) -> bool:
+    async def update_one(self, filter_query: dict, update_data: dict) -> bool:
         try:
             async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
                 result = await collection.update_one(filter_query, update_data)
                 self.__logger.info(
-                    "Updated TalkoCDR — matched: {}, modified: {}".format(
-                        result.matched_count, result.modified_count
-                    )
+                    f"Updated TalkoCDR — matched: {result.matched_count}, modified: {result.modified_count}"
                 )
                 return result.modified_count > 0
         except Exception as e:
-            self.__logger.error("Failed to update TalkoCDR: {}".format(str(e)))
+            self.__logger.error(f"Failed to update TalkoCDR: {str(e)}")
             raise
 
-    async def find_cdr_by_call_id(self, call_id: str) -> Optional[Dict[str, Any]]:
+    async def find_cdr_by_call_id(self, call_id: str) -> dict[str, Any] | None:
         """
         Fetch a single TalkoCDR by call_id for the purpose of setting custom
         field values (needs partner_id for tenant checks and the existing
         custom_fields map to merge into).
         """
         try:
-            projection: Dict[str, int] = {
+            projection: dict[str, int] = {
                 "_id": 1,
                 "call_id": 1,
                 "call_uuid": 1,
                 "partner_id": 1,
                 "custom_fields": 1,
             }
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                cdr: Optional[Dict[str, Any]] = await collection.find_one(
-                    {"call_id": call_id}, projection
-                )
-            self.__logger.info("Fetched TalkoCDR by call_id: {}".format(call_id))
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                cdr: dict[str, Any] | None = await collection.find_one({"call_id": call_id}, projection)
+            self.__logger.info(f"Fetched TalkoCDR by call_id: {call_id}")
             return cdr
         except Exception as e:
-            self.__logger.error(
-                "Failed to fetch TalkoCDR by call_id {}: {}".format(call_id, str(e))
-            )
+            self.__logger.error(f"Failed to fetch TalkoCDR by call_id {call_id}: {str(e)}")
             raise
 
     async def set_custom_field_values(
-        self, call_id: str, values: Dict[str, Any], updated_at: int
-    ) -> Optional[Dict[str, Any]]:
+        self, call_id: str, values: dict[str, Any], updated_at: int
+    ) -> dict[str, Any] | None:
         """
         Merge the given slug -> value pairs into the TalkoCDR's custom_fields map
         using dot-notation $set, and return the updated document.
         """
         try:
-            update_ops: Dict[str, Any] = {
-                "custom_fields.{}".format(slug): value for slug, value in values.items()
-            }
+            update_ops: dict[str, Any] = {f"custom_fields.{slug}": value for slug, value in values.items()}
             update_ops["updated_at"] = updated_at
 
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                result: Optional[Dict[str, Any]] = await collection.find_one_and_update(
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                result: dict[str, Any] | None = await collection.find_one_and_update(
                     {"call_id": call_id},
                     {"$set": update_ops},
                     projection={"_id": 1, "call_id": 1, "custom_fields": 1},
                     return_document=True,
                 )
-            self.__logger.info(
-                "Set custom field values for call_id {}: {}".format(call_id, values)
-            )
+            self.__logger.info(f"Set custom field values for call_id {call_id}: {values}")
             return result
         except Exception as e:
-            self.__logger.error(
-                "Failed to set custom field values for call_id {}: {}".format(
-                    call_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to set custom field values for call_id {call_id}: {str(e)}")
             raise

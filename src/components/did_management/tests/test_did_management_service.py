@@ -4,7 +4,6 @@ import pydantic
 import pytest
 from bson import ObjectId
 
-from src.components.common.responses import TalkoBadRequestResponse
 from src.components.did_management.constants import TalkoDIDStatus
 from src.components.did_management.dto import TalkoContract
 from src.components.did_management.helpers import TalkoDidStatusUpdateHelper
@@ -77,7 +76,6 @@ def _make_svc(logger=None, datetime_util=None):
 
 
 class TestAssignDid:
-
     @pytest.mark.asyncio
     async def test_assign_did_success(
         self,
@@ -157,9 +155,7 @@ class TestAssignDid:
         mock_logger.error.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_assign_did_already_exists(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_assign_did_already_exists(self, did_management_service, mock_did_repository, mock_logger):
         did_number = "12345"
         partner_id = 1
         vendor_id = "507f1f77bcf86cd799439011"
@@ -172,41 +168,28 @@ class TestAssignDid:
         mock_did_repository.find_did_attendance = AsyncMock(return_value=existing)
 
         with pytest.raises(ValueError, match="DID already exists"):
-            await did_management_service.assign_did(
-                100, did_number, partner_id, vendor_id, vendor_config_id
-            )
+            await did_management_service.assign_did(100, did_number, partner_id, vendor_id, vendor_config_id)
 
         mock_logger.info.assert_any_call(
-            "DID {} already assigned for vendor {} and partner {}".format(
-                did_number, vendor_id, partner_id
-            )
+            f"DID {did_number} already assigned for vendor {vendor_id} and partner {partner_id}"
         )
 
     @pytest.mark.asyncio
-    async def test_assign_did_failure(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_assign_did_failure(self, did_management_service, mock_did_repository, mock_logger):
         did_number = "12345"
         partner_id = 1
         vendor_id = "507f1f77bcf86cd799439011"
         vendor_config_id = "507f1f77bcf86cd799439012"
         mock_did_repository.find_did_attendance = AsyncMock(return_value=None)
-        mock_did_repository.insert_did_default_attendance = AsyncMock(
-            side_effect=Exception("Database error")
-        )
+        mock_did_repository.insert_did_default_attendance = AsyncMock(side_effect=Exception("Database error"))
 
         with pytest.raises(Exception, match="Database error"):
-            await did_management_service.assign_did(
-                100, did_number, partner_id, vendor_id, vendor_config_id
-            )
+            await did_management_service.assign_did(100, did_number, partner_id, vendor_id, vendor_config_id)
 
-        mock_logger.error.assert_called_with(
-            "Failed to assign DID {}: Database error".format(did_number)
-        )
+        mock_logger.error.assert_called_with(f"Failed to assign DID {did_number}: Database error")
 
 
 class TestUnassignDid:
-
     @pytest.mark.asyncio
     async def test_unassign_did_success(
         self,
@@ -218,77 +201,51 @@ class TestUnassignDid:
         did_number = "12345"
         partner_id = 1
         ts = mock_datetime_util.get_current_time.return_value
-        mock_did_repository.find_did_attendance = AsyncMock(
-            return_value={"did_number": did_number, "partner_id": partner_id}
-        )
-        mock_did_repository.delete_did_default_attendance = AsyncMock(return_value=True)
-        updated = {
-            "did_number": did_number,
-            "partner_id": partner_id,
-            "unassign_date": ts,
-        }
-        mock_did_repository.update_did_history = AsyncMock(return_value=updated)
+        updated = {"did_number": did_number, "partner_id": 0}
+        mock_did_repository.update_did_values = AsyncMock(return_value=updated)
+        mock_did_repository.update_did_history = AsyncMock(return_value={"unassign_date": ts})
 
         result = await did_management_service.unassign_did(did_number, partner_id)
 
-        mock_did_repository.find_did_attendance.assert_awaited_with(
-            did_number, partner_id
-        )
-        mock_did_repository.delete_did_default_attendance.assert_awaited_with(
-            did_number, partner_id
-        )
-        mock_did_repository.update_did_history.assert_awaited_with(
-            did_number, partner_id, {"unassign_date": ts}
-        )
+        assert mock_did_repository.update_did_values.await_count == 1
         assert result == updated
-        mock_logger.info.assert_any_call(
-            "Starting unassign_did with did_number: {}, partner_id: {}".format(
-                did_number, partner_id
-            )
+        mock_did_repository.update_did_history.assert_awaited_once_with(
+            did_number,
+            partner_id,
+            {"unassign_date": ts, "status": TalkoDIDStatus.AVAILABLE.value},
         )
-        mock_logger.info.assert_any_call(
-            "DID {} unassigned successfully".format(did_number)
-        )
+        mock_logger.info.assert_any_call(f"DID {did_number} unassigned successfully (reset to available)")
         mock_logger.error.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_unassign_did_not_found(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_unassign_did_not_found(self, did_management_service, mock_did_repository, mock_logger):
         did_number = "12345"
         partner_id = 1
-        mock_did_repository.find_did_attendance = AsyncMock(return_value=None)
+        mock_did_repository.update_did_values = AsyncMock(return_value=None)
 
-        with pytest.raises(TalkoResourceNotFound, match="DID attendance not found"):
+        with pytest.raises(
+            TalkoResourceNotFound,
+            match=f"DID {did_number} not found for partner {partner_id}",
+        ):
             await did_management_service.unassign_did(did_number, partner_id)
 
         mock_logger.error.assert_called_with(
-            "Failed to unassign DID {}: DID attendance not found".format(did_number)
+            f"Failed to unassign DID {did_number}: DID {did_number} not found for partner {partner_id}"
         )
 
     @pytest.mark.asyncio
-    async def test_unassign_did_failure(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_unassign_did_failure(self, did_management_service, mock_did_repository, mock_logger):
         did_number = "12345"
         partner_id = 1
-        mock_did_repository.find_did_attendance = AsyncMock(
-            return_value={"did_number": did_number, "partner_id": partner_id}
-        )
-        mock_did_repository.delete_did_default_attendance = AsyncMock(
-            side_effect=Exception("Database error")
-        )
+        mock_did_repository.update_did_values = AsyncMock(side_effect=Exception("Database error"))
 
         with pytest.raises(Exception, match="Database error"):
             await did_management_service.unassign_did(did_number, partner_id)
 
-        mock_logger.error.assert_called_with(
-            "Failed to unassign DID {}: Database error".format(did_number)
-        )
+        mock_logger.error.assert_called_with(f"Failed to unassign DID {did_number}: Database error")
 
 
 class TestUpdateDidStatus:
-
     @pytest.mark.asyncio
     async def test_update_did_status_success(self, did_management_service, mock_logger):
         vendor_id = ObjectId()
@@ -299,43 +256,26 @@ class TestUpdateDidStatus:
             vendor_id, ["12345"], ["67890"], ["54321"], ["98765"], 1_631_234_567_890
         )
 
-        did_management_service.assign_did.assert_awaited_once_with(
-            0, "98765", 1, str(vendor_id)
-        )
+        did_management_service.assign_did.assert_awaited_once_with(0, "98765", 1, str(vendor_id))
         did_management_service.unassign_did.assert_awaited_once_with("54321", 1)
-        mock_logger.info.assert_any_call(
-            "Starting update_did_status for vendor_id: {}".format(vendor_id)
-        )
-        mock_logger.info.assert_any_call(
-            "DID status updated successfully for vendor {}".format(vendor_id)
-        )
+        mock_logger.info.assert_any_call(f"Starting update_did_status for vendor_id: {vendor_id}")
+        mock_logger.info.assert_any_call(f"DID status updated successfully for vendor {vendor_id}")
         mock_logger.error.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_update_did_status_failure(self, did_management_service, mock_logger):
         vendor_id = ObjectId()
-        did_management_service.assign_did = AsyncMock(
-            side_effect=Exception("Database error")
-        )
+        did_management_service.assign_did = AsyncMock(side_effect=Exception("Database error"))
 
         with pytest.raises(Exception, match="Database error"):
-            await did_management_service.update_did_status(
-                vendor_id, [], [], [], ["98765"], 1_631_234_567_890
-            )
+            await did_management_service.update_did_status(vendor_id, [], [], [], ["98765"], 1_631_234_567_890)
 
-        mock_logger.error.assert_called_with(
-            "Failed to update DID status for vendor {}: Database error".format(
-                vendor_id
-            )
-        )
+        mock_logger.error.assert_called_with(f"Failed to update DID status for vendor {vendor_id}: Database error")
 
 
 class TestGetDids:
-
     @pytest.mark.asyncio
-    async def test_get_assigned_dids_success(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_get_assigned_dids_success(self, did_management_service, mock_did_repository, mock_logger):
         vendor_id = ObjectId()
         mock_did_repository.get_assigned_dids = AsyncMock(return_value=["12345"])
         result = await did_management_service.get_assigned_dids(vendor_id)
@@ -344,26 +284,18 @@ class TestGetDids:
         mock_logger.error.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_get_assigned_dids_failure(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_get_assigned_dids_failure(self, did_management_service, mock_did_repository, mock_logger):
         """Covers lines 235-241."""
         vendor_id = ObjectId()
-        mock_did_repository.get_assigned_dids = AsyncMock(
-            side_effect=Exception("DB error")
-        )
+        mock_did_repository.get_assigned_dids = AsyncMock(side_effect=Exception("DB error"))
 
         with pytest.raises(Exception, match="DB error"):
             await did_management_service.get_assigned_dids(vendor_id)
 
-        mock_logger.error.assert_called_with(
-            "Failed to retrieve assigned DIDs for vendor {}: DB error".format(vendor_id)
-        )
+        mock_logger.error.assert_called_with(f"Failed to retrieve assigned DIDs for vendor {vendor_id}: DB error")
 
     @pytest.mark.asyncio
-    async def test_get_available_dids_success(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_get_available_dids_success(self, did_management_service, mock_did_repository, mock_logger):
         vendor_id = ObjectId()
         mock_did_repository.get_available_dids = AsyncMock(return_value=["12345"])
         result = await did_management_service.get_available_dids(vendor_id)
@@ -372,27 +304,18 @@ class TestGetDids:
         mock_logger.error.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_get_available_dids_failure(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_get_available_dids_failure(self, did_management_service, mock_did_repository, mock_logger):
         """Covers lines 263-269."""
         vendor_id = ObjectId()
-        mock_did_repository.get_available_dids = AsyncMock(
-            side_effect=Exception("DB error")
-        )
+        mock_did_repository.get_available_dids = AsyncMock(side_effect=Exception("DB error"))
 
         with pytest.raises(Exception, match="DB error"):
             await did_management_service.get_available_dids(vendor_id)
 
-        mock_logger.error.assert_called_with(
-            "Failed to retrieve available DIDs for vendor {}: DB error".format(
-                vendor_id
-            )
-        )
+        mock_logger.error.assert_called_with(f"Failed to retrieve available DIDs for vendor {vendor_id}: DB error")
 
 
 class TestUpdateDid:
-
     _did = "12345"
     _vid = "507f1f77bcf86cd799439011"
     _vcid = "507f1f77bcf86cd799439012"
@@ -452,9 +375,7 @@ class TestUpdateDid:
             "updated_at": ANY,
             "unassign_date": None,
         }
-        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(
-            return_value=existing_did
-        )
+        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(return_value=existing_did)
         mock_did_repository.update_did_attendance = AsyncMock(return_value=updated_did)
         mock_did_repository.insert_did_history = AsyncMock(return_value=None)
 
@@ -467,39 +388,27 @@ class TestUpdateDid:
             vendor_config_id=vendor_config_id_obj,
         )
 
-        mock_did_repository.update_did_attendance.assert_awaited_with(
-            did_number, partner_id, expected_update_data
-        )
+        mock_did_repository.update_did_attendance.assert_awaited_with(did_number, partner_id, expected_update_data)
         mock_did_repository.insert_did_history.assert_awaited_with(history_data)
         assert result == updated_did
         mock_logger.info.assert_any_call(
-            "Starting update_did for did_number: {}, partner_id: {}, vendor_id: {}, "
-            "workspace_id: {}, agent_id: {}".format(
-                did_number, partner_id, vendor_id, workspace_id, agent_id
-            )
+            f"Starting update_did for did_number: {did_number}, partner_id: {partner_id}, vendor_id: {vendor_id}, "
+            f"workspace_id: {workspace_id}, agent_id: {agent_id}"
         )
-        mock_logger.info.assert_any_call(
-            "DID {} updated successfully".format(did_number)
-        )
+        mock_logger.info.assert_any_call(f"DID {did_number} updated successfully")
         mock_logger.error.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_update_did_not_found(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_update_did_not_found(self, did_management_service, mock_did_repository, mock_logger):
         did_number = self._did
         vendor_id = self._vid
-        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(
-            return_value=None
-        )
+        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(return_value=None)
 
         with pytest.raises(TalkoResourceNotFound):
             await did_management_service.update_did(did_number, vendor_id, 1)
 
         mock_logger.error.assert_called_with(
-            "Failed to update DID {}: DID {} not found for the specified vendor".format(
-                did_number, did_number
-            )
+            f"Failed to update DID {did_number}: DID {did_number} not found for the specified vendor"
         )
 
     @pytest.mark.asyncio
@@ -528,9 +437,7 @@ class TestUpdateDid:
         expected_update_data = {"status": TalkoDIDStatus.MAPPED.value}
         updated_did = {**existing_did, **expected_update_data}
 
-        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(
-            return_value=existing_did
-        )
+        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(return_value=existing_did)
         mock_did_repository.update_did_attendance = AsyncMock(return_value=updated_did)
         mock_did_repository.insert_did_history = AsyncMock(return_value=None)
 
@@ -541,9 +448,7 @@ class TestUpdateDid:
             vendor_config_id=vendor_config_id_obj,
         )
 
-        mock_did_repository.update_did_attendance.assert_awaited_with(
-            did_number, partner_id, expected_update_data
-        )
+        mock_did_repository.update_did_attendance.assert_awaited_with(did_number, partner_id, expected_update_data)
         assert result == updated_did
         mock_logger.error.assert_not_called()
 
@@ -574,9 +479,7 @@ class TestUpdateDid:
         expected_update_data = {"status": TalkoDIDStatus.MAPPED.value}
         updated_did = {**existing_did, **expected_update_data}
 
-        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(
-            return_value=existing_did
-        )
+        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(return_value=existing_did)
         mock_did_repository.update_did_attendance = AsyncMock(return_value=updated_did)
         mock_did_repository.insert_did_history = AsyncMock(return_value=None)
 
@@ -587,9 +490,7 @@ class TestUpdateDid:
             vendor_config_id=vendor_config_id_obj,
         )
 
-        mock_did_repository.update_did_attendance.assert_awaited_with(
-            did_number, partner_id, expected_update_data
-        )
+        mock_did_repository.update_did_attendance.assert_awaited_with(did_number, partner_id, expected_update_data)
         assert result == updated_did
         mock_logger.error.assert_not_called()
 
@@ -621,31 +522,17 @@ class TestUpdateDid:
             "updated_at": ts,
             "status": TalkoDIDStatus.MAPPED.value,
         }
-        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(
-            return_value=existing_did
-        )
+        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(return_value=existing_did)
         mock_did_repository.update_did_attendance = AsyncMock(return_value=None)
 
-        with pytest.raises(
-            TalkoResourceNotFound, match="Failed to update DID {}".format(did_number)
-        ):
-            await did_management_service.update_did(
-                did_number, vendor_id, partner_id, workspace_id=workspace_id
-            )
+        with pytest.raises(TalkoResourceNotFound, match=f"Failed to update DID {did_number}"):
+            await did_management_service.update_did(did_number, vendor_id, partner_id, workspace_id=workspace_id)
 
-        mock_did_repository.update_did_attendance.assert_awaited_with(
-            did_number, partner_id, expected_update_data
-        )
-        mock_logger.error.assert_called_with(
-            "Failed to update DID {}: Failed to update DID {}".format(
-                did_number, did_number
-            )
-        )
+        mock_did_repository.update_did_attendance.assert_awaited_with(did_number, partner_id, expected_update_data)
+        mock_logger.error.assert_called_with(f"Failed to update DID {did_number}: Failed to update DID {did_number}")
 
     @pytest.mark.asyncio
-    async def test_update_did_failure(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_update_did_failure(self, did_management_service, mock_did_repository, mock_logger):
         did_number = self._did
         vendor_id = self._vid
         vendor_id_obj = ObjectId(vendor_id)
@@ -657,38 +544,25 @@ class TestUpdateDid:
             "workspace_id": None,
             "agent_id": None,
         }
-        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(
-            return_value=existing_did
-        )
-        mock_did_repository.update_did_attendance = AsyncMock(
-            side_effect=Exception("Database error")
-        )
+        mock_did_repository.find_did_by_did_number_and_vendor_id = AsyncMock(return_value=existing_did)
+        mock_did_repository.update_did_attendance = AsyncMock(side_effect=Exception("Database error"))
 
         with pytest.raises(Exception, match="Database error"):
             await did_management_service.update_did(did_number, vendor_id, 1)
 
-        mock_logger.error.assert_called_with(
-            "Failed to update DID {}: Database error".format(did_number)
-        )
+        mock_logger.error.assert_called_with(f"Failed to update DID {did_number}: Database error")
 
 
 class TestGetDidsByPartner:
-
     _vid = "507f1f77bcf86cd799439011"
 
     @pytest.mark.asyncio
     async def test_get_dids_by_partner_and_vendor_success(
         self, did_management_service, mock_did_repository, mock_logger
     ):
-        mock_did_repository.get_dids_by_partner_and_vendor = AsyncMock(
-            return_value=["12345"]
-        )
-        result = await did_management_service.get_dids_by_partner_and_vendor(
-            1, self._vid
-        )
-        mock_did_repository.get_dids_by_partner_and_vendor.assert_awaited_with(
-            1, ObjectId(self._vid)
-        )
+        mock_did_repository.get_dids_by_partner_and_vendor = AsyncMock(return_value=["12345"])
+        result = await did_management_service.get_dids_by_partner_and_vendor(1, self._vid)
+        mock_did_repository.get_dids_by_partner_and_vendor.assert_awaited_with(1, ObjectId(self._vid))
         assert result == ["12345"]
         mock_logger.error.assert_not_called()
 
@@ -697,9 +571,7 @@ class TestGetDidsByPartner:
         self, did_management_service, mock_did_repository, mock_logger
     ):
         """Covers lines 422-428."""
-        mock_did_repository.get_dids_by_partner_and_vendor = AsyncMock(
-            side_effect=Exception("DB error")
-        )
+        mock_did_repository.get_dids_by_partner_and_vendor = AsyncMock(side_effect=Exception("DB error"))
         with pytest.raises(Exception, match="DB error"):
             await did_management_service.get_dids_by_partner_and_vendor(1, self._vid)
         mock_logger.error.assert_called_once()
@@ -709,16 +581,10 @@ class TestGetDidsByPartner:
     async def test_get_dids_by_partner_workspace_success(
         self, did_management_service, mock_did_repository, mock_logger
     ):
-        mock_did_repository.get_dids_by_partner_workspace_and_vendor = AsyncMock(
-            return_value=["12345"]
-        )
-        result = (
-            await did_management_service.get_dids_by_partner_workspace_and_vendor(
-                1, 100, self._vid
-            )
-        )
+        mock_did_repository.get_dids_by_partner_workspace_and_vendor = AsyncMock(return_value=["12345"])
+        result = await did_management_service.get_dids_by_partner_workspace_and_vendor(1, 100, self._vid)
         mock_did_repository.get_dids_by_partner_workspace_and_vendor.assert_awaited_with(
-            1, 100, ObjectId(self._vid)
+            1, 100, ObjectId(self._vid), None
         )
         assert result == ["12345"]
 
@@ -727,25 +593,17 @@ class TestGetDidsByPartner:
         self, did_management_service, mock_did_repository, mock_logger
     ):
         """Covers lines 456-462."""
-        mock_did_repository.get_dids_by_partner_workspace_and_vendor = AsyncMock(
-            side_effect=Exception("DB error")
-        )
+        mock_did_repository.get_dids_by_partner_workspace_and_vendor = AsyncMock(side_effect=Exception("DB error"))
         with pytest.raises(Exception, match="DB error"):
-            await did_management_service.get_dids_by_partner_workspace_and_vendor(
-                1, 100, self._vid
-            )
+            await did_management_service.get_dids_by_partner_workspace_and_vendor(1, 100, self._vid)
         mock_logger.error.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_dids_by_partner_agent_workspace_success(
         self, did_management_service, mock_did_repository, mock_logger
     ):
-        mock_did_repository.get_dids_by_partner_agent_workspace_and_vendor = (
-            AsyncMock(return_value=["12345"])
-        )
-        result = await did_management_service.get_dids_by_partner_agent_workspace_and_vendor(
-            1, 200, 100, self._vid
-        )
+        mock_did_repository.get_dids_by_partner_agent_workspace_and_vendor = AsyncMock(return_value=["12345"])
+        result = await did_management_service.get_dids_by_partner_agent_workspace_and_vendor(1, 200, 100, self._vid)
         mock_did_repository.get_dids_by_partner_agent_workspace_and_vendor.assert_awaited_with(
             1, 200, 100, ObjectId(self._vid)
         )
@@ -756,22 +614,17 @@ class TestGetDidsByPartner:
         self, did_management_service, mock_did_repository, mock_logger
     ):
         """Covers lines 468-486."""
-        mock_did_repository.get_dids_by_partner_agent_workspace_and_vendor = (
-            AsyncMock(side_effect=Exception("DB error"))
+        mock_did_repository.get_dids_by_partner_agent_workspace_and_vendor = AsyncMock(
+            side_effect=Exception("DB error")
         )
         with pytest.raises(Exception, match="DB error"):
-            await did_management_service.get_dids_by_partner_agent_workspace_and_vendor(
-                1, 200, 100, self._vid
-            )
+            await did_management_service.get_dids_by_partner_agent_workspace_and_vendor(1, 200, 100, self._vid)
         mock_logger.error.assert_called_once()
 
 
 class TestGetDidsByNumber:
-
     @pytest.mark.asyncio
-    async def test_success(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_success(self, did_management_service, mock_did_repository, mock_logger):
         number = "+919876543210"
         doc = {"did_number": number}
         mock_did_repository.get_did_by_number = AsyncMock(return_value=doc)
@@ -783,29 +636,20 @@ class TestGetDidsByNumber:
         mock_logger.error.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_failure(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_failure(self, did_management_service, mock_did_repository, mock_logger):
         """Covers get_dids_by_number exception path."""
         number = "+919876543210"
-        mock_did_repository.get_did_by_number = AsyncMock(
-            side_effect=Exception("DB error")
-        )
+        mock_did_repository.get_did_by_number = AsyncMock(side_effect=Exception("DB error"))
 
         with pytest.raises(Exception, match="DB error"):
             await did_management_service.get_dids_by_number(number)
 
-        mock_logger.error.assert_called_with(
-            "Failed to retrieve DIDs for call_to_number {}: DB error".format(number)
-        )
+        mock_logger.error.assert_called_with(f"Failed to retrieve DIDs for call_to_number {number}: DB error")
 
 
 @pytest.mark.asyncio
 class TestGetDidsByWorkspace:
-
-    async def test_success(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_success(self, did_management_service, mock_did_repository, mock_logger):
         vendor_id = ObjectId()
         mock_did_repository.get_dids_by_workspace = AsyncMock(
             return_value=[
@@ -830,24 +674,16 @@ class TestGetDidsByWorkspace:
         mock_did_repository.get_dids_by_workspace = AsyncMock(return_value=[])
         assert await did_management_service.get_dids_by_workspace(999) == []
 
-    async def test_exception(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_exception(self, did_management_service, mock_did_repository, mock_logger):
         sb_id = 789
-        mock_did_repository.get_dids_by_workspace = AsyncMock(
-            side_effect=Exception("DB fail")
-        )
+        mock_did_repository.get_dids_by_workspace = AsyncMock(side_effect=Exception("DB fail"))
         with pytest.raises(Exception, match="DB fail"):
             await did_management_service.get_dids_by_workspace(sb_id)
         mock_logger.error.assert_called_once()
-        assert (
-            "Error fetching DIDs for workspace {}".format(sb_id)
-            in mock_logger.error.call_args[0][0]
-        )
+        assert f"Error fetching DIDs for workspace {sb_id}" in mock_logger.error.call_args[0][0]
 
 
 class TestExtractSeriesKey:
-
     def test_exactly_10_digits(self, did_management_service, mock_logger):
         assert did_management_service.extract_series_key("9876543210") == "98"
         mock_logger.debug.assert_called_with("Length of did_number : 9876543210 is 10")
@@ -855,33 +691,23 @@ class TestExtractSeriesKey:
     def test_more_than_10_with_plus(self, did_management_service, mock_logger):
         did = "+919876543210"
         assert did_management_service.extract_series_key(did) == "98"
-        mock_logger.debug.assert_called_with(
-            "Length of did_number : {} is > 10 and it contains + in the starting".format(
-                did
-            )
-        )
+        mock_logger.debug.assert_called_with(f"Length of did_number : {did} is > 10 and it contains + in the starting")
 
     def test_more_than_10_without_plus(self, did_management_service, mock_logger):
         did = "919876543210"
         assert did_management_service.extract_series_key(did) == "98"
         mock_logger.debug.assert_called_with(
-            "Length of did_number : {} is > 10 and it does not contains + in the starting".format(
-                did
-            )
+            f"Length of did_number : {did} is > 10 and it does not contains + in the starting"
         )
 
     def test_short_number_fallback(self, did_management_service, mock_logger):
         assert did_management_service.extract_series_key("1234") == "34"
-        mock_logger.debug.assert_called_with(
-            "Returning to Fallback case in extract series key"
-        )
+        mock_logger.debug.assert_called_with("Returning to Fallback case in extract series key")
 
     def test_very_short_fallback_empty(self, did_management_service, mock_logger):
         """Covers 604-607: fallback path returns empty string for len < 4."""
         assert did_management_service.extract_series_key("12") == ""
-        mock_logger.debug.assert_called_with(
-            "Returning to Fallback case in extract series key"
-        )
+        mock_logger.debug.assert_called_with("Returning to Fallback case in extract series key")
 
     def test_plus_with_hyphen(self, did_management_service, mock_logger):
         did = "+91-9876543210"
@@ -891,26 +717,19 @@ class TestExtractSeriesKey:
 
 @pytest.mark.asyncio
 class TestGetDidsAvailableForAssignment:
-
-    async def test_success(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_success(self, did_management_service, mock_did_repository, mock_logger):
         vendor_id = ObjectId()
         did_management_service._TalkoDidManagementService__partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value={"vendor_id": str(vendor_id)}
         )
-        did_management_service.get_available_dids = AsyncMock(
-            return_value=["12345", "67890"]
-        )
+        did_management_service.get_available_dids = AsyncMock(return_value=["12345", "67890"])
         mock_did_repository.get_details_by_dids = AsyncMock(
             return_value=[
                 {"did_number": "12345", "instance_id": "inst1"},
                 {"did_number": "67890", "instance_id": "inst2"},
             ]
         )
-        did_management_service._TalkoDidManagementService__did_repository = (
-            mock_did_repository
-        )
+        did_management_service._TalkoDidManagementService__did_repository = mock_did_repository
 
         result = await did_management_service.get_dids_available_for_assignment(1)
 
@@ -918,9 +737,7 @@ class TestGetDidsAvailableForAssignment:
         for sr in result:
             assert isinstance(sr, TalkoContract.DIDSeriesResponse)
             assert sr.count == len(sr.dids)
-        mock_logger.info.assert_any_call(
-            "Successfully grouped and retrieved DIDs for partner_id: 1"
-        )
+        mock_logger.info.assert_any_call("Successfully grouped and retrieved DIDs for partner_id: 1")
 
     async def test_no_dids(self, did_management_service):
         did_management_service._TalkoDidManagementService__partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
@@ -938,9 +755,7 @@ class TestGetDidsAvailableForAssignment:
             await did_management_service.get_dids_available_for_assignment(99)
 
         mock_logger.error.assert_any_call(
-            "Error in retrieving free DIDs: PartnerConfig not found: {}".format(
-                PARTNER_CONFIG_NOT_FOUND
-            )
+            f"Error in retrieving free DIDs: PartnerConfig not found: {PARTNER_CONFIG_NOT_FOUND}"
         )
 
     async def test_repo_exception(self, did_management_service, mock_logger):
@@ -954,7 +769,6 @@ class TestGetDidsAvailableForAssignment:
 
 @pytest.mark.asyncio
 class TestAssignDidsAvailableForAssignment:
-
     _vid = "507f1f77bcf86cd799439011"
 
     def _config(self, *, rr=False, sb=False, am=False):
@@ -973,15 +787,11 @@ class TestAssignDidsAvailableForAssignment:
         did_management_service.update_did = AsyncMock()
         data = TalkoContract.AssignDIDToPartner(dids_for_round_robin=["123", "456"])
 
-        result = await did_management_service.assign_dids_available_for_assignment(
-            1, data
-        )
+        result = await did_management_service.assign_dids_available_for_assignment(1, data)
 
         assert result == {"message": "Successfully assigned DIDs to the Partner"}
         assert did_management_service.update_did.await_count == 2
-        mock_logger.info.assert_any_call(
-            "Successfully grouped and assigned DIDs for partner_id: 1"
-        )
+        mock_logger.info.assert_any_call("Successfully grouped and assigned DIDs for partner_id: 1")
 
     async def test_workspace_success(self, did_management_service):
         did_management_service._TalkoDidManagementService__partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
@@ -989,15 +799,9 @@ class TestAssignDidsAvailableForAssignment:
         )
         did_management_service.update_did = AsyncMock()
         data = TalkoContract.AssignDIDToPartner(
-            dids_for_workspace=[
-                TalkoContract.WorkspaceDIDMapping(
-                    workspace_id=100, did_numbers=["123", "456"]
-                )
-            ]
+            dids_for_workspace=[TalkoContract.WorkspaceDIDMapping(workspace_id=100, did_numbers=["123", "456"])]
         )
-        result = await did_management_service.assign_dids_available_for_assignment(
-            2, data
-        )
+        result = await did_management_service.assign_dids_available_for_assignment(2, data)
         assert result == {"message": "Successfully assigned DIDs to the Partner"}
         assert did_management_service.update_did.await_count == 2
 
@@ -1008,13 +812,9 @@ class TestAssignDidsAvailableForAssignment:
             return_value=cfg
         )
         did_management_service.update_did = AsyncMock()
-        data = TalkoContract.AssignDIDToPartner(
-            dids_for_agent_mapping=[{"agent_id": "1", "did_number": "123"}]
-        )
+        data = TalkoContract.AssignDIDToPartner(dids_for_agent_mapping=[{"agent_id": "1", "did_number": "123"}])
 
-        result = await did_management_service.assign_dids_available_for_assignment(
-            3, data
-        )
+        result = await did_management_service.assign_dids_available_for_assignment(3, data)
 
         assert result == {"message": "Successfully assigned DIDs to the Partner"}
         did_management_service.update_did.assert_awaited_once_with(
@@ -1027,14 +827,12 @@ class TestAssignDidsAvailableForAssignment:
         )
 
     async def test_no_criteria_returns_bad_request(self, did_management_service):
-        """Covers lines 514, 516 — all enable_* False → returns TalkoBadRequestResponse."""
+        """Covers all enable_* False → raises ValueError (400 at controller)."""
         did_management_service._TalkoDidManagementService__partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value=self._config()
         )
-        result = await did_management_service.assign_dids_available_for_assignment(
-            1, TalkoContract.AssignDIDToPartner()
-        )
-        assert isinstance(result, TalkoBadRequestResponse)
+        with pytest.raises(ValueError, match="Missing DID Assignment Criteria"):
+            await did_management_service.assign_dids_available_for_assignment(1, TalkoContract.AssignDIDToPartner())
 
     async def test_missing_partner_config(self, did_management_service, mock_logger):
         did_management_service._TalkoDidManagementService__partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
@@ -1044,9 +842,7 @@ class TestAssignDidsAvailableForAssignment:
             await did_management_service.assign_dids_available_for_assignment(
                 4, TalkoContract.AssignDIDToPartner(dids_for_round_robin=["123"])
             )
-        mock_logger.error.assert_called_with(
-            "PartnerConfig not found: No partner config available"
-        )
+        mock_logger.error.assert_called_with("PartnerConfig not found: No partner config available")
 
     async def test_round_robin_empty_dids_raises(self, did_management_service):
         """Covers 780: _assign_round_robin raises TypeError (TalkoBadRequestResponse not BaseException)."""
@@ -1091,32 +887,21 @@ class TestAssignDidsAvailableForAssignment:
 
 @pytest.mark.asyncio
 class TestUnassignDidsForPartner:
-
     async def test_success(self):
         svc, logger, dt = _make_svc()
         svc._TalkoDidManagementService__partner_config_repository.find_partner_config_by_partner_id = AsyncMock(
             return_value={"vendor_id": "507f1f77bcf86cd799439011"}
         )
-        svc._TalkoDidManagementService__did_repository.unassign_did_to_partner = AsyncMock(
-            return_value=True
-        )
-        svc._TalkoDidManagementService__did_repository.update_did_history = AsyncMock(
-            return_value={}
-        )
+        svc._TalkoDidManagementService__did_repository.unassign_did_to_partner = AsyncMock(return_value=True)
+        svc._TalkoDidManagementService__did_repository.update_did_history = AsyncMock(return_value={})
 
         result = await svc.unassign_dids_for_partner(1, ["12345", "67890"])
 
         assert result == {"message": "Successfully unassigned DIDs to the Partner"}
-        logger.info.assert_any_call(
-            "Unassign DID Numbers(Service)=> Received partner_id: 1"
-        )
-        logger.info.assert_any_call(
-            "Unassign DID Numbers(Service)=> Successfully unassigned DIDs for partner_id: 1"
-        )
+        logger.info.assert_any_call("Unassign DID Numbers(Service)=> Received partner_id: 1")
+        logger.info.assert_any_call("Unassign DID Numbers(Service)=> Successfully unassigned DIDs for partner_id: 1")
         for did in ["12345", "67890"]:
-            svc._TalkoDidManagementService__did_repository.unassign_did_to_partner.assert_any_await(
-                did, 1
-            )
+            svc._TalkoDidManagementService__did_repository.unassign_did_to_partner.assert_any_await(did, 1)
             svc._TalkoDidManagementService__did_repository.update_did_history.assert_any_await(
                 did, 1, {"unassign_date": 1_234_567_890}
             )
@@ -1129,9 +914,7 @@ class TestUnassignDidsForPartner:
         with pytest.raises(ValueError, match=PARTNER_CONFIG_NOT_FOUND):
             await svc.unassign_dids_for_partner(1, ["12345"])
         logger.error.assert_called_with(
-            "Error in unassigning DIDs: PartnerConfig not found: {}".format(
-                PARTNER_CONFIG_NOT_FOUND
-            )
+            f"Error in unassigning DIDs: PartnerConfig not found: {PARTNER_CONFIG_NOT_FOUND}"
         )
 
     async def test_repo_exception_mid_loop(self):
@@ -1150,7 +933,6 @@ class TestUnassignDidsForPartner:
 
 @pytest.mark.asyncio
 class TestApplyDidStatusUpdate:
-
     def _doc(self, status=None):
         return {
             "did_number": "12345",
@@ -1159,9 +941,7 @@ class TestApplyDidStatusUpdate:
         }
 
     @pytest.mark.asyncio
-    async def test_set_available(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_set_available(self, did_management_service, mock_did_repository, mock_logger):
         doc = {
             "did_number": "12345",
             "status": TalkoDIDStatus.MAPPED.value,
@@ -1184,9 +964,7 @@ class TestApplyDidStatusUpdate:
         mock_logger.warning.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_set_mapped(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_set_mapped(self, did_management_service, mock_did_repository, mock_logger):
         doc = {
             "did_number": "12345",
             "status": TalkoDIDStatus.AVAILABLE.value,
@@ -1209,9 +987,7 @@ class TestApplyDidStatusUpdate:
         mock_logger.warning.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_mark_spammed(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_mark_spammed(self, did_management_service, mock_did_repository, mock_logger):
         doc = {
             "did_number": "12345",
             "status": TalkoDIDStatus.MAPPED.value,
@@ -1222,9 +998,7 @@ class TestApplyDidStatusUpdate:
         mock_did_repository.update_did_status = AsyncMock(return_value=doc)
         mock_did_repository.increment_spam_count = AsyncMock(return_value=True)
 
-        payload = TalkoContract.AdminDIDAction(
-            action="mark_cooling_period", did_numbers=["12345"]
-        )
+        payload = TalkoContract.AdminDIDAction(action="mark_cooling_period", did_numbers=["12345"])
         result = await did_management_service.apply_did_status_update(1, payload)
 
         assert result["summary"]["total"] == 1
@@ -1235,9 +1009,7 @@ class TestApplyDidStatusUpdate:
         mock_did_repository.update_did_status.assert_awaited_once()
         mock_did_repository.increment_spam_count.assert_awaited_once_with("12345")
 
-    async def test_did_not_found(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_did_not_found(self, did_management_service, mock_did_repository, mock_logger):
         mock_did_repository.get_did_by_number = AsyncMock(return_value=None)
 
         payload = TalkoContract.AdminDIDAction(action="set_available", did_numbers=["99999"])
@@ -1250,16 +1022,10 @@ class TestApplyDidStatusUpdate:
         assert result["results"][0]["status"] == "skipped"
         assert result["results"][0]["error"]["code"] == "DID_NOT_FOUND"
         mock_did_repository.update_did_status.assert_not_called()
-        mock_logger.warning.assert_any_call(
-            "Validation failed for DID {}: {}".format("99999", result["results"][0])
-        )
+        mock_logger.warning.assert_any_call("Validation failed for DID {}: {}".format("99999", result["results"][0]))
 
-    async def test_cooling_period_blocked(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
-        mock_did_repository.get_did_by_number = AsyncMock(
-            return_value=self._doc(TalkoDIDStatus.COOLING_PERIOD.value)
-        )
+    async def test_cooling_period_blocked(self, did_management_service, mock_did_repository, mock_logger):
+        mock_did_repository.get_did_by_number = AsyncMock(return_value=self._doc(TalkoDIDStatus.COOLING_PERIOD.value))
 
         payload = TalkoContract.AdminDIDAction(action="set_mapped", did_numbers=["12345"])
         result = await did_management_service.apply_did_status_update(1, payload)
@@ -1270,14 +1036,9 @@ class TestApplyDidStatusUpdate:
         assert result["results"][0]["success"] is False
         assert result["results"][0]["status"] == "skipped"
         assert result["results"][0]["error"]["code"] == "COOLING_PERIOD_ACTIVE"
-        assert (
-            result["results"][0]["error"]["message"]
-            == "Cannot modify during active Cooling Period"
-        )
+        assert result["results"][0]["error"]["message"] == "Cannot modify during active Cooling Period"
         mock_did_repository.update_did_status.assert_not_called()
-        mock_logger.warning.assert_any_call(
-            "Validation failed for DID {}: {}".format("12345", result["results"][0])
-        )
+        mock_logger.warning.assert_any_call("Validation failed for DID {}: {}".format("12345", result["results"][0]))
 
     @pytest.mark.asyncio
     async def test_invalid_action_rejected_by_validation(
@@ -1294,9 +1055,7 @@ class TestApplyDidStatusUpdate:
         assert "mark_cooling_period" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_with_workspace_id(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_with_workspace_id(self, did_management_service, mock_did_repository, mock_logger):
         doc = {
             "did_number": "12345",
             "status": TalkoDIDStatus.AVAILABLE.value,
@@ -1307,9 +1066,7 @@ class TestApplyDidStatusUpdate:
         mock_did_repository.get_did_by_number = AsyncMock(return_value=doc)
         mock_did_repository.update_did_status = AsyncMock(return_value=updated_doc)
 
-        payload = TalkoContract.AdminDIDAction(
-            action="set_mapped", did_numbers=["12345"], workspace_id=100
-        )
+        payload = TalkoContract.AdminDIDAction(action="set_mapped", did_numbers=["12345"], workspace_id=100)
         result = await did_management_service.apply_did_status_update(1, payload)
 
         assert result["summary"]["total"] == 1
@@ -1318,9 +1075,7 @@ class TestApplyDidStatusUpdate:
         assert result["results"][0]["success"] is True
         mock_did_repository.update_did_status.assert_awaited_once()
 
-    async def test_multiple_dids_mixed(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_multiple_dids_mixed(self, did_management_service, mock_did_repository):
         """One found (available→mapped), one not found → mixed summary."""
         found_doc = {
             "did_number": "11111",
@@ -1332,9 +1087,7 @@ class TestApplyDidStatusUpdate:
             return_value={**found_doc, "status": TalkoDIDStatus.MAPPED.value}
         )
 
-        payload = TalkoContract.AdminDIDAction(
-            action="set_mapped", did_numbers=["11111", "22222"]
-        )
+        payload = TalkoContract.AdminDIDAction(action="set_mapped", did_numbers=["11111", "22222"])
         result = await did_management_service.apply_did_status_update(1, payload)
 
         assert result["summary"]["total"] == 2
@@ -1348,16 +1101,10 @@ class TestApplyDidStatusUpdate:
         assert len(failed_results) == 1
         assert failed_results[0]["error"]["code"] == "DID_NOT_FOUND"
 
-    async def test_handler_raises_value_error(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_handler_raises_value_error(self, did_management_service, mock_did_repository):
         """ValueError from handler is caught, appended to results as error."""
-        mock_did_repository.get_did_by_number = AsyncMock(
-            return_value=self._doc("available")
-        )
-        mock_did_repository.update_did_status = AsyncMock(
-            side_effect=ValueError("VALIDATION_ERROR|bad value")
-        )
+        mock_did_repository.get_did_by_number = AsyncMock(return_value=self._doc("available"))
+        mock_did_repository.update_did_status = AsyncMock(side_effect=ValueError("VALIDATION_ERROR|bad value"))
 
         payload = TalkoContract.AdminDIDAction(action="set_available", did_numbers=["12345"])
         result = await did_management_service.apply_did_status_update(1, payload)
@@ -1378,9 +1125,7 @@ class TestApplyDidStatusUpdate:
             ]
         )
 
-        payload = TalkoContract.AdminDIDAction(
-            action="set_mapped", did_numbers=["11111", "22222"]
-        )
+        payload = TalkoContract.AdminDIDAction(action="set_mapped", did_numbers=["11111", "22222"])
         result = await did_management_service.apply_did_status_update(1, payload)
 
         assert result["summary"]["total"] == 2
@@ -1390,9 +1135,7 @@ class TestApplyDidStatusUpdate:
             assert r["success"] is False
             assert r["error"]["code"] == "COOLING_PERIOD_ACTIVE"
 
-    async def test_error_result_structure(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_error_result_structure(self, did_management_service, mock_did_repository):
         """Verify full error result shape matches contract."""
         mock_did_repository.get_did_by_number = AsyncMock(return_value=None)
 
@@ -1410,9 +1153,7 @@ class TestApplyDidStatusUpdate:
         assert error_result["success"] is False
         assert error_result["status"] == "skipped"
 
-    async def test_process_single_did_invalid_action_not_in_handlers(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_process_single_did_invalid_action_not_in_handlers(self, did_management_service, mock_did_repository):
         """
         ACTION_HANDLERS cleared at runtime to simulate handler mismatch.
         """
@@ -1438,9 +1179,7 @@ class TestApplyDidStatusUpdate:
         assert result["results"][0]["success"] is False
         assert result["results"][0]["error"]["code"] == "INVALID_ACTION"
 
-    async def test_handler_raises_value_error_no_pipe(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_handler_raises_value_error_no_pipe(self, did_management_service, mock_did_repository):
         """
         ValueError with no '|' separator → code defaults to VALIDATION_ERROR.
         """
@@ -1451,9 +1190,7 @@ class TestApplyDidStatusUpdate:
                 "partner_id": 1,
             }
         )
-        mock_did_repository.update_did_status = AsyncMock(
-            side_effect=ValueError("plain error no pipe")
-        )
+        mock_did_repository.update_did_status = AsyncMock(side_effect=ValueError("plain error no pipe"))
 
         payload = TalkoContract.AdminDIDAction(action="set_available", did_numbers=["12345"])
         result = await did_management_service.apply_did_status_update(1, payload)
@@ -1462,9 +1199,7 @@ class TestApplyDidStatusUpdate:
         assert result["results"][0]["error"]["code"] == "VALIDATION_ERROR"
         assert result["results"][0]["error"]["message"] == "plain error no pipe"
 
-    async def test_mark_spammed_increment_returns_false(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_mark_spammed_increment_returns_false(self, did_management_service, mock_did_repository, mock_logger):
         """
         increment_spam_count returns False → DID update still succeeds.
         """
@@ -1477,23 +1212,18 @@ class TestApplyDidStatusUpdate:
         mock_did_repository.update_did_status = AsyncMock(return_value=doc)
         mock_did_repository.increment_spam_count = AsyncMock(return_value=False)
 
-        payload = TalkoContract.AdminDIDAction(
-            action="mark_cooling_period", did_numbers=["12345"]
-        )
+        payload = TalkoContract.AdminDIDAction(action="mark_cooling_period", did_numbers=["12345"])
         result = await did_management_service.apply_did_status_update(1, payload)
 
         assert result["summary"]["total"] == 1
         assert result["summary"]["succeeded"] == 1
         assert result["results"][0]["success"] is True
         mock_did_repository.increment_spam_count.assert_awaited_once_with("12345")
-        mock_logger.info.assert_any_call(
-            "Incremented spam count for DID {}".format("12345")
-        )
+        mock_logger.info.assert_any_call("Incremented spam count for DID {}".format("12345"))
 
 
 @pytest.mark.asyncio
 class TestListDids:
-
     def _doc(self, did_number="12345", status="available", partner_id=1, **kw):
         base = {
             "did_number": did_number,
@@ -1512,9 +1242,7 @@ class TestListDids:
         base.update(kw)
         return base
 
-    async def test_basic_success(
-        self, did_management_service, mock_did_repository, mock_logger
-    ):
+    async def test_basic_success(self, did_management_service, mock_did_repository, mock_logger):
         docs = [self._doc()]
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=(docs, 1))
 
@@ -1541,70 +1269,50 @@ class TestListDids:
     async def test_missing_partner_id_raises(self, did_management_service, mock_logger):
         with pytest.raises(ValueError, match="partner_id is required"):
             await did_management_service.list_dids(partner_id=None)
-        mock_logger.error.assert_called_once_with(
-            "partner_id is required for listing DIDs"
-        )
+        mock_logger.error.assert_called_once_with("partner_id is required for listing DIDs")
 
     async def test_invalid_status_raises(self, did_management_service):
         with pytest.raises(ValueError, match="Invalid status filter"):
             await did_management_service.list_dids(partner_id=1, status="garbage")
 
-    async def test_status_alias_available(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_status_alias_available(self, did_management_service, mock_did_repository):
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=([], 0))
         await did_management_service.list_dids(partner_id=1, status="available")
         kw = mock_did_repository.get_dids_by_partner.call_args[1]
         assert kw["status"] == TalkoDIDStatus.AVAILABLE.value
 
-    async def test_status_alias_mapped(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_status_alias_mapped(self, did_management_service, mock_did_repository):
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=([], 0))
         await did_management_service.list_dids(partner_id=1, status="MAPPED")
         kw = mock_did_repository.get_dids_by_partner.call_args[1]
         assert kw["status"] == TalkoDIDStatus.MAPPED.value
 
-    async def test_status_alias_cooling(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_status_alias_cooling(self, did_management_service, mock_did_repository):
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=([], 0))
         await did_management_service.list_dids(partner_id=1, status="cooling")
         kw = mock_did_repository.get_dids_by_partner.call_args[1]
         assert kw["status"] == TalkoDIDStatus.COOLING_PERIOD.value
 
-    async def test_status_alias_cooling_period(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_status_alias_cooling_period(self, did_management_service, mock_did_repository):
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=([], 0))
         await did_management_service.list_dids(partner_id=1, status="cooling_period")
         kw = mock_did_repository.get_dids_by_partner.call_args[1]
         assert kw["status"] == TalkoDIDStatus.COOLING_PERIOD.value
 
-    async def test_status_alias_cooldown(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_status_alias_cooldown(self, did_management_service, mock_did_repository):
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=([], 0))
         await did_management_service.list_dids(partner_id=1, status="cooldown")
         kw = mock_did_repository.get_dids_by_partner.call_args[1]
         assert kw["status"] == TalkoDIDStatus.COOLDOWN_COMPLETED.value
 
-    async def test_status_alias_cooldown_completed(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_status_alias_cooldown_completed(self, did_management_service, mock_did_repository):
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=([], 0))
-        await did_management_service.list_dids(
-            partner_id=1, status="cooldown_completed"
-        )
+        await did_management_service.list_dids(partner_id=1, status="cooldown_completed")
         kw = mock_did_repository.get_dids_by_partner.call_args[1]
         assert kw["status"] == TalkoDIDStatus.COOLDOWN_COMPLETED.value
 
-    async def test_pagination_forwarded(
-        self, did_management_service, mock_did_repository
-    ):
-        docs = [
-            self._doc(workspace_id=42, agent_id=7, spam_count=3, assign_date=100)
-        ]
+    async def test_pagination_forwarded(self, did_management_service, mock_did_repository):
+        docs = [self._doc(workspace_id=42, agent_id=7, spam_count=3, assign_date=100)]
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=(docs, 50))
 
         result = await did_management_service.list_dids(partner_id=1, page=3, limit=10)
@@ -1624,13 +1332,9 @@ class TestListDids:
             limit=10,
         )
 
-    async def test_workspace_filter_forwarded(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_workspace_filter_forwarded(self, did_management_service, mock_did_repository):
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=([], 0))
-        result = await did_management_service.list_dids(
-            partner_id=1, workspace_id=100
-        )
+        result = await did_management_service.list_dids(partner_id=1, workspace_id=100)
         assert result["total"] == 0
         mock_did_repository.get_dids_by_partner.assert_awaited_once_with(
             partner_id=1,
@@ -1646,18 +1350,14 @@ class TestListDids:
         result = await did_management_service.list_dids(partner_id=1)
         assert result == {"total": 0, "page": 1, "limit": 20, "dids": []}
 
-    async def test_objectid_vendor_id_stringified(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_objectid_vendor_id_stringified(self, did_management_service, mock_did_repository):
         doc = self._doc()
         doc["vendor_id"] = ObjectId()
         mock_did_repository.get_dids_by_partner = AsyncMock(return_value=([doc], 1))
         result = await did_management_service.list_dids(partner_id=1)
         assert isinstance(result["dids"][0]["vendor_id"], str)
 
-    async def test_all_optional_fields_preserved(
-        self, did_management_service, mock_did_repository
-    ):
+    async def test_all_optional_fields_preserved(self, did_management_service, mock_did_repository):
         ts = 1_631_234_567_890
         doc = self._doc(
             workspace_id=10,
@@ -1680,8 +1380,6 @@ class TestListDids:
         assert d["status_changed_at"] == ts
         assert d["assign_date"] == ts
         assert d["mapped_date"] == ts
-
-
 
 
 class TestClaimDidForCampaign:
@@ -1710,9 +1408,7 @@ class TestClaimDidForCampaign:
             return_value={"did_number": "911111111111", "status": TalkoDIDStatus.MAPPED.value}
         )
 
-        result = await svc.claim_did_for_campaign(
-            partner_id=101, did_number="911111111111", agent_bot_id=56
-        )
+        result = await svc.claim_did_for_campaign(partner_id=101, did_number="911111111111", agent_bot_id=56)
 
         assert result == {"did_number": "911111111111", "status": TalkoDIDStatus.MAPPED.value}
         svc._TalkoDidManagementService__did_repository.update_did_values.assert_awaited_once_with(
@@ -1735,9 +1431,7 @@ class TestClaimDidForCampaign:
         )
         svc._TalkoDidManagementService__did_repository.update_did_values = AsyncMock()
 
-        result = await svc.claim_did_for_campaign(
-            partner_id=101, did_number="911111111111", agent_bot_id=56
-        )
+        result = await svc.claim_did_for_campaign(partner_id=101, did_number="911111111111", agent_bot_id=56)
 
         assert result == {"did_number": "911111111111", "status": TalkoDIDStatus.MAPPED.value}
         svc._TalkoDidManagementService__did_repository.update_did_values.assert_not_awaited()
@@ -1759,22 +1453,16 @@ class TestClaimDidForCampaign:
         svc._TalkoDidManagementService__did_repository.update_did_values = AsyncMock()
 
         with pytest.raises(ValueError):
-            await svc.claim_did_for_campaign(
-                partner_id=101, did_number="911111111111", agent_bot_id=56
-            )
+            await svc.claim_did_for_campaign(partner_id=101, did_number="911111111111", agent_bot_id=56)
         svc._TalkoDidManagementService__did_repository.update_did_values.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_raises_when_did_not_found_for_partner(self):
         svc, logger, _ = _make_svc()
-        svc._TalkoDidManagementService__did_repository.find_did_attendance = AsyncMock(
-            return_value=None
-        )
+        svc._TalkoDidManagementService__did_repository.find_did_attendance = AsyncMock(return_value=None)
 
         with pytest.raises(TalkoResourceNotFound):
-            await svc.claim_did_for_campaign(
-                partner_id=101, did_number="911111111111", agent_bot_id=56
-            )
+            await svc.claim_did_for_campaign(partner_id=101, did_number="911111111111", agent_bot_id=56)
 
     @pytest.mark.asyncio
     async def test_raises_when_did_in_cooling_period(self):
@@ -1790,9 +1478,7 @@ class TestClaimDidForCampaign:
         )
 
         with pytest.raises(ValueError):
-            await svc.claim_did_for_campaign(
-                partner_id=101, did_number="911111111111", agent_bot_id=56
-            )
+            await svc.claim_did_for_campaign(partner_id=101, did_number="911111111111", agent_bot_id=56)
 
 
 class TestReleaseCampaignDid:
@@ -1823,9 +1509,7 @@ class TestReleaseCampaignDid:
             }
         )
 
-        result = await svc.release_campaign_did(
-            partner_id=101, did_number="911111111111", agent_bot_id=56
-        )
+        result = await svc.release_campaign_did(partner_id=101, did_number="911111111111", agent_bot_id=56)
 
         assert result == {"did_number": "911111111111", "status": TalkoDIDStatus.AVAILABLE.value}
         svc._TalkoDidManagementService__did_repository.update_did_values.assert_awaited_once_with(
@@ -1849,9 +1533,7 @@ class TestReleaseCampaignDid:
         )
         svc._TalkoDidManagementService__did_repository.update_did_values = AsyncMock()
 
-        result = await svc.release_campaign_did(
-            partner_id=101, did_number="911111111111", agent_bot_id=56
-        )
+        result = await svc.release_campaign_did(partner_id=101, did_number="911111111111", agent_bot_id=56)
 
         assert result == {"did_number": "911111111111", "status": TalkoDIDStatus.MAPPED.value}
         svc._TalkoDidManagementService__did_repository.update_did_values.assert_not_awaited()
@@ -1869,9 +1551,7 @@ class TestReleaseCampaignDid:
         )
         svc._TalkoDidManagementService__did_repository.update_did_values = AsyncMock()
 
-        result = await svc.release_campaign_did(
-            partner_id=101, did_number="911111111111", agent_bot_id=56
-        )
+        result = await svc.release_campaign_did(partner_id=101, did_number="911111111111", agent_bot_id=56)
 
         assert result == {"did_number": "911111111111", "status": TalkoDIDStatus.AVAILABLE.value}
         svc._TalkoDidManagementService__did_repository.update_did_values.assert_not_awaited()
@@ -1879,11 +1559,7 @@ class TestReleaseCampaignDid:
     @pytest.mark.asyncio
     async def test_raises_when_did_not_found_for_partner(self):
         svc, logger, _ = _make_svc()
-        svc._TalkoDidManagementService__did_repository.find_did_attendance = AsyncMock(
-            return_value=None
-        )
+        svc._TalkoDidManagementService__did_repository.find_did_attendance = AsyncMock(return_value=None)
 
         with pytest.raises(TalkoResourceNotFound):
-            await svc.release_campaign_did(
-                partner_id=101, did_number="911111111111", agent_bot_id=56
-            )
+            await svc.release_campaign_did(partner_id=101, did_number="911111111111", agent_bot_id=56)

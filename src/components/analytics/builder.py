@@ -1,11 +1,4 @@
-from typing import Dict, List, Optional
-
-from dateutil.relativedelta import relativedelta
-
 from src.components.analytics import constants as analytics_constants
-from src.components.analytics.date_range_helper import TalkoDateRangeHelper
-from src.components.cdr.models import TalkoCDR
-from src.core.doc_db import TalkoDocDatabaseSessionManager
 from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.enums import TalkoUserRoleHierarchy
 
@@ -19,13 +12,13 @@ class TalkoQueryBuilder:
     def build_query(
         self,
         partner_id: int,
-        start_date_ms: Optional[int],
-        end_date_ms: Optional[int],
-        agents: Optional[List[int]] = None,
-        workspace_id: Optional[List[int]] = None,
-        entity_type: Optional[str] = None,
-        user_role: Optional[int] = TalkoUserRoleHierarchy.MAINTAINER.value,
-    ) -> Dict:
+        start_date_ms: int | None,
+        end_date_ms: int | None,
+        agents: list[int] | None = None,
+        workspace_id: list[int] | None = None,
+        entity_type: str | None = None,
+        user_role: int | None = TalkoUserRoleHierarchy.MAINTAINER.value,
+    ) -> dict:
         """Build MongoDB query with partner_id, date range, and optional filters."""
         query = {analytics_constants.PARTNER_ID: partner_id}
         if start_date_ms and end_date_ms:
@@ -33,16 +26,10 @@ class TalkoQueryBuilder:
                 analytics_constants.GTE_CONDITION: start_date_ms,
                 analytics_constants.LTE_CONDITION: end_date_ms,
             }
-        if (
-            user_role != TalkoUserRoleHierarchy.MAINTAINER.value
-            and agents
-            and len(agents) > 0
-        ):
+        if user_role != TalkoUserRoleHierarchy.MAINTAINER.value and agents and len(agents) > 0:
             query["agent"] = {analytics_constants.IN_CONDITION: agents}
         if workspace_id and len(workspace_id) > 0:
-            query["workspace_id"] = {
-                analytics_constants.IN_CONDITION: workspace_id
-            }
+            query["workspace_id"] = {analytics_constants.IN_CONDITION: workspace_id}
         if entity_type:
             query["entity_type"] = entity_type
         self.__logger.debug(f"Built query: {query}")
@@ -53,11 +40,11 @@ class TalkoQueryBuilder:
         partner_id: int,
         start_date_ms: int,
         end_date_ms: int,
-        agents: List[int],
-        workspace_id: Optional[List[int]],
-        entity_type: Optional[str],
+        agents: list[int],
+        workspace_id: list[int] | None,
+        entity_type: str | None,
         user_role: int,
-    ) -> Dict:
+    ) -> dict:
         """Build query for trend analysis using correct field names."""
         query = self.build_query(
             partner_id=partner_id,

@@ -1,7 +1,8 @@
 import contextlib
-from typing import Annotated, Any, AsyncIterator
+import logging
+from collections.abc import AsyncIterator
+from typing import Any
 
-from fastapi import Depends
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncSession,
@@ -12,13 +13,12 @@ from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
+
 class TalkoDatabaseSessionManager:
-    def __init__(self, host: str, engine_kwargs: dict[str, Any] = {}):
-        print(host)
-        self._engine = create_async_engine(host, **engine_kwargs)
-        self._sessionmaker = async_sessionmaker(
-            autocommit=False, bind=self._engine, expire_on_commit=False
-        )
+    def __init__(self, host: str, engine_kwargs: dict[str, Any] | None = None):
+        logging.getLogger(__name__).debug("TalkoDatabaseSessionManager host: %s", host)
+        self._engine = create_async_engine(host, **(engine_kwargs or {}))
+        self._sessionmaker = async_sessionmaker(autocommit=False, bind=self._engine, expire_on_commit=False)
 
     async def close(self):
         if self._engine is None:

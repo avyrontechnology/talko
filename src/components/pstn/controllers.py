@@ -22,16 +22,16 @@ async def tata_stream(
 ) -> None:
     await ws.accept()
     logger.info("[PSTN] websocket accepted")
-    logger.info("[PSTN] bridge type={}".format(type(bridge).__name__))
+    logger.info(f"[PSTN] bridge type={type(bridge).__name__}")
 
     async def raw_events():
         while True:
             try:
                 msg = await ws.receive_text()
-                logger.info("[PSTN] received raw msg={}".format(msg[:120]))
+                logger.info(f"[PSTN] received raw msg={msg[:120]}")
                 yield msg
             except Exception as e:
-                logger.exception("[PSTN] raw_events failed: {}".format(e))
+                logger.exception(f"[PSTN] raw_events failed: {e}")
                 break
 
     await bridge.handle_call(ws, _tata_provider, raw_events())

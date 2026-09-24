@@ -29,7 +29,6 @@ VALID_BODY = "Plain text body"
 
 
 class TestValidateEmails:
-
     def test_raises_on_empty_list(self):
         svc, logger, _ = make_service()
         with pytest.raises(ValueError, match="To"):
@@ -55,7 +54,6 @@ class TestValidateEmails:
 
 
 class TestRenderHtmlContent:
-
     def test_returns_none_when_no_template(self):
         svc, _, _ = make_service()
         result = svc._render_html_content("body", html_template=None)
@@ -93,7 +91,6 @@ class TestRenderHtmlContent:
 
 
 class TestValidateInputs:
-
     def test_raises_on_empty_subject(self):
         svc, logger, _ = make_service()
         with pytest.raises(ValueError):
@@ -114,31 +111,22 @@ class TestValidateInputs:
     def test_raises_on_invalid_cc(self):
         svc, _, _ = make_service()
         with pytest.raises(ValueError, match="CC"):
-            svc._validate_inputs(
-                VALID_TO, VALID_SUBJECT, VALID_BODY, ["bad-email"], None
-            )
+            svc._validate_inputs(VALID_TO, VALID_SUBJECT, VALID_BODY, ["bad-email"], None)
 
     def test_raises_on_invalid_bcc(self):
         svc, _, _ = make_service()
         with pytest.raises(ValueError, match="BCC"):
-            svc._validate_inputs(
-                VALID_TO, VALID_SUBJECT, VALID_BODY, None, ["bad-email"]
-            )
+            svc._validate_inputs(VALID_TO, VALID_SUBJECT, VALID_BODY, None, ["bad-email"])
 
     def test_skips_cc_bcc_validation_when_none(self):
         svc, _, _ = make_service()
-        svc._validate_inputs(
-            VALID_TO, VALID_SUBJECT, VALID_BODY, None, None
-        )  # no exception
+        svc._validate_inputs(VALID_TO, VALID_SUBJECT, VALID_BODY, None, None)  # no exception
 
 
 class TestBuildPayload:
-
     def test_basic_payload_structure(self):
         svc, _, _ = make_service()
-        payload = svc._build_payload(
-            VALID_TO, VALID_SUBJECT, VALID_BODY, None, None, None, None
-        )
+        payload = svc._build_payload(VALID_TO, VALID_SUBJECT, VALID_BODY, None, None, None, None)
         assert payload["to_emails"] == VALID_TO
         assert payload["subject"] == VALID_SUBJECT
         assert payload["body"] == VALID_BODY
@@ -150,9 +138,7 @@ class TestBuildPayload:
     def test_dict_body_is_json_serialized(self):
         svc, _, _ = make_service()
         body_dict = {"key": "value"}
-        payload = svc._build_payload(
-            VALID_TO, VALID_SUBJECT, body_dict, None, None, None, None
-        )
+        payload = svc._build_payload(VALID_TO, VALID_SUBJECT, body_dict, None, None, None, None)
         assert payload["body"] == json.dumps(body_dict)
 
     def test_html_content_added_when_template_provided(self):
@@ -161,17 +147,13 @@ class TestBuildPayload:
         mock_template.render.return_value = "<h1>hi</h1>"
         template_env.get_template.return_value = mock_template
 
-        payload = svc._build_payload(
-            VALID_TO, VALID_SUBJECT, VALID_BODY, None, None, "tpl.html", None
-        )
+        payload = svc._build_payload(VALID_TO, VALID_SUBJECT, VALID_BODY, None, None, "tpl.html", None)
         assert payload["html_content"] == "<h1>hi</h1>"
 
     def test_attachments_added_when_provided(self):
         svc, _, _ = make_service()
         attachments = [{"filename": "file.pdf", "content": "base64data"}]
-        payload = svc._build_payload(
-            VALID_TO, VALID_SUBJECT, VALID_BODY, None, None, None, attachments
-        )
+        payload = svc._build_payload(VALID_TO, VALID_SUBJECT, VALID_BODY, None, None, None, attachments)
         assert payload["attachments"] == attachments
 
     def test_cc_and_bcc_included(self):
@@ -190,7 +172,6 @@ class TestBuildPayload:
 
 
 class TestMakeApiCall:
-
     def _mock_response(self, status_code=200, json_data=None, raise_for_status=None):
         resp = MagicMock()
         resp.status_code = status_code
@@ -265,7 +246,6 @@ class TestMakeApiCall:
 
 
 class TestSendEmail:
-
     @patch("src.components.email_service.services.requests.post")
     def test_full_happy_path(self, mock_post):
         svc, logger, _ = make_service()

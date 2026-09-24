@@ -1,7 +1,7 @@
 import json
 import secrets
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -37,11 +37,9 @@ class TalkoPartnerWebhookService:
         self.datetime_util = datetime_util
 
     async def create_webhook_config(
-        self, data: TalkoContract.WebhookConfigCreate, created_by_user_id: Optional[int]
+        self, data: TalkoContract.WebhookConfigCreate, created_by_user_id: int | None
     ) -> TalkoContract.WebhookConfigResponse:
-        self.logger.info(
-            "Creating webhook config for partner_id: {}".format(data.partner_id)
-        )
+        self.logger.info(f"Creating webhook config for partner_id: {data.partner_id}")
         self.validator.validate_url_is_https(data.url)
         await self.validator.check_config_does_not_already_exist(data.partner_id)
 
@@ -58,11 +56,7 @@ class TalkoPartnerWebhookService:
         )
         doc = model.model_dump(exclude_unset=False)
         config_id = await self.repository.insert_config(doc)
-        self.logger.info(
-            "Created webhook config {} for partner_id: {}".format(
-                config_id, data.partner_id
-            )
-        )
+        self.logger.info(f"Created webhook config {config_id} for partner_id: {data.partner_id}")
         return TalkoContract.WebhookConfigResponse(
             id=config_id,
             partner_id=data.partner_id,
@@ -77,7 +71,7 @@ class TalkoPartnerWebhookService:
     async def update_webhook_config(
         self, partner_id: int, data: TalkoContract.WebhookConfigUpdate
     ) -> TalkoContract.WebhookConfigResponse:
-        self.logger.info("Updating webhook config for partner_id: {}".format(partner_id))
+        self.logger.info(f"Updating webhook config for partner_id: {partner_id}")
         if data.url is not None:
             self.validator.validate_url_is_https(data.url)
 
@@ -86,9 +80,7 @@ class TalkoPartnerWebhookService:
         updated = await self.repository.update_config(partner_id, update_dict)
         return self.__to_response(updated)
 
-    async def get_webhook_config(
-        self, partner_id: int
-    ) -> TalkoContract.WebhookConfigResponse:
+    async def get_webhook_config(self, partner_id: int) -> TalkoContract.WebhookConfigResponse:
         config = await self.repository.find_config_by_partner_id(partner_id)
         if not config:
             raise TalkoResourceNotFound(PARTNER_WEBHOOK_CONFIG_NOT_FOUND)
@@ -96,10 +88,8 @@ class TalkoPartnerWebhookService:
 
     async def list_delivery_attempts(
         self, partner_id: int, limit: int = DEFAULT_DELIVERY_ATTEMPTS_LIMIT
-    ) -> List[TalkoContract.DeliveryAttemptResponse]:
-        attempts = await self.repository.find_delivery_attempts_by_partner_id(
-            partner_id, limit
-        )
+    ) -> list[TalkoContract.DeliveryAttemptResponse]:
+        attempts = await self.repository.find_delivery_attempts_by_partner_id(partner_id, limit)
         return [
             TalkoContract.DeliveryAttemptResponse(
                 id=str(attempt["_id"]),
@@ -117,7 +107,7 @@ class TalkoPartnerWebhookService:
             for attempt in attempts
         ]
 
-    async def get_active_config_for_delivery(self, partner_id: int) -> Optional[dict]:
+    async def get_active_config_for_delivery(self, partner_id: int) -> dict | None:
         config = await self.repository.find_config_by_partner_id(partner_id)
         if not config or not config.get("is_active"):
             return None
@@ -128,7 +118,7 @@ class TalkoPartnerWebhookService:
         partner_id: int,
         event_type: str,
         event_id: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         attempt_number: int,
     ) -> str:
         """Signs and POSTs one webhook event to a partner's configured URL.
@@ -141,19 +131,11 @@ class TalkoPartnerWebhookService:
         """
         config = await self.get_active_config_for_delivery(partner_id)
         if not config:
-            self.logger.info(
-                "No active webhook config for partner_id {}; skipping delivery".format(
-                    partner_id
-                )
-            )
+            self.logger.info(f"No active webhook config for partner_id {partner_id}; skipping delivery")
             return "no_active_config"
 
         if event_type not in config.get("subscribed_events", []):
-            self.logger.info(
-                "partner_id {} not subscribed to event_type {}; skipping".format(
-                    partner_id, event_type
-                )
-            )
+            self.logger.info(f"partner_id {partner_id} not subscribed to event_type {event_type}; skipping")
             return "not_subscribed"
 
         secret = self.cipher.decrypt(config["signing_secret_encrypted"])
@@ -169,7 +151,7 @@ class TalkoPartnerWebhookService:
                     content=body,
                     headers={
                         "Content-Type": "application/json",
-                        "X-Talko-Signature": "t={},v1={}".format(ts, signature),
+                        "X-Talko-Signature": f"t={ts},v1={signature}",
                         "X-Talko-Event-Id": event_id,
                         "X-Talko-Event-Type": event_type,
                     },
@@ -187,11 +169,7 @@ class TalkoPartnerWebhookService:
                 error=None,
                 duration_ms=int((time.monotonic() - started) * 1000),
             )
-            self.logger.info(
-                "Delivered webhook event {} to partner_id {}".format(
-                    event_id, partner_id
-                )
-            )
+            self.logger.info(f"Delivered webhook event {event_id} to partner_id {partner_id}")
             return "delivered"
         except Exception as exc:
             status_code = getattr(getattr(exc, "response", None), "status_code", None)
@@ -206,11 +184,7 @@ class TalkoPartnerWebhookService:
                 error=str(exc),
                 duration_ms=int((time.monotonic() - started) * 1000),
             )
-            self.logger.error(
-                "Webhook delivery failed for partner_id {} event {}: {}".format(
-                    partner_id, event_id, exc
-                )
-            )
+            self.logger.error(f"Webhook delivery failed for partner_id {partner_id} event {event_id}: {exc}")
             raise
 
     async def log_delivery_attempt(
@@ -220,10 +194,10 @@ class TalkoPartnerWebhookService:
         event_id: str,
         url: str,
         attempt_number: int,
-        status_code: Optional[int],
+        status_code: int | None,
         success: bool,
-        error: Optional[str],
-        duration_ms: Optional[int],
+        error: str | None,
+        duration_ms: int | None,
     ) -> None:
         now = self.datetime_util.get_current_time()
         await self.repository.insert_delivery_attempt(

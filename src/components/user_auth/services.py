@@ -1,5 +1,3 @@
-from typing import Optional
-
 from src.components.user_auth.dto import TalkoContract
 from src.components.user_auth.models import TalkoUserModel, TalkoUserRole
 from src.components.user_auth.passwords import (
@@ -73,11 +71,7 @@ class TalkoUserAuthService:
         ).model_dump()
         user_id = await self.__repository.insert_user(doc)
         doc["_id"] = user_id
-        self.__logger.info(
-            "Talko user signed up email={} role={} active={}".format(
-                payload.email, role, is_active
-            )
-        )
+        self.__logger.info(f"Talko user signed up email={payload.email} role={role} active={is_active}")
         return _public_user(doc)
 
     async def create_user(self, payload: TalkoContract.AdminCreateUser) -> dict:
@@ -109,11 +103,7 @@ class TalkoUserAuthService:
         ).model_dump()
         user_id = await self.__repository.insert_user(doc)
         doc["_id"] = user_id
-        self.__logger.info(
-            "Talko user provisioned email={} role={} partner_id={}".format(
-                payload.email, role, partner_id
-            )
-        )
+        self.__logger.info(f"Talko user provisioned email={payload.email} role={role} partner_id={partner_id}")
         return _public_user(doc)
 
     async def login(self, payload: TalkoContract.Login) -> dict:
@@ -121,9 +111,7 @@ class TalkoUserAuthService:
         if not TalkoENV.TALKO_JWT_SECRET:
             raise RuntimeError("TALKO_JWT_SECRET is not provisioned")
         doc = await self.__repository.find_by_email(payload.credential)
-        if doc is None or not verify_password(
-            payload.password, doc.get("password_hash") or ""
-        ):
+        if doc is None or not verify_password(payload.password, doc.get("password_hash") or ""):
             raise TalkoInvalidCredentialsError("Invalid email or password")
         if not doc.get("is_active", True):
             raise TalkoInactiveUserError("Account is disabled")
@@ -142,9 +130,7 @@ class TalkoUserAuthService:
         docs = await self.__repository.list_users(limit=min(max(limit, 1), 500))
         return [_public_user(doc) for doc in docs]
 
-    async def update_user(
-        self, target_user_id: str, patch: TalkoContract.UpdateUser
-    ) -> Optional[dict]:
+    async def update_user(self, target_user_id: str, patch: TalkoContract.UpdateUser) -> dict | None:
         """Superadmin role/partner/active management. Returns updated user or None."""
         doc = await self.__repository.find_by_id(target_user_id)
         if doc is None:

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel, field_validator, model_validator
 from pydantic_core import PydanticCustomError
@@ -9,27 +9,27 @@ from src.components.cdr.constants import TalkoEntityType
 
 class TalkoContract:
     class CallCreate(BaseModel):
-        entity_type: Optional[TalkoEntityType] = None  # "Lead" or "Contact"
-        entity_id: Optional[int] = None
-        entity_name: Optional[str] = None
+        entity_type: TalkoEntityType | None = None  # "Lead" or "Contact"
+        entity_id: int | None = None
+        entity_name: str | None = None
 
         # ── DEPRECATED: kept for backward compat (old callers) ─────────
-        lead_id: Optional[int] = None
-        lead_name: Optional[str] = None
+        lead_id: int | None = None
+        lead_name: str | None = None
 
-        workspace_id: Optional[int] = None
-        partner_id: Optional[int] = None
-        number_type: Optional[str] = None
-        lead_secret: Optional[str] = None
-        cloud_agent_number: Optional[str] = None
-        outbound_type: Optional[str] = None
-        agent_number: Optional[str] = None
-        to_number: Optional[str] = None
-        call_url: Optional[str] = None
-        encryption_enabled: Optional[bool] = None
-        dedicated_did: Optional[str] = None
-        enable_ai_bridge: Optional[bool] = False
-        context_data: Optional[Dict[str, Any]] = None
+        workspace_id: int | None = None
+        partner_id: int | None = None
+        number_type: str | None = None
+        lead_secret: str | None = None
+        cloud_agent_number: str | None = None
+        outbound_type: str | None = None
+        agent_number: str | None = None
+        to_number: str | None = None
+        call_url: str | None = None
+        encryption_enabled: bool | None = None
+        dedicated_did: str | None = None
+        enable_ai_bridge: bool | None = False
+        context_data: dict[str, Any] | None = None
 
         # Encryption vs Lead Secret validation
         @model_validator(mode="after")
@@ -54,10 +54,7 @@ class TalkoContract:
         # Outbound type validation
         @model_validator(mode="after")
         def validate_outbound_type(self):
-            if (
-                self.outbound_type
-                and self.outbound_type not in TalkoOutboundType._value2member_map_
-            ):
+            if self.outbound_type and self.outbound_type not in TalkoOutboundType._value2member_map_:
                 raise PydanticCustomError(
                     "invalid_outbound_type",
                     f"Invalid outbound_type. Allowed values are: "
@@ -80,15 +77,14 @@ class TalkoContract:
         # Dedicated DID format validation
         @field_validator("dedicated_did")
         @classmethod
-        def validate_dedicated_did_format(cls, v: Optional[str]) -> Optional[str]:
+        def validate_dedicated_did_format(cls, v: str | None) -> str | None:
             if v is None:
                 return v
 
             if not v.isdigit() or not (10 <= len(v) <= 15):
                 raise PydanticCustomError(
                     "invalid_dedicated_did_format",
-                    "dedicated_did must contain only digits and be between 10 to 15 digits "
-                    "(e.g. 918889560593)",
+                    "dedicated_did must contain only digits and be between 10 to 15 digits (e.g. 918889560593)",
                 )
             return v
 
@@ -109,7 +105,7 @@ class TalkoContract:
 
     class HangupCallRequest(BaseModel):
         call_id: str
-        enable_ai_bridge: Optional[bool] = False
+        enable_ai_bridge: bool | None = False
 
         @field_validator("call_id")
         @classmethod
@@ -128,15 +124,13 @@ class TalkoContract:
     class CallTransferRequest(BaseModel):
         call_id: str
         destination_number: str
-        enable_ai_bridge: Optional[bool] = False
+        enable_ai_bridge: bool | None = False
 
         @field_validator("call_id")
         @classmethod
         def validate_call_id(cls, v: str) -> str:
             if not v or not v.strip():
-                raise PydanticCustomError(
-                    "call_id_required", "call_id must not be empty"
-                )
+                raise PydanticCustomError("call_id_required", "call_id must not be empty")
             return v
 
         @field_validator("destination_number")
@@ -152,3 +146,22 @@ class TalkoContract:
     class CallTransferResponse(BaseModel):
         status: str
         message: str
+
+    class GrpcHangupRequest(BaseModel):
+        call_id: str
+        vendor_config_id: str = ""
+
+    class GrpcTransferRequest(BaseModel):
+        call_id: str
+        destination_number: str
+        vendor_config_id: str = ""
+
+    class SuperviseRequest(BaseModel):
+        call_id: str
+        supervisor_id: str
+        mode: str = "listen"
+        room_name: str | None = None
+
+    class AttendedTransferStart(BaseModel):
+        call_id: str
+        target_number: str

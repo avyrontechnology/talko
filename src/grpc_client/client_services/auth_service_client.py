@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Union
+from typing import Any
 
 import grpc
 from grpc.aio import AioRpcError
@@ -12,18 +12,13 @@ logger = TalkoServiceLogger.get_logger()
 
 
 class TalkoAuthServiceClient(TalkoGRPCClient):
-
     def __init__(self):
         super().__init__()
         self.stub = auth_pb2_grpc.AuthServiceStub(self.channel)
 
     @TalkoGRPCClient.call_with_retry
     async def validate_token(self, token, correlation_id="12345"):
-        logger.info(
-            "Sending ValidateToken request for token: {} correlation_id: {}".format(
-                token, correlation_id
-            )
-        )
+        logger.info(f"Sending ValidateToken request for token: {token} correlation_id: {correlation_id}")
 
         # Create the nested request with MContext and MBody
         mcontext = auth_pb2.MContext(correlation_id=correlation_id)
@@ -31,7 +26,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
         request = auth_pb2.ValidateTokenRequest(mcontext=mcontext, mbody=mbody)
         try:
             response = await self.stub.ValidateToken(request)
-            logger.info("Received response for user: {}".format(response.is_active))
+            logger.info(f"Received response for user: {response.is_active}")
             if not response.is_active:
                 return None
             return {
@@ -41,23 +36,17 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
                 "partner_id": response.partner_id,
             }
         except AioRpcError as exc:
-            logger.error("gRPC error during ValidateToken: {}".format(exc))
+            logger.error(f"gRPC error during ValidateToken: {exc}")
             if exc.code() == grpc.StatusCode.UNAVAILABLE:
-                return TalkoInternalServerErrorResponse(
-                    detail="Authentication service unavailable"
-                )
+                return TalkoInternalServerErrorResponse(detail="Authentication service unavailable")
             raise
 
     @TalkoGRPCClient.call_with_retry
-    async def get_user_child_hierarchy(
-        self, user_ids: Union[int, List[int]]
-    ) -> Dict[int, Dict[str, Any]]:
+    async def get_user_child_hierarchy(self, user_ids: int | list[int]) -> dict[int, dict[str, Any]]:
         """Fetches child user hierarchies for one or multiple user IDs."""
         user_ids_list = [user_ids] if isinstance(user_ids, int) else user_ids
         # mcontext = auth_pb2.MContext(correlation_id=correlation_id)
-        logger.info(
-            f"Sending GetUserChildHierarchy request for user_ids: {user_ids_list}"
-        )
+        logger.info(f"Sending GetUserChildHierarchy request for user_ids: {user_ids_list}")
 
         request = auth_pb2.GetUserChildHierarchyRequest(user_ids=user_ids_list)
 
@@ -79,9 +68,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
 
     @TalkoGRPCClient.call_with_retry
     async def get_user_child_details(self, user_id):
-        logger.info(
-            "Sending GetUserChildHierarchy request for user_id: {}".format(user_id)
-        )
+        logger.info(f"Sending GetUserChildHierarchy request for user_id: {user_id}")
 
         # Create the request with MContext and user_id
         # mcontext = auth_pb2.MContext(correlation_id=correlation_id)
@@ -89,11 +76,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
 
         try:
             response = await self.stub.GetUserChildDetails(request)
-            logger.info(
-                "Received child user list for user_id: {}: {}".format(
-                    user_id, response.user_detail
-                )
-            )
+            logger.info(f"Received child user list for user_id: {user_id}: {response.user_detail}")
 
             child_user_dict = {
                 user.user_id: {
@@ -106,12 +89,12 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
             }
             return child_user_dict
         except AioRpcError as exc:
-            logger.error("Error during GetUserChildHierarchy call: {}".format(exc))
+            logger.error(f"Error during GetUserChildHierarchy call: {exc}")
             return {}
 
     @TalkoGRPCClient.call_with_retry
     async def get_user_details(self, user_id):
-        logger.info("Sending GetUserDetails request for user_id: {}".format(user_id))
+        logger.info(f"Sending GetUserDetails request for user_id: {user_id}")
 
         # Create the request with MContext and user_id
         # mcontext = auth_pb2.MContext(correlation_id=correlation_id)
@@ -119,11 +102,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
 
         try:
             response = await self.stub.GetUserDetails(request)
-            logger.info(
-                "Received user details for user_id: {}: {}".format(
-                    user_id, response.user_profile
-                )
-            )
+            logger.info(f"Received user details for user_id: {user_id}: {response.user_profile}")
             user = response.user_profile
             user_details = {
                 "user_id": user.user_id,
@@ -134,57 +113,45 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
             }
             return user_details
         except AioRpcError as exc:
-            logger.error("Error during GetUserDetails call: {}".format(exc))
+            logger.error(f"Error during GetUserDetails call: {exc}")
             return {}
 
     @TalkoGRPCClient.call_with_retry
     async def get_user_permissions(self, user_id):
-        logger.info(
-            "Sending GetUserPermissions request for user_id: {}".format(user_id)
-        )
+        logger.info(f"Sending GetUserPermissions request for user_id: {user_id}")
 
         # Create the request with MContext and user_id
         request = auth_pb2.GetUserPermissionsRequest(user_id=user_id)
 
         try:
             response = await self.stub.GetUserPermissions(request)
-            logger.info(
-                "Received permissions for user_id: {}: {}".format(
-                    user_id, response.permissions
-                )
-            )
+            logger.info(f"Received permissions for user_id: {user_id}: {response.permissions}")
             return list(response.permissions)
         except AioRpcError as exc:
-            logger.error("Error during GetUserPermissions call: {}".format(exc))
+            logger.error(f"Error during GetUserPermissions call: {exc}")
             return []
 
     @TalkoGRPCClient.call_with_retry
     async def get_user_roles(self, user_id):
-        logger.info("Sending GetUserRoles request for user_id: {}".format(user_id))
+        logger.info(f"Sending GetUserRoles request for user_id: {user_id}")
 
         # Create the request with MContext and user_id
         request = auth_pb2.GetUserRoleRequest(user_id=user_id)
 
         try:
             response = await self.stub.GetUserRole(request)
-            logger.info(
-                "Received roles for user_id: {}: {}".format(user_id, response.role)
-            )
+            logger.info(f"Received roles for user_id: {user_id}: {response.role}")
             return {
                 "hierarchy": response.hierarchy,
                 "roles": response.role,
             }
         except AioRpcError as exc:
-            logger.error("Error during GetUserRoles call: {}".format(exc))
+            logger.error(f"Error during GetUserRoles call: {exc}")
             return {}
 
     @TalkoGRPCClient.call_with_retry
     async def get_workspace_users_details(self, user_ids):
-        user_ids: list = (
-            [user_ids]
-            if isinstance(user_ids, int)
-            else [uid for uid in user_ids if isinstance(uid, int)]
-        )
+        user_ids: list = [user_ids] if isinstance(user_ids, int) else [uid for uid in user_ids if isinstance(uid, int)]
 
         logger.info(f"Sending GetUserChildHierarchy request for user_id: {user_ids}")
 
@@ -193,9 +160,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
         try:
             # Proto RPC name is external (console-service) — do not rename.
             response = await self.stub.GetServiceBoardUsersDetails(request)
-            logger.info(
-                f"Received child user list for user_id: {user_ids}: {response.user_detail}"
-            )
+            logger.info(f"Received child user list for user_id: {user_ids}: {response.user_detail}")
 
             child_user_dict = {
                 user.user_id: {

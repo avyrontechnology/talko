@@ -27,9 +27,7 @@ class TalkoUserHierarchy:
         self.grpc_client = grpc_client
         self.logger = logger
 
-    async def get_user_hierarchy_data(
-        self, request_data: Any, current_user_id: int
-    ) -> list[int]:
+    async def get_user_hierarchy_data(self, request_data: Any, current_user_id: int) -> list[int]:
         """
         Fetch and validate the full agent hierarchy under the given user.
 
@@ -52,24 +50,16 @@ class TalkoUserHierarchy:
             list[int]: A list of unique agent IDs belonging to the user hierarchy.
                        Returns an empty list if no valid agents match the filter.
         """
-        filter_agent_ids = (
-            request_data.agents
-            if request_data and hasattr(request_data, "agents")
-            else []
-        )
+        filter_agent_ids = request_data.agents if request_data and hasattr(request_data, "agents") else []
 
-        self.logger.info(
-            "Fetching user hierarchy for user_id={}, filter_agents={}".format(
-                current_user_id, filter_agent_ids
-            )
-        )
+        self.logger.info(f"Fetching user hierarchy for user_id={current_user_id}, filter_agents={filter_agent_ids}")
 
         # Get direct children and their hierarchies
         user_list = await self.grpc_client.get_user_child_details(current_user_id)
         child_hierarchies = await self.grpc_client.get_user_child_hierarchy(user_list)
 
-        self.logger.debug("Child hierarchies: {}".format(child_hierarchies))
-        self.logger.debug("Direct children: {}".format(user_list))
+        self.logger.debug(f"Child hierarchies: {child_hierarchies}")
+        self.logger.debug(f"Direct children: {user_list}")
 
         # Collect all unique agent IDs (self + children + grandchildren)
         agent_ids = {
@@ -83,7 +73,7 @@ class TalkoUserHierarchy:
         }
         agent_ids.add(current_user_id)  # include current user
 
-        self.logger.info("User hierarchy (before filter): {}".format(agent_ids))
+        self.logger.info(f"User hierarchy (before filter): {agent_ids}")
 
         # Apply filtering if specific agent_ids are requested
         if filter_agent_ids:
@@ -94,5 +84,5 @@ class TalkoUserHierarchy:
         else:
             agent_ids = list(agent_ids)
 
-        self.logger.info("User hierarchy (final): {}".format(agent_ids))
+        self.logger.info(f"User hierarchy (final): {agent_ids}")
         return agent_ids

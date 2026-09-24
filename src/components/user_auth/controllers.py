@@ -1,7 +1,6 @@
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Request, status
 
-from src.components.common.constants import TalkoCurrentUserMap
 from src.components.common.responses import (
     TalkoBadRequestResponse,
     TalkoForbiddenPermissionResponse,
@@ -37,30 +36,26 @@ class TalkoUserAuthController:
     @inject
     async def signup(
         payload: TalkoContract.Signup,
-        user_auth_service: TalkoUserAuthService = Depends(
-            Provide[TalkoContainer.user_auth_service]
-        ),
+        user_auth_service: TalkoUserAuthService = Depends(Provide[TalkoContainer.user_auth_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
             user = await user_auth_service.signup(payload)
             return TalkoResourceCreatedResponse(data=user)
         except TalkoUserExistsError as exc:
-            talko_service_logger.warning("Talko signup conflict: {}".format(exc))
+            talko_service_logger.warning(f"Talko signup conflict: {exc}")
             return TalkoBadRequestResponse(detail=str(exc))
         except ValueError as exc:
             return TalkoBadRequestResponse(detail=str(exc))
         except Exception as exc:
-            talko_service_logger.error("Unexpected error on talko signup: {}".format(exc))
+            talko_service_logger.error(f"Unexpected error on talko signup: {exc}")
             return TalkoInternalServerErrorResponse()
 
     @router.post("/auth/login", response_model=TalkoContract.TokenResponse)
     @inject
     async def login(
         payload: TalkoContract.Login,
-        user_auth_service: TalkoUserAuthService = Depends(
-            Provide[TalkoContainer.user_auth_service]
-        ),
+        user_auth_service: TalkoUserAuthService = Depends(Provide[TalkoContainer.user_auth_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
@@ -71,7 +66,7 @@ class TalkoUserAuthController:
         except TalkoInactiveUserError as exc:
             return TalkoForbiddenPermissionResponse(detail=str(exc))
         except Exception as exc:
-            talko_service_logger.error("Unexpected error on talko login: {}".format(exc))
+            talko_service_logger.error(f"Unexpected error on talko login: {exc}")
             return TalkoInternalServerErrorResponse()
 
     @router.post(
@@ -83,18 +78,14 @@ class TalkoUserAuthController:
     async def create_user(
         payload: TalkoContract.AdminCreateUser,
         request: Request,
-        user_auth_service: TalkoUserAuthService = Depends(
-            Provide[TalkoContainer.user_auth_service]
-        ),
+        user_auth_service: TalkoUserAuthService = Depends(Provide[TalkoContainer.user_auth_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         """Superadmin-provisioned account (credentials handed over offline)."""
         try:
-            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
             if not await is_superadmin(request, grpc_client, talko_service_logger):
-                return TalkoForbiddenPermissionResponse(
-                    detail="User provisioning requires superadmin"
-                )
+                return TalkoForbiddenPermissionResponse(detail="User provisioning requires superadmin")
             user = await user_auth_service.create_user(payload)
             return TalkoResourceCreatedResponse(data=user)
         except TalkoUserExistsError as exc:
@@ -102,27 +93,23 @@ class TalkoUserAuthController:
         except ValueError as exc:
             return TalkoBadRequestResponse(detail=str(exc))
         except Exception as exc:
-            talko_service_logger.error("Unexpected error provisioning user: {}".format(exc))
+            talko_service_logger.error(f"Unexpected error provisioning user: {exc}")
             return TalkoInternalServerErrorResponse()
 
     @router.get("/auth/users")
     @inject
     async def list_users(
         request: Request,
-        user_auth_service: TalkoUserAuthService = Depends(
-            Provide[TalkoContainer.user_auth_service]
-        ),
+        user_auth_service: TalkoUserAuthService = Depends(Provide[TalkoContainer.user_auth_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
-            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
             if not await is_superadmin(request, grpc_client, talko_service_logger):
-                return TalkoForbiddenPermissionResponse(
-                    detail="User management requires superadmin"
-                )
+                return TalkoForbiddenPermissionResponse(detail="User management requires superadmin")
             return TalkoSuccessResponse(data=await user_auth_service.list_users())
         except Exception as exc:
-            talko_service_logger.error("Unexpected error listing users: {}".format(exc))
+            talko_service_logger.error(f"Unexpected error listing users: {exc}")
             return TalkoInternalServerErrorResponse()
 
     @router.patch("/auth/users/{user_id}")
@@ -131,17 +118,13 @@ class TalkoUserAuthController:
         user_id: str,
         payload: TalkoContract.UpdateUser,
         request: Request,
-        user_auth_service: TalkoUserAuthService = Depends(
-            Provide[TalkoContainer.user_auth_service]
-        ),
+        user_auth_service: TalkoUserAuthService = Depends(Provide[TalkoContainer.user_auth_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
-            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
             if not await is_superadmin(request, grpc_client, talko_service_logger):
-                return TalkoForbiddenPermissionResponse(
-                    detail="User management requires superadmin"
-                )
+                return TalkoForbiddenPermissionResponse(detail="User management requires superadmin")
             updated = await user_auth_service.update_user(user_id, payload)
             if updated is None:
                 return TalkoBadRequestResponse(detail="User not found")
@@ -149,5 +132,5 @@ class TalkoUserAuthController:
         except ValueError as exc:
             return TalkoBadRequestResponse(detail=str(exc))
         except Exception as exc:
-            talko_service_logger.error("Unexpected error updating user: {}".format(exc))
+            talko_service_logger.error(f"Unexpected error updating user: {exc}")
             return TalkoInternalServerErrorResponse()

@@ -28,13 +28,7 @@ class TalkoVendorValidator:
         validate_required_fields(vendor.model_dump(), required_fields, self.logger)
 
         # Check for duplicate vendor_type
-        existing_vendor_type = await self.repository.find_vendor_by_type(
-            vendor.vendor_type.value, vendor.name
-        )
+        existing_vendor_type = await self.repository.find_vendor_by_type(vendor.vendor_type.value, vendor.name)
         if existing_vendor_type:
-            self.logger.error(
-                "Vendor with type {} and name {} already exists.".format(
-                    vendor.vendor_type.value, vendor.name
-                )
-            )
+            self.logger.error(f"Vendor with type {vendor.vendor_type.value} and name {vendor.name} already exists.")
             raise ValueError("Vendor already exists.")

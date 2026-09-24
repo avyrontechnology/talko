@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from bson import ObjectId
 
@@ -14,9 +14,7 @@ class TalkoCustomFieldRepository:
     custom field definitions.
     """
 
-    def __init__(
-        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
-    ):
+    def __init__(self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger):
         self.__db_manager = db_manager
         self.__logger = logger
 
@@ -26,21 +24,13 @@ class TalkoCustomFieldRepository:
                 TalkoCustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
             ) as collection:
                 result: Any = await collection.insert_one(field_dict)
-                self.__logger.info(
-                    "Inserted custom field definition with ID: {}".format(
-                        result.inserted_id
-                    )
-                )
+                self.__logger.info(f"Inserted custom field definition with ID: {result.inserted_id}")
                 return str(result.inserted_id)
         except Exception as e:
-            self.__logger.error(
-                "Failed to insert custom field definition: {}".format(str(e))
-            )
+            self.__logger.error(f"Failed to insert custom field definition: {str(e)}")
             raise
 
-    async def find_by_slug(
-        self, partner_id: int, entity_type: str, field_slug: str
-    ) -> Optional[Dict[str, Any]]:
+    async def find_by_slug(self, partner_id: int, entity_type: str, field_slug: str) -> dict[str, Any] | None:
         try:
             async with self.__db_manager.collection(
                 TalkoCustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
@@ -53,21 +43,17 @@ class TalkoCustomFieldRepository:
                     }
                 )
         except Exception as e:
-            self.__logger.error(
-                "Failed to find custom field by slug {}: {}".format(field_slug, str(e))
-            )
+            self.__logger.error(f"Failed to find custom field by slug {field_slug}: {str(e)}")
             raise
 
-    async def find_by_id(self, field_id: ObjectId) -> Optional[Dict[str, Any]]:
+    async def find_by_id(self, field_id: ObjectId) -> dict[str, Any] | None:
         try:
             async with self.__db_manager.collection(
                 TalkoCustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
             ) as collection:
                 return await collection.find_one({"_id": field_id})
         except Exception as e:
-            self.__logger.error(
-                "Failed to find custom field by id {}: {}".format(field_id, str(e))
-            )
+            self.__logger.error(f"Failed to find custom field by id {field_id}: {str(e)}")
             raise
 
     async def find_all(
@@ -75,9 +61,9 @@ class TalkoCustomFieldRepository:
         partner_id: int,
         entity_type: str,
         include_inactive: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         try:
-            query: Dict[str, Any] = {
+            query: dict[str, Any] = {
                 "partner_id": partner_id,
                 "entity_type": entity_type,
             }
@@ -91,24 +77,16 @@ class TalkoCustomFieldRepository:
                 return await cursor.to_list(None)
         except Exception as e:
             self.__logger.error(
-                "Failed to list custom fields for partner {}, entity_type {}: {}".format(
-                    partner_id, entity_type, str(e)
-                )
+                f"Failed to list custom fields for partner {partner_id}, entity_type {entity_type}: {str(e)}"
             )
             raise
 
-    async def update_by_id(
-        self, field_id: ObjectId, update_dict: dict
-    ) -> Optional[Dict[str, Any]]:
+    async def update_by_id(self, field_id: ObjectId, update_dict: dict) -> dict[str, Any] | None:
         try:
             async with self.__db_manager.collection(
                 TalkoCustomFieldDefinition.CollectionName.CUSTOM_FIELD_DEFINITIONS
             ) as collection:
-                return await collection.find_one_and_update(
-                    {"_id": field_id}, {SET: update_dict}, return_document=True
-                )
+                return await collection.find_one_and_update({"_id": field_id}, {SET: update_dict}, return_document=True)
         except Exception as e:
-            self.__logger.error(
-                "Failed to update custom field {}: {}".format(field_id, str(e))
-            )
+            self.__logger.error(f"Failed to update custom field {field_id}: {str(e)}")
             raise

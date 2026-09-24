@@ -15,30 +15,22 @@ class TestVendorValidator:
     def setup_class(cls):
         cls.mock_repository = AsyncMock()
         cls.mock_logger = MagicMock()
-        cls.validator = TalkoVendorValidator(
-            repository=cls.mock_repository, logger=cls.mock_logger
-        )
+        cls.validator = TalkoVendorValidator(repository=cls.mock_repository, logger=cls.mock_logger)
 
     async def test_validate_vendor_create_success(self):
         """Should pass validation if required fields exist and vendor type doesn't exist already."""
-        vendor_data = TalkoContract.VendorCreate(
-            name="airtel", vendor_type=TalkoVendorType.AIRTEL
-        )
+        vendor_data = TalkoContract.VendorCreate(name="airtel", vendor_type=TalkoVendorType.AIRTEL)
 
         self.mock_repository.find_vendor_by_type.return_value = None
 
         await self.validator.validate_vendor_create(vendor_data)
 
-        self.mock_repository.find_vendor_by_type.assert_called_once_with(
-            "airtel", "airtel"
-        )
+        self.mock_repository.find_vendor_by_type.assert_called_once_with("airtel", "airtel")
         self.mock_logger.error.assert_not_called()
 
     async def test_validate_vendor_create_duplicate_vendor_type(self):
         """Should raise ValueError if vendor with same type already exists."""
-        vendor_data = TalkoContract.VendorCreate(
-            name="airtel", vendor_type=TalkoVendorType.AIRTEL
-        )
+        vendor_data = TalkoContract.VendorCreate(name="airtel", vendor_type=TalkoVendorType.AIRTEL)
 
         self.mock_repository.find_vendor_by_type.return_value = {
             "id": 123,
@@ -49,9 +41,7 @@ class TestVendorValidator:
         with pytest.raises(ValueError, match=r"Vendor already exists."):
             await self.validator.validate_vendor_create(vendor_data)
 
-        self.mock_logger.error.assert_called_once_with(
-            "Vendor with type airtel and name airtel already exists."
-        )
+        self.mock_logger.error.assert_called_once_with("Vendor with type airtel and name airtel already exists.")
 
     async def test_validate_vendor_create_missing_required_fields(self, monkeypatch):
         """Should raise ValueError if required fields are missing."""

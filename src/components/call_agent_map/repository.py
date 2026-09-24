@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pymongo.results import InsertOneResult, UpdateResult
 
@@ -16,9 +16,7 @@ class TalkoAgentMappingRepository:
     Repository for managing call-related data operations in the database.
     """
 
-    def __init__(
-        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
-    ) -> None:
+    def __init__(self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger) -> None:
         """
         Initialize the repository.
 
@@ -29,7 +27,7 @@ class TalkoAgentMappingRepository:
         self.db_manager: TalkoDocDatabaseSessionManager = db_manager
         self.logger: TalkoServiceLogger = logger
 
-    async def get_all_agent_mapping(self) -> Optional[Dict[str, Any]]:
+    async def get_all_agent_mapping(self) -> dict[str, Any] | None:
         """
         Fetches the agent DID mapping.
         Returns:
@@ -39,18 +37,14 @@ class TalkoAgentMappingRepository:
             async with self.db_manager.collection(
                 TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
-                document: Optional[Dict[str, Any]] = await collection.find(
-                    {"is_active": True}
-                ).to_list(length=None)
-                self.logger.debug("Fetched agent DID mapping {}".format(document))
+                document: dict[str, Any] | None = await collection.find({"is_active": True}).to_list(length=None)
+                self.logger.debug(f"Fetched agent DID mapping {document}")
                 return document
         except Exception as e:
-            self.logger.error("Error fetching agent DID mapping {}".format(str(e)))
+            self.logger.error(f"Error fetching agent DID mapping {str(e)}")
             raise
 
-    async def get_agent_did_mapping(
-        self, agent_id: int, partner_id: Optional[int] = None
-    ) -> Optional[Dict[str, Any]]:
+    async def get_agent_did_mapping(self, agent_id: int, partner_id: int | None = None) -> dict[str, Any] | None:
         """
         Fetches the agent DID mapping for a given agent_id and partner_id.
 
@@ -62,32 +56,28 @@ class TalkoAgentMappingRepository:
             Optional[Dict[str, Any]]: Agent DID mapping or None if not found.
         """
         try:
-            query: Dict[str, Any] = {"is_active": True}
+            query: dict[str, Any] = {"is_active": True}
             if agent_id is not None:
                 query["agent_id"] = agent_id
             if partner_id is not None:
                 query["partner_id"] = partner_id
 
-            self.logger.debug("Get agent did mapping final query: {}".format(query))
+            self.logger.debug(f"Get agent did mapping final query: {query}")
             async with self.db_manager.collection(
                 TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
-                document: Optional[Dict[str, Any]] = await collection.find_one(query)
+                document: dict[str, Any] | None = await collection.find_one(query)
                 self.logger.debug(
-                    "Fetched agent DID mapping for agent_id {} and partner_id {}: {}".format(
-                        agent_id, partner_id, document
-                    )
+                    f"Fetched agent DID mapping for agent_id {agent_id} and partner_id {partner_id}: {document}"
                 )
                 return document
         except Exception as e:
             self.logger.error(
-                "Error fetching agent DID mapping for agent_id {} and partner_id {}: {}".format(
-                    agent_id, partner_id, str(e)
-                )
+                f"Error fetching agent DID mapping for agent_id {agent_id} and partner_id {partner_id}: {str(e)}"
             )
             raise
 
-    async def insert_agent_did_mapping(self, mapping_dict: Dict[str, Any]) -> str:
+    async def insert_agent_did_mapping(self, mapping_dict: dict[str, Any]) -> str:
         """
         Inserts a new agent DID mapping into the database.
 
@@ -98,23 +88,19 @@ class TalkoAgentMappingRepository:
             str: The ID of the inserted mapping.
         """
         try:
-            self.logger.debug("Inserting agent did mapping data: ".format(mapping_dict))
+            self.logger.debug("Inserting agent did mapping data: ")
             async with self.db_manager.collection(
                 TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
                 result: InsertOneResult = await collection.insert_one(mapping_dict)
                 inserted_id: str = str(result.inserted_id)
-                self.logger.debug(
-                    "Inserted agent DID mapping with id: {}".format(inserted_id)
-                )
+                self.logger.debug(f"Inserted agent DID mapping with id: {inserted_id}")
                 return inserted_id
         except Exception as e:
             self.logger.error(f"Error inserting agent DID mapping: {str(e)}")
             raise
 
-    async def update_agent_did_mapping(
-        self, agent_id: str, partner_id: int, updates: Dict[str, Any]
-    ) -> bool:
+    async def update_agent_did_mapping(self, agent_id: str, partner_id: int, updates: dict[str, Any]) -> bool:
         """
         Updates an existing agent DID mapping.
 
@@ -135,22 +121,16 @@ class TalkoAgentMappingRepository:
                     {"$set": updates},
                 )
                 self.logger.debug(
-                    "Updated agent DID mapping for agent_id {} and partner_id {}: {}".format(
-                        agent_id, partner_id, result.modified_count
-                    )
+                    f"Updated agent DID mapping for agent_id {agent_id} and partner_id {partner_id}: {result.modified_count}"
                 )
                 return result.modified_count > 0
         except Exception as e:
             self.logger.error(
-                "Error updating agent DID mapping for agent_id {} and partner_id {}: {}".format(
-                    agent_id, partner_id, str(e)
-                )
+                f"Error updating agent DID mapping for agent_id {agent_id} and partner_id {partner_id}: {str(e)}"
             )
             raise
 
-    async def bulk_insert_agent_did_mappings(
-        self, mappings: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    async def bulk_insert_agent_did_mappings(self, mappings: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Inserts multiple agent DID mappings into the database
 
@@ -161,7 +141,7 @@ class TalkoAgentMappingRepository:
             List[Dict[str, Any]]: List of results with IDs or error details.
         """
         try:
-            results: List[Dict[str, Any]] = []
+            results: list[dict[str, Any]] = []
             async with self.db_manager.collection(
                 TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
@@ -189,15 +169,11 @@ class TalkoAgentMappingRepository:
                             }
                         )
                         self.logger.error(
-                            "Failed to insert agent DID mapping for agent_id {}: {}".format(
-                                mapping["agent_id"], str(e)
-                            )
+                            "Failed to insert agent DID mapping for agent_id {}: {}".format(mapping["agent_id"], str(e))
                         )
             return results
         except Exception as e:
-            self.logger.error(
-                "Error in bulk insert of agent DID mappings: {}".format(str(e))
-            )
+            self.logger.error(f"Error in bulk insert of agent DID mappings: {str(e)}")
             raise
 
     async def count_active_agent_mappings(self, partner_id: int) -> int:
@@ -214,26 +190,14 @@ class TalkoAgentMappingRepository:
             async with self.db_manager.collection(
                 TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
-                count: int = await collection.count_documents(
-                    {"partner_id": partner_id, "is_active": True}
-                )
-                self.logger.debug(
-                    "Counted {} active agent mappings for partner_id {}".format(
-                        count, partner_id
-                    )
-                )
+                count: int = await collection.count_documents({"partner_id": partner_id, "is_active": True})
+                self.logger.debug(f"Counted {count} active agent mappings for partner_id {partner_id}")
                 return count
         except Exception as e:
-            self.logger.error(
-                "Error counting active agent mappings for partner_id {}: {}".format(
-                    partner_id, str(e)
-                )
-            )
+            self.logger.error(f"Error counting active agent mappings for partner_id {partner_id}: {str(e)}")
             raise
 
-    async def get_unassigned_did(
-        self, partner_id: int, agent_mapping_dids: List[str]
-    ) -> str:
+    async def get_unassigned_did(self, partner_id: int, agent_mapping_dids: list[str]) -> str:
         """
         Retrieves an unassigned DID from the agent_mapping_dids pool for a given partner.
 
@@ -252,27 +216,19 @@ class TalkoAgentMappingRepository:
                 TalkoAgentDidMappingModel.CollectionName.AGENT_DID_MAPPING
             ) as collection:
                 # Get all currently assigned DIDs for this partner
-                assigned_dids: List[str] = await collection.distinct(
+                assigned_dids: list[str] = await collection.distinct(
                     "did", {"partner_id": partner_id, "is_active": True}
                 )
                 # Find an unassigned DID
-                available_dids: List[str] = [
-                    did for did in agent_mapping_dids if did not in assigned_dids
-                ]
+                available_dids: list[str] = [did for did in agent_mapping_dids if did not in assigned_dids]
                 if not available_dids:
                     raise TalkoBadRequestError("No available DIDs for agent mapping")
-                return available_dids[
-                    0
-                ]  # Simple first-available; can be enhanced with round-robin
+                return available_dids[0]  # Simple first-available; can be enhanced with round-robin
         except Exception as e:
-            self.logger.error(
-                "Error fetching unassigned DID for partner_id {}: {}".format(
-                    partner_id, str(e)
-                )
-            )
+            self.logger.error(f"Error fetching unassigned DID for partner_id {partner_id}: {str(e)}")
             raise
 
-    async def insert_agent_workspace_mapping(self, mapping_dict: Dict[str, Any]) -> str:
+    async def insert_agent_workspace_mapping(self, mapping_dict: dict[str, Any]) -> str:
         """
         Inserts a new Agent–Workspace mapping into the database.
 
@@ -283,21 +239,21 @@ class TalkoAgentMappingRepository:
             str: The ID of the inserted mapping.
         """
         try:
-            self.logger.debug("Inserting mapping data: ".format(mapping_dict))
+            self.logger.debug("Inserting mapping data: ")
             async with self.db_manager.collection(
                 TalkoAgentWorkspaceMappingModel.CollectionName.AGENT_WORKSPACE_MAPPING
             ) as collection:
                 result: InsertOneResult = await collection.insert_one(mapping_dict)
                 inserted_id: str = str(result.inserted_id)
-                self.logger.debug(
-                    "Inserted Agent–Workspace mapping with id: {}".format(inserted_id)
-                )
+                self.logger.debug(f"Inserted Agent–Workspace mapping with id: {inserted_id}")
                 return inserted_id
         except Exception as e:
-            self.logger.error("Error inserting Agent–Workspace mapping: {}".format(str(e)))
+            self.logger.error(f"Error inserting Agent–Workspace mapping: {str(e)}")
             raise
 
-    async def get_agents_by_workspace_id_and_partner_id(self, workspace_id: int, partner_id: int) -> List[Dict[str, Any]]:
+    async def get_agents_by_workspace_id_and_partner_id(
+        self, workspace_id: int, partner_id: int
+    ) -> list[dict[str, Any]]:
         """
         Fetch all agents mapped to a given workspace id and partner_id
         """
@@ -305,15 +261,17 @@ class TalkoAgentMappingRepository:
             async with self.db_manager.collection(
                 TalkoAgentWorkspaceMappingModel.CollectionName.AGENT_WORKSPACE_MAPPING
             ) as collection:
-                agents: List[Dict[str, Any]] = await collection.find(
-                    {"workspace_id": workspace_id, "partner_id":partner_id, "is_active": True}
+                agents: list[dict[str, Any]] = await collection.find(
+                    {"workspace_id": workspace_id, "partner_id": partner_id, "is_active": True}
                 ).to_list(length=None)
                 self.logger.debug(
-                    "Fetched agents for workspace_id {} and partner_id {}: {}".format(workspace_id, partner_id, agents)
+                    f"Fetched agents for workspace_id {workspace_id} and partner_id {partner_id}: {agents}"
                 )
                 return agents
         except Exception as e:
-            self.logger.error("Error fetching agents for workspace_id {} and partner_id {}: {}".format(workspace_id, partner_id, str(e)))
+            self.logger.error(
+                f"Error fetching agents for workspace_id {workspace_id} and partner_id {partner_id}: {str(e)}"
+            )
             raise
 
     async def update_is_active_by_workspace_and_partner_id(
@@ -334,11 +292,11 @@ class TalkoAgentMappingRepository:
                     {"$set": {"is_active": is_active}},
                 )
                 self.logger.info(
-                    "Updated 'is_active'={} for {} mappings (workspace_id={}, partner_id={})".format(
-                        is_active, result.modified_count, workspace_id, partner_id
-                    )
+                    f"Updated 'is_active'={is_active} for {result.modified_count} mappings (workspace_id={workspace_id}, partner_id={partner_id})"
                 )
                 return result.modified_count
         except Exception as e:
-            self.logger.error("Failed to update status of mappings for workspace_id={} and partner_id={}: {}".format(workspace_id, partner_id, str(e)))
+            self.logger.error(
+                f"Failed to update status of mappings for workspace_id={workspace_id} and partner_id={partner_id}: {str(e)}"
+            )
             raise

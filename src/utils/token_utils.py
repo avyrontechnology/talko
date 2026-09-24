@@ -1,6 +1,5 @@
 import hashlib
 import secrets
-from typing import Tuple
 
 
 class TalkoApiKeyGenerator:
@@ -15,18 +14,14 @@ class TalkoApiKeyGenerator:
     DISPLAY_SUFFIX_LENGTH = 8
 
     @staticmethod
-    def generate() -> Tuple[str, str, str]:
+    def generate() -> tuple[str, str, str]:
         """Generate a new key. Returns (raw_key, key_prefix, key_hash).
 
         raw_key is returned to the caller exactly once and never stored.
         key_hash (SHA-256 hex digest) is what gets persisted for lookup.
         """
-        raw_key = "{}{}".format(
-            TalkoApiKeyGenerator.PREFIX, secrets.token_urlsafe(32)
-        )
-        key_prefix = raw_key[
-            : len(TalkoApiKeyGenerator.PREFIX) + TalkoApiKeyGenerator.DISPLAY_SUFFIX_LENGTH
-        ]
+        raw_key = f"{TalkoApiKeyGenerator.PREFIX}{secrets.token_urlsafe(32)}"
+        key_prefix = raw_key[: len(TalkoApiKeyGenerator.PREFIX) + TalkoApiKeyGenerator.DISPLAY_SUFFIX_LENGTH]
         return raw_key, key_prefix, TalkoApiKeyGenerator.hash_key(raw_key)
 
     @staticmethod

@@ -1,14 +1,15 @@
 import pytest
+
 from src.utils.enums import (
-    TalkoVendorType,
-    TalkoNumberType,
-    TalkoTimeFilter,
     TalkoCallStatus,
+    TalkoConnectionStatus,
     TalkoHangupCause,
+    TalkoNumberType,
     TalkoReasonKey,
     TalkoRingType,
+    TalkoTimeFilter,
     TalkoUserRoleHierarchy,
-    TalkoConnectionStatus,
+    TalkoVendorType,
 )
 
 
@@ -67,15 +68,11 @@ class TestHangupCause:
 
     def test_from_raw_normalized_match(self, monkeypatch):
         """Covers normalize_auto_format + for loop match"""
-        monkeypatch.setattr(
-            "src.utils.enums.normalize_auto_format", lambda v: "Normal clearing"
-        )
+        monkeypatch.setattr("src.utils.enums.normalize_auto_format", lambda v: "Normal clearing")
         assert TalkoHangupCause.from_raw("random value") == TalkoHangupCause.NORMAL_CLEARING
 
     def test_from_raw_fallback_unknown(self, monkeypatch):
-        monkeypatch.setattr(
-            "src.utils.enums.normalize_auto_format", lambda v: "Unmatched value"
-        )
+        monkeypatch.setattr("src.utils.enums.normalize_auto_format", lambda v: "Unmatched value")
         assert TalkoHangupCause.from_raw("random") == TalkoHangupCause.UNKNOWN
 
 
@@ -101,15 +98,11 @@ class TestReasonKey:
         assert TalkoReasonKey.from_raw(raw) == expected
 
     def test_from_raw_normalized_match(self, monkeypatch):
-        monkeypatch.setattr(
-            "src.utils.enums.normalize_auto_format", lambda v: "Calls Dropped"
-        )
+        monkeypatch.setattr("src.utils.enums.normalize_auto_format", lambda v: "Calls Dropped")
         assert TalkoReasonKey.from_raw("something") == TalkoReasonKey.DROPPED
 
     def test_from_raw_fallback_unknown(self, monkeypatch):
-        monkeypatch.setattr(
-            "src.utils.enums.normalize_auto_format", lambda v: "Unknown something"
-        )
+        monkeypatch.setattr("src.utils.enums.normalize_auto_format", lambda v: "Unknown something")
         assert TalkoReasonKey.from_raw("other") == TalkoReasonKey.UNKNOWN
 
 

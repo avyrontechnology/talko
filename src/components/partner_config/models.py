@@ -1,41 +1,35 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from bson import ObjectId
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from src.utils.enums import TalkoRingType
 from src.utils.timestamped_model import TalkoTimestampedModel
 
 
 class TalkoPartnerConfigModel(TalkoTimestampedModel):
-    partner_id: Optional[int] = None  # ID of the partner
+    partner_id: int | None = None  # ID of the partner
     is_active: bool  # Active status
     vendor_id: ObjectId  # Associated vendor ID
-    vendor_config_id: Optional[str] = None  # Associated vendor config ID
-    ai_vendor_config_id: Optional[str] = (
-        None  # Vendor config used for AI-bridge calls (falls back to vendor_config_id)
-    )
-    did_indices: Dict[str | int, int] = Field(
+    vendor_config_id: str | None = None  # Associated vendor config ID
+    ai_vendor_config_id: str | None = None  # Vendor config used for AI-bridge calls (falls back to vendor_config_id)
+    did_indices: dict[str | int, int] = Field(
         default_factory=lambda: {"round_robin": 0}
     )  # Indices for round-robin and workspaces
     enable_round_robin: bool = False  # Flag to enable round-robin DID assignment
     enable_agent_mapping: bool = False  # Flag to enable agent-specific DID mapping
     enable_workspace: bool = False  # Flag to enable workspace DID assignment
-    workspace_ids: Optional[List[int]] = (
-        None  # Workspace IDs for DID assignment
-    )
-    workspace_did_counts: Optional[Dict[str, int]] = None  # DID counts per workspace
-    agent_mapping_ids: Optional[List[int]] = (
-        None  # Agent IDs for mapping (one DID per ID)
-    )
-    round_robin_did_count: Optional[int] = None  # DID count for round-robin (deferred)
-    service_default_attendance: Dict[int, List[Dict[str, Any]]] = Field(
+    workspace_ids: list[int] | None = None  # Workspace IDs for DID assignment
+    workspace_did_counts: dict[str, int] | None = None  # DID counts per workspace
+    agent_mapping_ids: list[int] | None = None  # Agent IDs for mapping (one DID per ID)
+    round_robin_did_count: int | None = None  # DID count for round-robin (deferred)
+    service_default_attendance: dict[int, list[dict[str, Any]]] = Field(
         default_factory=dict
     )  # Default attendance per workspace
-    round_robin_default_attendance: Dict[str, List[Dict[str, Any]]] = Field(
+    round_robin_default_attendance: dict[str, list[dict[str, Any]]] = Field(
         default_factory=lambda: {"default": []}
     )  # Default attendance for round-robin
-    ring_type: Optional[TalkoRingType] = None
+    ring_type: TalkoRingType | None = None
     dialer_enabled: bool = Field(False, description="Enable dialer for this partner")
     enable_inbound_lead_creation: bool = Field(
         default=True,
@@ -44,9 +38,7 @@ class TalkoPartnerConfigModel(TalkoTimestampedModel):
             "attempt to create a new lead in Maglo/CRM before routing"
         ),
     )
-    enable_ai_agent: bool = Field(
-        False, description="Master switch — enable AI agent routing for this partner"
-    )
+    enable_ai_agent: bool = Field(False, description="Master switch — enable AI agent routing for this partner")
     enable_agent_reassignment_on_inactive: bool = Field(
         False,
         description=(
@@ -66,8 +58,7 @@ class TalkoPartnerConfigModel(TalkoTimestampedModel):
     inbound_round_robin_index: int = Field(
         0,
         description=(
-            "Cursor for inbound round-robin agent ringing order, shared "
-            "across all of this partner's workspaces"
+            "Cursor for inbound round-robin agent ringing order, shared across all of this partner's workspaces"
         ),
     )
     enable_missed_call_callback: bool = Field(
@@ -87,17 +78,11 @@ class TalkoPartnerConfigModel(TalkoTimestampedModel):
     @model_validator(mode="after")
     def check_mutual_exclusivity_and_config(self) -> "TalkoPartnerConfigModel":
         if self.enable_round_robin and self.enable_workspace:
-            raise ValueError(
-                "Round-robin and workspace cannot be enabled simultaneously."
-            )
+            raise ValueError("Round-robin and workspace cannot be enabled simultaneously.")
         if self.enable_workspace and not self.workspace_ids:
-            raise ValueError(
-                "Workspace IDs are required when workspace is enabled."
-            )
+            raise ValueError("Workspace IDs are required when workspace is enabled.")
         if self.enable_round_robin and self.round_robin_did_count is None:
-            raise ValueError(
-                "round_robin_did_count is required when enable_round_robin is true."
-            )
+            raise ValueError("round_robin_did_count is required when enable_round_robin is true.")
         if self.enable_workspace:
             for workspace_id in self.workspace_ids or []:
                 if workspace_id not in self.did_indices:
@@ -106,16 +91,8 @@ class TalkoPartnerConfigModel(TalkoTimestampedModel):
             self.did_indices["round_robin"] = 0
         if (
             self.enable_workspace
-            and any(
-                len(attendance) > 1
-                for attendance in self.service_default_attendance.values()
-            )
-        ) or (
-            self.enable_round_robin
-            and len(self.round_robin_default_attendance["default"]) > 1
-        ):
+            and any(len(attendance) > 1 for attendance in self.service_default_attendance.values())
+        ) or (self.enable_round_robin and len(self.round_robin_default_attendance["default"]) > 1):
             if not self.ring_type:
-                raise ValueError(
-                    "ring_type is required for multiple default attendance numbers."
-                )
+                raise ValueError("ring_type is required for multiple default attendance numbers.")
         return self

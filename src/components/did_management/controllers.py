@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Header, Query, Request
@@ -13,7 +13,6 @@ from src.components.common.responses import (
 from src.components.did_management.constants import TalkoDIDStatus
 from src.components.did_management.dto import TalkoContract
 from src.components.did_management.messages import (
-    PARTNER_CONFIG_NOT_FOUND,
     SOMETHING_WENT_WRONG,
 )
 from src.components.did_management.services import TalkoDidManagementService
@@ -36,7 +35,7 @@ class TalkoDIDController:
 
     @did_router.get(
         "/by-workspace",
-        response_model=List[TalkoContract.DIDResponse],
+        response_model=list[TalkoContract.DIDResponse],
     )
     @permission_check(TalkoPermissionDependency)
     @inject
@@ -45,42 +44,28 @@ class TalkoDIDController:
         workspace_id: int = Query(..., description="Workspace ID"),
         did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-    ) -> List[TalkoContract.DIDResponse]:
+    ) -> list[TalkoContract.DIDResponse]:
         try:
-            talko_service_logger.info(
-                "Fetching DIDs for workspace_id {}".format(workspace_id)
-            )
+            talko_service_logger.info(f"Fetching DIDs for workspace_id {workspace_id}")
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
             partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
             talko_service_logger.info(
-                "User: {}, Partner: {}, Workspace: {}, fetching DIDs initiated.".format(
-                    user_id, partner_id, workspace_id
-                )
+                f"User: {user_id}, Partner: {partner_id}, Workspace: {workspace_id}, fetching DIDs initiated."
             )
 
-            dids: List[TalkoContract.DIDResponse] = (
-                await did_service.get_dids_by_workspace(workspace_id)
-            )
+            dids: list[TalkoContract.DIDResponse] = await did_service.get_dids_by_workspace(workspace_id)
 
-            talko_service_logger.info(
-                "Retrieved {} DIDs for workspace_id {}".format(
-                    len(dids), workspace_id
-                )
-            )
+            talko_service_logger.info(f"Retrieved {len(dids)} DIDs for workspace_id {workspace_id}")
             return TalkoSuccessResponse(dids)
 
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error retrieving DIDs for workspace_id {}: {}".format(
-                    workspace_id, str(e)
-                )
-            )
+            talko_service_logger.error(f"Unexpected error retrieving DIDs for workspace_id {workspace_id}: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=str(e))
 
     @did_router.get(
         "/available-for-assignment",
-        response_model=List[TalkoContract.DIDSeriesResponse],
+        response_model=list[TalkoContract.DIDSeriesResponse],
     )
     @permission_check(TalkoPermissionDependency)
     @inject
@@ -88,48 +73,40 @@ class TalkoDIDController:
         request: Request,
         did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-        partner_scope: Optional[int] = Header(default=None, alias=SUPERADMIN_SCOPE_HEADER),
-    ) -> List[TalkoContract.DIDSeriesResponse]:
+        partner_scope: int | None = Header(default=None, alias=SUPERADMIN_SCOPE_HEADER),
+    ) -> list[TalkoContract.DIDSeriesResponse]:
         try:
             talko_service_logger.info("Fetching DIDs available to be assigned")
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
-            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
             try:
                 partner_id = await resolve_effective_partner_id(
                     request, grpc_client, talko_service_logger, partner_scope
                 )
             except TalkoSuperadminDenied as denied:
                 return TalkoForbiddenPermissionResponse(detail=str(denied))
-            talko_service_logger.info(
-                "User: {}, Partner: {}".format(user_id, partner_id)
-            )
+            talko_service_logger.info(f"User: {user_id}, Partner: {partner_id}")
 
-            dids: List[TalkoContract.DIDSeriesResponse] = (
-                await did_service.get_dids_available_for_assignment(partner_id)
+            dids: list[TalkoContract.DIDSeriesResponse] = await did_service.get_dids_available_for_assignment(
+                partner_id
             )
-            talko_service_logger.info("DIDS available to be assigned: {}".format(dids))
+            talko_service_logger.info(f"DIDS available to be assigned: {dids}")
 
-            talko_service_logger.info(
-                "Successfully Retrieved DIDs which are available to be assigned"
-            )
+            talko_service_logger.info("Successfully Retrieved DIDs which are available to be assigned")
             return TalkoSuccessResponse(data=dids)
 
         except ValueError as ve:
-            talko_service_logger.error("Partner config not found: {}".format(str(ve)))
-            return TalkoBadRequestResponse(detail=PARTNER_CONFIG_NOT_FOUND)
+            talko_service_logger.error(f"DID request failed: {str(ve)}")
+            return TalkoBadRequestResponse(detail=str(ve))
 
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error retrieving DIDs availbe for assignment{}".format(
-                    str(e)
-                )
-            )
+            talko_service_logger.error(f"Unexpected error retrieving DIDs availbe for assignment{str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.post(
         "/assign-did-numbers",
-        response_model=List[TalkoContract.DIDSeriesResponse],
+        response_model=list[TalkoContract.DIDSeriesResponse],
     )
     @permission_check(TalkoPermissionDependency)
     @inject
@@ -138,13 +115,13 @@ class TalkoDIDController:
         assign_did_data: TalkoContract.AssignDIDToPartner,
         did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-        partner_scope: Optional[int] = Header(default=None, alias=SUPERADMIN_SCOPE_HEADER),
+        partner_scope: int | None = Header(default=None, alias=SUPERADMIN_SCOPE_HEADER),
     ) -> dict:
         try:
             talko_service_logger.info("DIDs received to be assigned: ")
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
-            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
             try:
                 partner_id = await resolve_effective_partner_id(
                     request, grpc_client, talko_service_logger, partner_scope
@@ -152,29 +129,21 @@ class TalkoDIDController:
             except TalkoSuperadminDenied as denied:
                 return TalkoForbiddenPermissionResponse(detail=str(denied))
             talko_service_logger.info(
-                "Assign DID Numbers=> User: {}, Partner: {}, Assign_did_Data: {}".format(
-                    user_id, partner_id, assign_did_data
-                )
+                f"Assign DID Numbers=> User: {user_id}, Partner: {partner_id}, Assign_did_Data: {assign_did_data}"
             )
 
-            response: dict = await did_service.assign_dids_available_for_assignment(
-                partner_id, assign_did_data
-            )
-            talko_service_logger.info(
-                "Assign DID Numbers=> Response: {}".format(response)
-            )
+            response: dict = await did_service.assign_dids_available_for_assignment(partner_id, assign_did_data)
+            talko_service_logger.info(f"Assign DID Numbers=> Response: {response}")
 
             talko_service_logger.info("Successfully assigned DIDs")
             return TalkoSuccessResponse(data=response)
 
         except ValueError as ve:
-            talko_service_logger.error("Partner config not found: {}".format(str(ve)))
-            return TalkoBadRequestResponse(detail=PARTNER_CONFIG_NOT_FOUND)
+            talko_service_logger.error(f"DID request failed: {str(ve)}")
+            return TalkoBadRequestResponse(detail=str(ve))
 
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error assigning available DIDs {}".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error assigning available DIDs {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.post(
@@ -188,45 +157,33 @@ class TalkoDIDController:
         payload: TalkoContract.UnassignDIDRequest,
         did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-        partner_scope: Optional[int] = Header(default=None, alias=SUPERADMIN_SCOPE_HEADER),
+        partner_scope: int | None = Header(default=None, alias=SUPERADMIN_SCOPE_HEADER),
     ) -> dict:
         try:
-            talko_service_logger.info(
-                "DIDs received to be unassigned: {}".format(payload.did_numbers)
-            )
+            talko_service_logger.info(f"DIDs received to be unassigned: {payload.did_numbers}")
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
-            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
             try:
                 partner_id = await resolve_effective_partner_id(
                     request, grpc_client, talko_service_logger, partner_scope
                 )
             except TalkoSuperadminDenied as denied:
                 return TalkoForbiddenPermissionResponse(detail=str(denied))
-            talko_service_logger.info(
-                "Unassign DID Numbers=> User: {}, Partner: {}".format(
-                    user_id, partner_id
-                )
-            )
+            talko_service_logger.info(f"Unassign DID Numbers=> User: {user_id}, Partner: {partner_id}")
 
-            response: dict = await did_service.unassign_dids_for_partner(
-                partner_id, payload.did_numbers
-            )
-            talko_service_logger.info(
-                "Unassign DID Numbers=> Response: {}".format(response)
-            )
+            response: dict = await did_service.unassign_dids_for_partner(partner_id, payload.did_numbers)
+            talko_service_logger.info(f"Unassign DID Numbers=> Response: {response}")
 
             talko_service_logger.info("Successfully unassigned DIDs")
             return TalkoSuccessResponse(data=response)
 
         except ValueError as ve:
-            talko_service_logger.error("Partner config not found: {}".format(str(ve)))
-            return TalkoBadRequestResponse(detail=PARTNER_CONFIG_NOT_FOUND)
+            talko_service_logger.error(f"DID request failed: {str(ve)}")
+            return TalkoBadRequestResponse(detail=str(ve))
 
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error assigning available DIDs {}".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error assigning available DIDs {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.patch(
@@ -243,17 +200,13 @@ class TalkoDIDController:
     ) -> dict:
         try:
             talko_service_logger.info(
-                "Action received to update DID status: {}, for DIDs: {}".format(
-                    payload.action, payload.did_numbers
-                )
+                f"Action received to update DID status: {payload.action}, for DIDs: {payload.did_numbers}"
             )
             current_user = request.state.user
             user_id = current_user.get(TalkoCurrentUserMap.USER_ID)
             partner_id: int = current_user.get(TalkoCurrentUserMap.PARTNER_ID)
             talko_service_logger.info(
-                "Action {} applying DID status update: {} on {} DIDs".format(
-                    user_id, payload.action, len(payload.did_numbers)
-                )
+                f"Action {user_id} applying DID status update: {payload.action} on {len(payload.did_numbers)} DIDs"
             )
 
             result = await did_service.apply_did_status_update(partner_id, payload)
@@ -264,36 +217,28 @@ class TalkoDIDController:
             failed = summary.get("failed", 0)
 
             talko_service_logger.info(
-                "Action {} successfully applied DID status update: {} on DIDs: {}, Result: {}".format(
-                    user_id, payload.action, payload.did_numbers, result
-                )
+                f"Action {user_id} successfully applied DID status update: {payload.action} on DIDs: {payload.did_numbers}, Result: {result}"
             )
             if failed == 0:
                 status_label = "success"
-                message = "{} DIDs updated successfully".format(total)
+                message = f"{total} DIDs updated successfully"
 
             elif succeeded == 0:
                 status_label = "failed"
-                message = (
-                    "{} DID failed to update".format(total)
-                    if total == 1
-                    else "{} DIDs failed to update".format(total)
-                )
+                message = f"{total} DID failed to update" if total == 1 else f"{total} DIDs failed to update"
 
             else:
                 status_label = "partial_success"
-                message = "{} of {} DIDs updated successfully".format(succeeded, total)
+                message = f"{succeeded} of {total} DIDs updated successfully"
 
-            talko_service_logger.info("{} - {}".format(status_label, message))
+            talko_service_logger.info(f"{status_label} - {message}")
             return TalkoSuccessResponse(status=status_label, message=message, data=result)
 
         except ValueError as ve:
             talko_service_logger.error(str(ve))
             return TalkoBadRequestResponse(detail=str(ve))
         except Exception as e:
-            talko_service_logger.error(
-                "Error in apply_did_status_update: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in apply_did_status_update: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.get(
@@ -304,17 +249,16 @@ class TalkoDIDController:
     @inject
     async def list_dids(
         request: Request,
-        status: Optional[str] = Query(
+        status: str | None = Query(
             None,
             description="Filter by DID status (available, mapped, cooling_period, cooldown_completed)",
         ),
-        workspace_id: Optional[int] = Query(
-            None, description="Filter by workspace ID"
-        ),
-        did_number: Optional[str] = Query(
+        workspace_id: int | None = Query(None, description="Filter by workspace ID"),
+        did_number: str | None = Query(
             None,
             description="Partial or full DID number search (e.g. 98765 or +9198765)",
         ),
+        did_layer: str | None = Query(None, description="Filter by layer (external, internal)"),
         page: int = Query(1, ge=1, description="Page number"),
         limit: int = Query(20, ge=1, le=2000, description="Items per page"),
         did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
@@ -325,12 +269,8 @@ class TalkoDIDController:
             user_id = current_user.get(TalkoCurrentUserMap.USER_ID)
             partner_id = current_user.get(TalkoCurrentUserMap.PARTNER_ID)
             talko_service_logger.info(
-                "User {} calling list_dids - filters: status={}, ".format(
-                    user_id, status
-                )
-                + "partner={}, board={}, did number={}, page={}, limit={}".format(
-                    partner_id, workspace_id, did_number, page, limit
-                )
+                f"User {user_id} calling list_dids - filters: status={status}, "
+                + f"partner={partner_id}, board={workspace_id}, did number={did_number}, page={page}, limit={limit}"
             )
 
             result: TalkoContract.DIDListResponse = await did_service.list_dids(
@@ -340,17 +280,16 @@ class TalkoDIDController:
                 did_number=did_number,
                 page=page,
                 limit=limit,
+                did_layer=did_layer,
             )
 
             return TalkoSuccessResponse(data=result)
 
         except ValueError as ve:
-            talko_service_logger.error(
-                "Validation error in list_dids: {}".format(str(ve))
-            )
+            talko_service_logger.error(f"Validation error in list_dids: {str(ve)}")
             return TalkoBadRequestResponse(detail=str(ve))
         except Exception as e:
-            talko_service_logger.error("Error in list_dids: {}".format(str(e)))
+            talko_service_logger.error(f"Error in list_dids: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.get(
@@ -362,7 +301,7 @@ class TalkoDIDController:
     async def get_did_status_transitions(
         request: Request,
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-    ) -> List[TalkoContract.StatusMetadataResponse]:
+    ) -> list[TalkoContract.StatusMetadataResponse]:
         """
         Retrieve the allowed status transitions for DIDs.
 
@@ -379,10 +318,7 @@ class TalkoDIDController:
         partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
 
         talko_service_logger.info(
-            "Processing DID status metadata request for user_id={}, partner_id={}".format(
-                user_id,
-                partner_id,
-            )
+            f"Processing DID status metadata request for user_id={user_id}, partner_id={partner_id}"
         )
         transitions = [
             TalkoContract.StatusTransition(
@@ -432,20 +368,14 @@ class TalkoDIDController:
     ) -> dict:
         try:
             talko_service_logger.info(
-                "assign-ai-agent called. partner_id={}, agent_bot_id={}".format(
-                    assign_data.partner_id, assign_data.agent_bot_id
-                )
+                f"assign-ai-agent called. partner_id={assign_data.partner_id}, agent_bot_id={assign_data.agent_bot_id}"
             )
 
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
             partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
 
-            talko_service_logger.info(
-                "User: {}, Partner: {}, assigning AI agent DID".format(
-                    user_id, partner_id
-                )
-            )
+            talko_service_logger.info(f"User: {user_id}, Partner: {partner_id}, assigning AI agent DID")
 
             # Verify partner AI agent enabled (add partner_repo dependency if needed)
             did_record: dict = await did_service.assign_ai_agent_did(
@@ -454,22 +384,14 @@ class TalkoDIDController:
                 did_number=assign_data.did_number,
             )
 
-            talko_service_logger.info(
-                "AI agent DID assigned: {}".format(did_record["did_number"])
-            )
+            talko_service_logger.info("AI agent DID assigned: {}".format(did_record["did_number"]))
             return TalkoSuccessResponse(data=did_record)
 
         except TalkoResourceNotFound:
-            talko_service_logger.error(
-                "No available ai_agent DIDs for partner {}".format(
-                    assign_data.partner_id
-                )
-            )
+            talko_service_logger.error(f"No available ai_agent DIDs for partner {assign_data.partner_id}")
             return TalkoBadRequestResponse(detail="No available ai_agent DIDs")
         except Exception as e:
-            talko_service_logger.error(
-                "Error assigning AI agent DID: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error assigning AI agent DID: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.post(
@@ -486,27 +408,19 @@ class TalkoDIDController:
     ) -> dict:
         try:
             talko_service_logger.info(
-                "release-ai-agent called. partner_id={}, agent_bot_id={}".format(
-                    release_data.partner_id, release_data.agent_bot_id
-                )
+                f"release-ai-agent called. partner_id={release_data.partner_id}, agent_bot_id={release_data.agent_bot_id}"
             )
 
-            released_dids: List[str] = await did_service.release_ai_agent_did(
+            released_dids: list[str] = await did_service.release_ai_agent_did(
                 partner_id=release_data.partner_id,
                 agent_bot_id=release_data.agent_bot_id,
             )
 
-            talko_service_logger.info(
-                "Released {} AI agent DIDs".format(len(released_dids))
-            )
-            return TalkoSuccessResponse(
-                data={"released_dids": released_dids, "count": len(released_dids)}
-            )
+            talko_service_logger.info(f"Released {len(released_dids)} AI agent DIDs")
+            return TalkoSuccessResponse(data={"released_dids": released_dids, "count": len(released_dids)})
 
         except Exception as e:
-            talko_service_logger.error(
-                "Error releasing AI agent DIDs: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error releasing AI agent DIDs: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.post(
@@ -534,9 +448,7 @@ class TalkoDIDController:
         """
         try:
             talko_service_logger.info(
-                "campaign-claim called. partner_id={}, did_number={}, agent_bot_id={}".format(
-                    claim_data.partner_id, claim_data.did_number, claim_data.agent_bot_id
-                )
+                f"campaign-claim called. partner_id={claim_data.partner_id}, did_number={claim_data.did_number}, agent_bot_id={claim_data.agent_bot_id}"
             )
             result: dict = await did_service.claim_did_for_campaign(
                 partner_id=claim_data.partner_id,
@@ -549,9 +461,7 @@ class TalkoDIDController:
         except ValueError as e:
             return TalkoBadRequestResponse(detail=str(e))
         except Exception as e:
-            talko_service_logger.error(
-                "Error claiming campaign DID: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error claiming campaign DID: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.post(
@@ -575,9 +485,7 @@ class TalkoDIDController:
         """
         try:
             talko_service_logger.info(
-                "campaign-release called. partner_id={}, did_number={}, agent_bot_id={}".format(
-                    release_data.partner_id, release_data.did_number, release_data.agent_bot_id
-                )
+                f"campaign-release called. partner_id={release_data.partner_id}, did_number={release_data.did_number}, agent_bot_id={release_data.agent_bot_id}"
             )
             result: dict = await did_service.release_campaign_did(
                 partner_id=release_data.partner_id,
@@ -588,9 +496,7 @@ class TalkoDIDController:
         except TalkoResourceNotFound as e:
             return TalkoBadRequestResponse(detail=str(e))
         except Exception as e:
-            talko_service_logger.error(
-                "Error releasing campaign DID: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error releasing campaign DID: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.get(
@@ -610,37 +516,25 @@ class TalkoDIDController:
         for the given partner.
         """
         try:
-            talko_service_logger.info(
-                "get_unassigned_available_ai_agent_dids called. partner_id={}".format(
-                    partner_id
-                )
-            )
+            talko_service_logger.info(f"get_unassigned_available_ai_agent_dids called. partner_id={partner_id}")
             current_user_data: dict = request.state.user
             user_id: int = current_user_data.get(TalkoCurrentUserMap.USER_ID)
 
             talko_service_logger.info(
-                "User {} requesting unassigned available ai_agent DIDs for partner_id={}".format(
-                    user_id, partner_id
-                )
+                f"User {user_id} requesting unassigned available ai_agent DIDs for partner_id={partner_id}"
             )
 
-            dids: List[str] = await did_service.list_unassigned_available_ai_agent_dids(
+            dids: list[str] = await did_service.list_unassigned_available_ai_agent_dids(
                 partner_id=partner_id,
             )
 
             talko_service_logger.info(
-                "Found {} unassigned available ai_agent DIDs for partner_id={}".format(
-                    len(dids), partner_id
-                )
+                f"Found {len(dids)} unassigned available ai_agent DIDs for partner_id={partner_id}"
             )
             return TalkoSuccessResponse(data={"dids": dids})
 
         except ValueError as ve:
-            talko_service_logger.error(
-                "Validation error in get_unassigned_available_ai_agent_dids: {}".format(
-                    str(ve)
-                )
-            )
+            talko_service_logger.error(f"Validation error in get_unassigned_available_ai_agent_dids: {str(ve)}")
             return TalkoBadRequestResponse(detail=str(ve))
 
         except Exception as e:
@@ -662,16 +556,10 @@ class TalkoDIDController:
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> dict:
         try:
-            talko_service_logger.info(
-                "get-ai-agent-dids called. agent_bot_id={}, partner_id={}".format(
-                    agent_bot_id, partner_id
-                )
-            )
+            talko_service_logger.info(f"get-ai-agent-dids called. agent_bot_id={agent_bot_id}, partner_id={partner_id}")
 
-            dids: List[str] = await did_service.get_ai_agent_dids(
-                partner_id, agent_bot_id
-            )
-            primary_did: Optional[str] = dids[0] if dids else None
+            dids: list[str] = await did_service.get_ai_agent_dids(partner_id, agent_bot_id)
+            primary_did: str | None = dids[0] if dids else None
 
             data: dict = {
                 "agent_bot_id": agent_bot_id,
@@ -680,15 +568,11 @@ class TalkoDIDController:
                 "count": len(dids),
             }
 
-            talko_service_logger.info(
-                "Found {} DIDs for AI agent {}".format(len(dids), agent_bot_id)
-            )
+            talko_service_logger.info(f"Found {len(dids)} DIDs for AI agent {agent_bot_id}")
             return TalkoSuccessResponse(data=data)
 
         except Exception as e:
-            talko_service_logger.error(
-                "Error fetching AI agent DIDs: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error fetching AI agent DIDs: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @did_router.get(
@@ -709,25 +593,118 @@ class TalkoDIDController:
         TalkoAuthMiddleware) since it's called server-to-server, not by a user.
         """
         try:
-            talko_service_logger.info(
-                "list-ai-agent-dids called. partner_id={}".format(partner_id)
-            )
+            talko_service_logger.info(f"list-ai-agent-dids called. partner_id={partner_id}")
 
-            dids: List[Dict[str, Any]] = await did_service.list_ai_agent_dids(
-                partner_id
-            )
+            dids: list[dict[str, Any]] = await did_service.list_ai_agent_dids(partner_id)
 
-            talko_service_logger.info(
-                "Found {} ai_agent DIDs for partner_id={}".format(
-                    len(dids), partner_id
-                )
-            )
+            talko_service_logger.info(f"Found {len(dids)} ai_agent DIDs for partner_id={partner_id}")
             return TalkoSuccessResponse(data={"dids": dids})
 
         except Exception as e:
-            talko_service_logger.error(
-                "Error listing ai_agent DIDs for partner_id={}: {}".format(
-                    partner_id, str(e)
-                )
+            talko_service_logger.error(f"Error listing ai_agent DIDs for partner_id={partner_id}: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+
+    @did_router.post(
+        "/external/import",
+        response_model=dict,
+    )
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def import_external_dids(
+        request: Request,
+        payload: TalkoContract.ExternalDIDImportRequest,
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> dict:
+        """Bulk-import wholesaler EXTERNAL DIDs (immutable pool)."""
+        try:
+            result = await did_service.import_external_dids(
+                vendor_id=payload.vendor_id,
+                did_numbers=payload.did_numbers,
+                vendor_config_id=payload.vendor_config_id,
+                display_name=payload.display_name,
             )
+            return TalkoSuccessResponse(data=result)
+        except ValueError as ve:
+            return TalkoBadRequestResponse(detail=str(ve))
+        except Exception as e:
+            talko_service_logger.error(f"Error importing external DIDs: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+
+    @did_router.post(
+        "/internal/provision",
+        response_model=dict,
+    )
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def provision_internal_did(
+        request: Request,
+        payload: TalkoContract.InternalDIDProvisionRequest,
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> dict:
+        """Provision INTERNAL routable DID from an EXTERNAL parent."""
+        try:
+            result = await did_service.provision_internal_did(
+                parent_did_number=payload.parent_did_number,
+                partner_id=payload.partner_id,
+                workspace_id=payload.workspace_id,
+                agent_id=payload.agent_id,
+                vendor_config_id=payload.vendor_config_id,
+            )
+            return TalkoSuccessResponse(data=result)
+        except TalkoResourceNotFound as e:
+            return TalkoBadRequestResponse(detail=str(e))
+        except ValueError as e:
+            return TalkoBadRequestResponse(detail=str(e))
+        except Exception as e:
+            talko_service_logger.error(f"Error provisioning internal DID: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+
+    @did_router.post(
+        "/map-external-internal",
+        response_model=dict,
+    )
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def map_external_internal(
+        request: Request,
+        payload: TalkoContract.MapExternalInternalRequest,
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> dict:
+        """Bind an INTERNAL DID to an EXTERNAL parent (re-map)."""
+        try:
+            result = await did_service.map_external_internal(
+                external_did_number=payload.external_did_number,
+                internal_did_number=payload.internal_did_number,
+                partner_id=payload.partner_id,
+            )
+            return TalkoSuccessResponse(data=result)
+        except TalkoResourceNotFound as e:
+            return TalkoBadRequestResponse(detail=str(e))
+        except ValueError as e:
+            return TalkoBadRequestResponse(detail=str(e))
+        except Exception as e:
+            talko_service_logger.error(f"Error mapping DIDs: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+
+    @did_router.get(
+        "/pool-utilization",
+        response_model=dict,
+    )
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def get_pool_utilization(
+        request: Request,
+        vendor_id: str | None = Query(None, description="Vendor ID filter"),
+        did_service: TalkoDidManagementService = Depends(Provide[TalkoContainer.did_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> dict:
+        """Counts by (did_layer, status) for admin pool dashboard."""
+        try:
+            rows = await did_service.get_pool_utilization(vendor_id=vendor_id)
+            return TalkoSuccessResponse(data={"utilization": rows})
+        except Exception as e:
+            talko_service_logger.error(f"Error fetching pool utilization: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)

@@ -7,11 +7,6 @@ load_dotenv()
 
 class TalkoENV:
     SERVICE_NAME = os.getenv("SERVICE_NAME", "Template Service")
-    CONSOLE_GRPC_HOST = os.getenv("CONSOLE_GRPC_HOST", "int-console-grpc.makunaiglobal.ai")
-    CONSOLE_GRPC_PORT = os.getenv("CONSOLE_GRPC_PORT", "50051")
-    GRPC_CERT_PATH = os.getenv("GRPC_CERT_PATH", "certs/server.crt")
-    GRPC_KEY_PATH = os.getenv("GRPC_KEY_PATH", "certs/server.key")
-    GRPC_CA_CERT_PATH = os.getenv("GRPC_CA_CERT_PATH", "certs/ca.crt")
     DO_ENDPOINT_URL = os.getenv("DO_ENDPOINT_URL", "")
     DO_SPACE_NAME = os.getenv("DO_SPACE_NAME", "")
     DO_SECRET_ACCESS_KEY = os.getenv("DO_SECRET_ACCESS_KEY", "")
@@ -42,16 +37,12 @@ class TalkoENV:
     RSA_PRIVATE_KEY = os.getenv("RSA_PRIVATE_KEY", "keys/private_key.pem")
     RSA_PUBLIC_KEY = os.getenv("RSA_PUBLIC_KEY", "keys/public_key.pem")
 
-    MAGLO_BASE_URL = os.getenv("MAGLO_BASE_URL", "https://int-maglo-service.makunaiglobal.ai/maglo-service")
-    CONSOLE_SERVICE_BASE_URL = os.getenv("CONSOLE_SERVICE_BASE_URL", "http://localhost:8001")
-    CONSOLE_API_KEY = os.getenv("CONSOLE_API_KEY", "TEST_CONSOLE_API_KEY")
-
-    MAILMG_API_URL = os.getenv("MAILMG_API_URL", "https://int-mailmg.makunaiglobal.ai/api/v1/email/send")
-    MAILMG_CHANNEL_KEY = os.getenv("MAILMG_CHANNEL_KEY", "test_key")
-    MAILMG_CLIENT_NAME = os.getenv("MAILMG_CLIENT_NAME", "talko")
-
-    MAKUNAI_SESSION_URL = os.getenv("MAKUNAI_SESSION_URL", "https://int-makun-ai-service.makunaiglobal.ai/ai/v1/voice/sessions")
-    MAKUNAI_SESSION_API_KEY = os.getenv("MAKUNAI_SESSION_API_KEY", "cc18990d45720d7d036a2a107127e4f24b7ed966f626e62621bdbebd4cc643a5")
+    MAKUNAI_SESSION_URL = os.getenv(
+        "MAKUNAI_SESSION_URL", "https://int-makun-ai-service.makunaiglobal.ai/ai/v1/voice/sessions"
+    )
+    MAKUNAI_SESSION_API_KEY = os.getenv(
+        "MAKUNAI_SESSION_API_KEY", "cc18990d45720d7d036a2a107127e4f24b7ed966f626e62621bdbebd4cc643a5"
+    )
 
     # ── voiceai (external AI voice-agent engine) trunk integration ──────
     # When a call carries context_data.voiceai_agent_id (outbound calls placed
@@ -65,12 +56,8 @@ class TalkoENV:
     VOICEAI_API_BASE_URL = os.getenv("VOICEAI_API_BASE_URL", "")
     VOICEAI_WS_BASE_URL = os.getenv("VOICEAI_WS_BASE_URL", "")
     VOICEAI_API_KEY = os.getenv("VOICEAI_API_KEY", "")
-    VOICEAI_WS_TICKET_TIMEOUT_SECONDS = float(
-        os.getenv("VOICEAI_WS_TICKET_TIMEOUT_SECONDS", "10")
-    )
-    VOICEAI_WS_CONNECT_TIMEOUT_SECONDS = float(
-        os.getenv("VOICEAI_WS_CONNECT_TIMEOUT_SECONDS", "15")
-    )
+    VOICEAI_WS_TICKET_TIMEOUT_SECONDS = float(os.getenv("VOICEAI_WS_TICKET_TIMEOUT_SECONDS", "10"))
+    VOICEAI_WS_CONNECT_TIMEOUT_SECONDS = float(os.getenv("VOICEAI_WS_CONNECT_TIMEOUT_SECONDS", "15"))
     # Optional inbound routing: JSON map of Talko DID -> voiceai agent_id,
     # e.g. '{"918045678901": "agent_abc123"}'. DIDs listed here bypass the
     # makun-ai path even without per-call context_data.
@@ -78,17 +65,15 @@ class TalkoENV:
     # DID -> agent engine lookup (cached). Talko asks the voiceai engine's
     # GET {VOICEAI_API_BASE_URL}/phone-numbers/resolve per DID, Redis-cached.
     # Env map above stays as emergency override and wins when set.
-    VOICEAI_DID_RESOLVE_TIMEOUT_SECONDS = float(
-        os.getenv("VOICEAI_DID_RESOLVE_TIMEOUT_SECONDS", "0.3")
-    )
+    VOICEAI_DID_RESOLVE_TIMEOUT_SECONDS = float(os.getenv("VOICEAI_DID_RESOLVE_TIMEOUT_SECONDS", "0.3"))
     VOICEAI_DID_CACHE_TTL_SECONDS = int(os.getenv("VOICEAI_DID_CACHE_TTL_SECONDS", "60"))
-    VOICEAI_DID_NEGATIVE_CACHE_TTL_SECONDS = int(
-        os.getenv("VOICEAI_DID_NEGATIVE_CACHE_TTL_SECONDS", "10")
-    )
+    VOICEAI_DID_NEGATIVE_CACHE_TTL_SECONDS = int(os.getenv("VOICEAI_DID_NEGATIVE_CACHE_TTL_SECONDS", "10"))
 
     # Relays Tata Tele's dialer webhook (already-persisted TalkoCDR) onward to
     # makun-ai's campaign webhook — see TalkoDialerWebhookHandler._relay_to_makunai.
-    MAKUNAI_CDR_WEBHOOK_URL = os.getenv("MAKUNAI_CDR_WEBHOOK_URL", "https://int-makun-ai-service.makunaiglobal.ai/ai/v1/voice/webhooks/tata-dialer-cdr")
+    MAKUNAI_CDR_WEBHOOK_URL = os.getenv(
+        "MAKUNAI_CDR_WEBHOOK_URL", "https://int-makun-ai-service.makunaiglobal.ai/ai/v1/voice/webhooks/tata-dialer-cdr"
+    )
     # Shared secret makun-ai's webhook route checks — must match its own
     # CDR_WEBHOOK_RELAY_SECRET. Hardcoded here temporarily for live testing,
     # same value as talko-oc-config's CDR_WEBHOOK_RELAY_SECRET — once that
@@ -122,16 +107,10 @@ class TalkoENV:
         """
         Validate all required environment variables are defined.
         """
-        missing_vars = [
-            var
-            for var in cls.__dict__
-            if not var.startswith("__") and not getattr(cls, var)
-        ]
+        missing_vars = [var for var in cls.__dict__ if not var.startswith("__") and not getattr(cls, var)]
         if missing_vars:
-            raise EnvironmentError(
-                "The following required environment variables are missing or empty: {}".format(
-                    ", ".join(missing_vars)
-                )
+            raise OSError(
+                "The following required environment variables are missing or empty: {}".format(", ".join(missing_vars))
             )
 
 

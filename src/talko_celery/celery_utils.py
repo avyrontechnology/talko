@@ -14,11 +14,7 @@ def create_celery(
     config_module: str = None,
 ) -> Celery:
     try:
-        celery_logger.info(
-            "Creating Celery app '{}' with broker='{}' and backend='{}'".format(
-                app_name, broker_url, backend_url
-            )
-        )
+        celery_logger.info(f"Creating Celery app '{app_name}' with broker='{broker_url}' and backend='{backend_url}'")
 
         celery = Celery(app_name, broker=broker_url, backend=backend_url)
         celery.conf.update(
@@ -37,7 +33,7 @@ def create_celery(
             "check_and_save_unsaved_recordings_every_3_minutes": {
                 "task": "src.components.call_assets.tasks.check_and_save_unsaved_recordings",
                 "schedule": crontab(minute="*/3"),  # runs every 3 minutes
-                "args":[],
+                "args": [],
             },
             "did_cooldown_expiry_daily": {
                 "task": "src.components.did_management.tasks.process_expired_did_cooldowns",

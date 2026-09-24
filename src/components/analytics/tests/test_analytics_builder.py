@@ -1,12 +1,7 @@
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from src.components.analytics import constants as analytics_constants
 from src.components.analytics.builder import TalkoQueryBuilder
-from src.components.analytics.enums import TalkoDateRangePeriod
-from src.components.analytics.repositories import TalkoAnalyticsRepository
 
 
 class TestQueryBuilder:
@@ -42,6 +37,7 @@ class TestQueryBuilder:
             end_date_ms=2000,
             agents=[123, 456],
             workspace_id=[99, 100],
+            entity_type="Lead",
             user_role=2,
         )
         expected_query = {
@@ -52,6 +48,7 @@ class TestQueryBuilder:
             },
             "agent": {analytics_constants.IN_CONDITION: [123, 456]},
             "workspace_id": {analytics_constants.IN_CONDITION: [99, 100]},
+            "entity_type": "Lead",
         }
         assert query == expected_query
         self.mock_logger.debug.assert_called_with(f"Built query: {expected_query}")
@@ -78,6 +75,7 @@ class TestQueryBuilder:
             end_date_ms=2000,
             agents=[123, 456],
             workspace_id=[99, 100],
+            entity_type="Lead",
             user_role=2,
         )
         expected_query = {
@@ -86,9 +84,11 @@ class TestQueryBuilder:
                 analytics_constants.GTE_CONDITION: 1000,
                 analytics_constants.LTE_CONDITION: 2000,
             },
-            "agent_id": {analytics_constants.IN_CONDITION: [123, 456]},
+            "agent": {analytics_constants.IN_CONDITION: [123, 456]},
             "workspace_id": {analytics_constants.IN_CONDITION: [99, 100]},
+            "entity_type": "Lead",
         }
+        assert query == expected_query
 
     def test_build_trend_query_no_agents(self):
         """Test build_trend_query without agents."""
@@ -98,12 +98,15 @@ class TestQueryBuilder:
             end_date_ms=2000,
             agents=[],
             workspace_id=None,
+            entity_type="Lead",
             user_role=3,
         )
         expected_query = {
             analytics_constants.PARTNER_ID: 42,
-            "call_time": {
+            "date_time": {
                 analytics_constants.GTE_CONDITION: 1000,
                 analytics_constants.LTE_CONDITION: 2000,
             },
+            "entity_type": "Lead",
         }
+        assert query == expected_query

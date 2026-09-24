@@ -1,4 +1,3 @@
-from src.config import settings
 from src.core.container import TalkoContainer
 from src.talko_celery.celery_config import APP_NAME, REDIS_URL, TASK_MODULES
 from src.talko_celery.celery_utils import create_celery

@@ -1,13 +1,11 @@
-from typing import Optional
-
 from pydantic import BaseModel, model_validator
 
 from src.utils.datetime_util import TalkoDateTimeUtil
 
 
 class TalkoTimestampedModel(BaseModel):
-    created_at: Optional[int] = None  # Created timestamp
-    updated_at: Optional[int] = None  # Updated timestamp
+    created_at: int | None = None  # Created timestamp
+    updated_at: int | None = None  # Updated timestamp
 
     @model_validator(mode="before")
     @classmethod

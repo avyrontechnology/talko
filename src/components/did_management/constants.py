@@ -21,10 +21,19 @@ class TalkoDIDType(str, Enum):
     AI_AGENT = "ai_agent"
 
 
+class TalkoDIDLayer(str, Enum):
+    """Dual-layer DID ownership.
+
+    EXTERNAL = wholesaler/telco-owned, immutable inventory (partner_id=0 pool).
+    INTERNAL = partner-routable clone provisioned from an EXTERNAL parent.
+    """
+
+    EXTERNAL = "external"
+    INTERNAL = "internal"
+
+
 # Useful constant sets (type-safe)
-COOLDOWN_BLOCKED_STATUSES = frozenset(
-    [TalkoDIDStatus.COOLING_PERIOD, TalkoDIDStatus.COOLDOWN_COMPLETED]
-)
+COOLDOWN_BLOCKED_STATUSES = frozenset([TalkoDIDStatus.COOLING_PERIOD, TalkoDIDStatus.COOLDOWN_COMPLETED])
 
 USABLE_STATUSES = frozenset([TalkoDIDStatus.AVAILABLE, TalkoDIDStatus.MAPPED])
 

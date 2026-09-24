@@ -8,7 +8,6 @@ logger = TalkoServiceLogger.get_logger()
 
 
 class TalkoApiKeyServiceClient(TalkoGRPCClient):
-
     def __init__(self):
         super().__init__()
         self.stub = api_key_service_pb2_grpc.ApiKeyServiceStub(self.channel)
@@ -19,9 +18,7 @@ class TalkoApiKeyServiceClient(TalkoGRPCClient):
         request = api_key_service_pb2.ValidateApiKeyRequest(key=api_key)
         try:
             response = await self.stub.ValidateApiKey(request)
-            logger.info(
-                "ValidateApiKey response: is_active={}".format(response.is_active)
-            )
+            logger.info(f"ValidateApiKey response: is_active={response.is_active}")
             if not response.is_active:
                 return None
             return {
@@ -31,5 +28,5 @@ class TalkoApiKeyServiceClient(TalkoGRPCClient):
                 "is_active": response.is_active,
             }
         except AioRpcError as exc:
-            logger.error("gRPC error during ValidateApiKey: {}".format(exc))
+            logger.error(f"gRPC error during ValidateApiKey: {exc}")
             raise

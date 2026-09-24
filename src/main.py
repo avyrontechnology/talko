@@ -39,9 +39,7 @@ async def lifespan(app: FastAPI):
     try:
         doc_db_manager = container.db()
         doc_db_manager._initialize_client()
-        result = await doc_db_manager._client.admin.command(
-            "ping", serverSelectionTimeoutMS=3000
-        )
+        result = await doc_db_manager._client.admin.command("ping", serverSelectionTimeoutMS=3000)
         if result.get("ok") == 1.0:
             health_state["mongodb"] = {"status": "ok"}
         else:

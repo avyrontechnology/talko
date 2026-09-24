@@ -31,5 +31,5 @@ class TalkoFactoryStorageManager:
         # elif provider == TalkoStorageProvidersEnum.AZURE.name:
         #     storage_manager_class = BlobStorageManager()
         else:
-            raise ValueError("Unknown storage service provider: {}".format(provider))
+            raise ValueError(f"Unknown storage service provider: {provider}")
         return storage_manager_class

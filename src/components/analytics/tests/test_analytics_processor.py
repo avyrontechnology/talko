@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.components.analytics.base import TalkoAnalyticsBase
 from src.components.analytics.dto import (
     TalkoAgentCallAnalyticsRequest,
     TalkoAgentTalkTimeDistributionRequest,
@@ -11,7 +10,6 @@ from src.components.analytics.dto import (
     TalkoTotalAgentTalkTimeRequest,
 )
 from src.components.analytics.processor import TalkoAnalyticsProcessor
-from src.exceptions import TalkoPayloadValidationError
 
 
 @pytest.mark.asyncio
@@ -60,6 +58,7 @@ class TestAnalyticsProcessor:
             end_date=1738272000,
             agents=[1, 2, 3],  # From mocked user_hierarchy_data
             workspace_id=[1, 3],
+            entity_type="Lead",
             limit=10,
             offset=1,
             user_role=3,  # From mocked get_user_roles
@@ -88,9 +87,7 @@ class TestAnalyticsProcessor:
             )
 
         assert str(exc_info.value) == "DB error"
-        mock_logger.error.assert_any_call(
-            "Error in agent call analytics for user_id=11, partner_id=22, error=DB error"
-        )
+        mock_logger.error.assert_any_call("Error in agent call analytics for user_id=11, partner_id=22, error=DB error")
 
     async def test_get_total_agent_talk_time_success(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor
@@ -118,6 +115,7 @@ class TestAnalyticsProcessor:
             end_date=1740787200,
             agents=[1, 2, 3],
             workspace_id=None,
+            entity_type="Lead",
             limit=10,
             offset=1,
             user_role=3,
@@ -149,6 +147,7 @@ class TestAnalyticsProcessor:
             end_date=1743379200,
             agents=[1, 2, 3],
             workspace_id=None,
+            entity_type="Lead",
             limit=10,
             offset=1,
             user_role=3,
@@ -178,8 +177,11 @@ class TestAnalyticsProcessor:
             start_date=1743465600,
             end_date=1746057600,
             workspace_id=None,
+            entity_type="Lead",
             limit=10,
             offset=1,
+            agents=[1, 2, 3],
+            user_role=3,
         )
 
     async def test_get_total_agent_talk_time_failure(self, setup_processor):
@@ -190,9 +192,7 @@ class TestAnalyticsProcessor:
             agents=[9],
         )
 
-        mock_repo.get_total_agent_talk_time.side_effect = Exception(
-            "Talk time DB error"
-        )
+        mock_repo.get_total_agent_talk_time.side_effect = Exception("Talk time DB error")
 
         with pytest.raises(Exception) as exc_info:
             await processor._get_total_agent_talk_time(
@@ -216,9 +216,7 @@ class TestAnalyticsProcessor:
             agents=[10],
         )
 
-        mock_repo.get_agent_talk_time_distribution.side_effect = Exception(
-            "Distribution error"
-        )
+        mock_repo.get_agent_talk_time_distribution.side_effect = Exception("Distribution error")
 
         with pytest.raises(Exception) as exc_info:
             await processor._get_agent_talk_time_distribution(
@@ -241,9 +239,7 @@ class TestAnalyticsProcessor:
             time_range="1743465600000-1746057600000",
         )
 
-        mock_repo.get_partner_workspace.side_effect = Exception(
-            "Workspace failure"
-        )
+        mock_repo.get_partner_workspace.side_effect = Exception("Workspace failure")
 
         with pytest.raises(Exception) as exc_info:
             await processor._get_partner_workspace(
@@ -266,7 +262,7 @@ class TestAnalyticsProcessor:
             time_range="1722470400000-1726444800000",  # 2025-08-01 to 2025-09-15
             workspace_id=[40, 41],
             metric_filter="agent_missed_calls",
-            trend_basis="Weekly",
+            trend_basis="WEEKS",
         )
 
         expected_result = {
@@ -295,14 +291,15 @@ class TestAnalyticsProcessor:
             end_date=1726444800,
             agents=[1, 2, 3],
             workspace_id=[40, 41],
+            entity_type="Lead",
             metric="agent_missed_calls",
-            trend_basis="Weekly",
+            trend_basis="WEEKS",
             limit=10,
             offset=0,
             user_role=3,
         )
         mock_logger.info.assert_any_call(
-            "Fetching dashboard followup trends for user_id=99, partner_id=100, metric=agent_missed_calls, trend_basis=Weekly, date_range=(1722470400, 1726444800), limit=10, offset=0"
+            "Fetching dashboard followup trends for user_id=99, partner_id=100, metric=agent_missed_calls, trend_basis=WEEKS, date_range=(1722470400, 1726444800), limit=10, offset=0"
         )
 
     async def test_get_dashboard_call_trends_failure(self, setup_processor):
@@ -312,7 +309,7 @@ class TestAnalyticsProcessor:
             time_range="1722470400000-1726444800000",
             workspace_id=[40],
             metric_filter="agent_missed_calls",
-            trend_basis="Weekly",
+            trend_basis="WEEKS",
         )
 
         mock_repo.get_dashboard_call_trends.side_effect = Exception("Trend DB error")
@@ -331,13 +328,11 @@ class TestAnalyticsProcessor:
             "Error in dashboard followup trends for user_id=111, partner_id=222, error=Trend DB error"
         )
 
-    async def test_parse_time_range_invalid_end_before_start_isolated(
-        self, setup_processor
-    ):
+    async def test_parse_time_range_invalid_end_before_start_isolated(self, setup_processor):
         processor, _, mock_logger, _, _ = setup_processor
         time_range = "1738272000000-1735689600000"
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError):
             processor._parse_time_range(time_range)
 
         mock_logger.error.assert_any_call(

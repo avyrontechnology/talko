@@ -16,3 +16,9 @@ VOICEAI_DID_CACHE_KEY = "voiceai:did:{digits}"
 MAX_PENDING_MARKS = 8
 ACK_WAIT_SECONDS = 2.0
 CHUNK_SIZE = 160
+
+# Channel pooling: per-vendor-config concurrent-call counter.
+# Limit lives in Mongo (vendor_config.channel_pool.max_channels);
+# Redis holds only the live in-use count. No TTL — acquire/release
+# must stay paired (release on hangup + on initiate failure).
+CHANNEL_POOL_INUSE_KEY = "pool:inuse:{vendor_config_id}"

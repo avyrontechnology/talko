@@ -85,9 +85,7 @@ class TestCustomFieldValidator:
         with pytest.raises(TalkoResourceNotFound):
             await validator.validate_custom_field_exists(field_id, partner_id=1)
 
-    async def test_validate_custom_field_exists_returns_doc_for_matching_partner(
-        self, setup
-    ):
+    async def test_validate_custom_field_exists_returns_doc_for_matching_partner(self, setup):
         validator, repo, _ = setup
         field_id = ObjectId()
         repo.find_by_id.return_value = {"_id": field_id, "partner_id": 1}
@@ -124,27 +122,17 @@ class TestCustomFieldValidator:
             ),  # bool must not pass as date
         ],
     )
-    async def test_validate_and_normalize_values_type_checks(
-        self, setup, data_type, valid_value, invalid_value
-    ):
+    async def test_validate_and_normalize_values_type_checks(self, setup, data_type, valid_value, invalid_value):
         validator, repo, _ = setup
-        repo.find_all.return_value = [
-            {"field_slug": "field_x", "data_type": data_type, "choice_options": None}
-        ]
+        repo.find_all.return_value = [{"field_slug": "field_x", "data_type": data_type, "choice_options": None}]
 
-        normalized = await validator.validate_and_normalize_values(
-            1, "TalkoCDR", {"field_x": valid_value}
-        )
+        normalized = await validator.validate_and_normalize_values(1, "TalkoCDR", {"field_x": valid_value})
         assert normalized == {"field_x": valid_value}
 
         with pytest.raises(TalkoBadRequestError):
-            await validator.validate_and_normalize_values(
-                1, "TalkoCDR", {"field_x": invalid_value}
-            )
+            await validator.validate_and_normalize_values(1, "TalkoCDR", {"field_x": invalid_value})
 
-    async def test_validate_and_normalize_values_choice_rejects_unlisted_option(
-        self, setup
-    ):
+    async def test_validate_and_normalize_values_choice_rejects_unlisted_option(self, setup):
         validator, repo, _ = setup
         repo.find_all.return_value = [
             {
@@ -154,15 +142,11 @@ class TestCustomFieldValidator:
             }
         ]
 
-        normalized = await validator.validate_and_normalize_values(
-            1, "TalkoCDR", {"lead_source": "Web"}
-        )
+        normalized = await validator.validate_and_normalize_values(1, "TalkoCDR", {"lead_source": "Web"})
         assert normalized == {"lead_source": "Web"}
 
         with pytest.raises(TalkoBadRequestError):
-            await validator.validate_and_normalize_values(
-                1, "TalkoCDR", {"lead_source": "NotAnOption"}
-            )
+            await validator.validate_and_normalize_values(1, "TalkoCDR", {"lead_source": "NotAnOption"})
 
     async def test_validate_and_normalize_values_none_passthrough(self, setup):
         validator, repo, _ = setup
@@ -173,7 +157,5 @@ class TestCustomFieldValidator:
                 "choice_options": None,
             }
         ]
-        normalized = await validator.validate_and_normalize_values(
-            1, "TalkoCDR", {"notes": None}
-        )
+        normalized = await validator.validate_and_normalize_values(1, "TalkoCDR", {"notes": None})
         assert normalized == {"notes": None}

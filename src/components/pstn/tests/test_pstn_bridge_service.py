@@ -47,9 +47,7 @@ class TestBackfillRealVendorCallId:
         deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(
             return_value={"vendor_id": "vendor-1", "vendor_config_id": "config-1"}
         )
-        deps["call_repository"].get_vendor_config = AsyncMock(
-            return_value={"vendor_type": "tata_tele"}
-        )
+        deps["call_repository"].get_vendor_config = AsyncMock(return_value={"vendor_type": "tata_tele"})
 
         room = MagicMock()
         room.name = "call-abc"
@@ -85,9 +83,7 @@ class TestBackfillRealVendorCallId:
                 "ai_vendor_config_id": "ai-config-1",
             }
         )
-        deps["call_repository"].get_vendor_config = AsyncMock(
-            return_value={"vendor_type": "tata_tele"}
-        )
+        deps["call_repository"].get_vendor_config = AsyncMock(return_value={"vendor_type": "tata_tele"})
 
         room = MagicMock()
         room.local_participant.publish_data = AsyncMock()
@@ -101,16 +97,12 @@ class TestBackfillRealVendorCallId:
         ):
             await service._backfill_real_vendor_call_id(make_ctx(), room)
 
-        deps["call_repository"].get_vendor_config.assert_awaited_once_with(
-            "vendor-1", "ai-config-1"
-        )
+        deps["call_repository"].get_vendor_config.assert_awaited_once_with("vendor-1", "ai-config-1")
 
     @pytest.mark.asyncio
     async def test_no_partner_config_skips_publish(self):
         service, deps = make_service()
-        deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(
-            return_value=None
-        )
+        deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(return_value=None)
         room = MagicMock()
         room.local_participant.publish_data = AsyncMock()
 
@@ -151,9 +143,7 @@ class TestBackfillRealVendorCallId:
         deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(
             return_value={"vendor_id": "vendor-1", "vendor_config_id": "config-1"}
         )
-        deps["call_repository"].get_vendor_config = AsyncMock(
-            return_value={"vendor_type": "tata_tele"}
-        )
+        deps["call_repository"].get_vendor_config = AsyncMock(return_value={"vendor_type": "tata_tele"})
         room = MagicMock()
         room.local_participant.publish_data = AsyncMock()
 
@@ -179,9 +169,7 @@ class TestBackfillRealVendorCallId:
         deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(
             return_value={"vendor_id": "vendor-1", "vendor_config_id": "config-1"}
         )
-        deps["call_repository"].get_vendor_config = AsyncMock(
-            return_value={"vendor_type": "tata_tele"}
-        )
+        deps["call_repository"].get_vendor_config = AsyncMock(return_value={"vendor_type": "tata_tele"})
         deps["call_repository"].update_cdr = AsyncMock(return_value=True)
 
         room = MagicMock()
@@ -199,9 +187,7 @@ class TestBackfillRealVendorCallId:
             await service._backfill_real_vendor_call_id(ctx, room)
 
         room.local_participant.publish_data.assert_not_awaited()
-        deps["call_repository"].update_cdr.assert_awaited_once_with(
-            "cdr-abc-123", {"call_id": ctx.call_sid}
-        )
+        deps["call_repository"].update_cdr.assert_awaited_once_with("cdr-abc-123", {"call_id": ctx.call_sid})
 
     @pytest.mark.asyncio
     async def test_updates_original_cdr_when_cdr_id_present(self):
@@ -214,9 +200,7 @@ class TestBackfillRealVendorCallId:
         deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(
             return_value={"vendor_id": "vendor-1", "vendor_config_id": "config-1"}
         )
-        deps["call_repository"].get_vendor_config = AsyncMock(
-            return_value={"vendor_type": "tata_tele"}
-        )
+        deps["call_repository"].get_vendor_config = AsyncMock(return_value={"vendor_type": "tata_tele"})
         deps["call_repository"].update_cdr = AsyncMock(return_value=True)
 
         room = MagicMock()
@@ -233,9 +217,7 @@ class TestBackfillRealVendorCallId:
         ):
             await service._backfill_real_vendor_call_id(ctx, room)
 
-        deps["call_repository"].update_cdr.assert_awaited_once_with(
-            "cdr-abc-123", {"call_id": "CAXX-real-123"}
-        )
+        deps["call_repository"].update_cdr.assert_awaited_once_with("cdr-abc-123", {"call_id": "CAXX-real-123"})
 
     @pytest.mark.asyncio
     async def test_skips_cdr_update_when_no_cdr_id_in_context(self):
@@ -243,9 +225,7 @@ class TestBackfillRealVendorCallId:
         deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(
             return_value={"vendor_id": "vendor-1", "vendor_config_id": "config-1"}
         )
-        deps["call_repository"].get_vendor_config = AsyncMock(
-            return_value={"vendor_type": "tata_tele"}
-        )
+        deps["call_repository"].get_vendor_config = AsyncMock(return_value={"vendor_type": "tata_tele"})
         deps["call_repository"].update_cdr = AsyncMock()
 
         room = MagicMock()
@@ -270,12 +250,8 @@ class TestBackfillRealVendorCallId:
         deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(
             return_value={"vendor_id": "vendor-1", "vendor_config_id": "config-1"}
         )
-        deps["call_repository"].get_vendor_config = AsyncMock(
-            return_value={"vendor_type": "tata_tele"}
-        )
-        deps["call_repository"].update_cdr = AsyncMock(
-            side_effect=RuntimeError("mongo down")
-        )
+        deps["call_repository"].get_vendor_config = AsyncMock(return_value={"vendor_type": "tata_tele"})
+        deps["call_repository"].update_cdr = AsyncMock(side_effect=RuntimeError("mongo down"))
 
         room = MagicMock()
         room.local_participant.publish_data = AsyncMock()
@@ -296,9 +272,7 @@ class TestBackfillRealVendorCallId:
     @pytest.mark.asyncio
     async def test_repository_exception_is_swallowed(self):
         service, deps = make_service()
-        deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(
-            side_effect=RuntimeError("db down")
-        )
+        deps["call_repository"].get_partner_config_by_partner_id = AsyncMock(side_effect=RuntimeError("db down"))
         room = MagicMock()
         room.local_participant.publish_data = AsyncMock()
 

@@ -8,8 +8,6 @@ from starlette_context.plugins.request_id import RequestIdPlugin
 from src.config.log import LOGGING_CONFIG
 from src.loggers import TalkoLogLevel
 
-from ..exceptions import TalkoLoggerException
-
 
 class TalkoRequestIdFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool | logging.LogRecord:
@@ -85,7 +83,7 @@ class TalkoBaseLogger:
         module_name = frame.f_globals["__name__"]
 
         # Prepare the log message with line number and module name
-        original_message = "({}:{}) {}".format(module_name, line_number, message)
+        original_message = f"({module_name}:{line_number}) {message}"
         self.__logger.log(level, original_message)
 
     def debug(self, message: str):

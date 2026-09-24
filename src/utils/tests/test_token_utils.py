@@ -18,12 +18,8 @@ class TestTalkoApiKeyGenerator:
         assert raw_key_1 != raw_key_2
 
     def test_hash_key_deterministic(self):
-        assert TalkoApiKeyGenerator.hash_key("abc") == TalkoApiKeyGenerator.hash_key(
-            "abc"
-        )
-        assert TalkoApiKeyGenerator.hash_key("abc") != TalkoApiKeyGenerator.hash_key(
-            "abd"
-        )
+        assert TalkoApiKeyGenerator.hash_key("abc") == TalkoApiKeyGenerator.hash_key("abc")
+        assert TalkoApiKeyGenerator.hash_key("abc") != TalkoApiKeyGenerator.hash_key("abd")
 
     def test_is_partner_key(self):
         raw_key, _, _ = TalkoApiKeyGenerator.generate()

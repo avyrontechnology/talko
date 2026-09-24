@@ -1,5 +1,3 @@
-from bson import ObjectId
-
 from src.components.partner_config.message import (
     PARTNER_CONFIG_WITH_PARTNER_ID_ALREADY_EXIST,
 )
@@ -29,22 +27,14 @@ class TalkoPartnerConfigValidator:
         self.logger = logger
         self.partner_config_repository = partner_config_repository
 
-    async def check_if_already_partner_exist_in_partner_config(
-        self, partner_id: int
-    ) -> None:
+    async def check_if_already_partner_exist_in_partner_config(self, partner_id: int) -> None:
         """
         Validate that a partner exists and no config already exists for it.
 
         :param partner_id: The ObjectId of the partner.
         :raises ValueError: If the partner config already exists for partner id.
         """
-        partner_config = (
-            await self.partner_config_repository.find_partner_config_by_partner_id(
-                partner_id
-            )
-        )
+        partner_config = await self.partner_config_repository.find_partner_config_by_partner_id(partner_id)
         if partner_config:
-            self.logger.error(
-                "Partner id: {} already exists in partner config.".format(partner_id)
-            )
+            self.logger.error(f"Partner id: {partner_id} already exists in partner config.")
             raise ValueError(PARTNER_CONFIG_WITH_PARTNER_ID_ALREADY_EXIST)

@@ -34,19 +34,13 @@ class TalkoCustomFieldController:
     async def create_custom_field(
         request: Request,
         field_data: TalkoContract.CustomFieldCreate,
-        custom_field_service: TalkoCustomFieldService = Depends(
-            Provide[TalkoContainer.custom_field_service]
-        ),
+        custom_field_service: TalkoCustomFieldService = Depends(Provide[TalkoContainer.custom_field_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> TalkoContract.CustomFieldCreationUpdationResponse:
         try:
             current_user_data: dict = request.state.user
             partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
-            talko_service_logger.info(
-                "Partner: {}, create custom field api initiated. data: {}".format(
-                    partner_id, field_data
-                )
-            )
+            talko_service_logger.info(f"Partner: {partner_id}, create custom field api initiated. data: {field_data}")
             created_field: TalkoContract.CustomFieldCreationUpdationResponse = (
                 await custom_field_service.create_custom_field(partner_id, field_data)
             )
@@ -56,9 +50,7 @@ class TalkoCustomFieldController:
         except TalkoDuplicateResourceError as e:
             return TalkoResourceConflictResponse(detail=str(e))
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error creating custom field: {}.".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error creating custom field: {str(e)}.")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @custom_field_router.get("", response_model=list[TalkoContract.CustomFieldResponse])
@@ -69,100 +61,72 @@ class TalkoCustomFieldController:
         entity_type: TalkoCustomFieldEntityType = Query(
             ..., description="Entity type to fetch custom field definitions for"
         ),
-        custom_field_service: TalkoCustomFieldService = Depends(
-            Provide[TalkoContainer.custom_field_service]
-        ),
+        custom_field_service: TalkoCustomFieldService = Depends(Provide[TalkoContainer.custom_field_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> list[TalkoContract.CustomFieldResponse]:
         try:
             current_user_data: dict = request.state.user
             partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
             talko_service_logger.info(
-                "Partner: {}, entity_type: {}, get custom fields api initiated.".format(
-                    partner_id, entity_type
-                )
+                f"Partner: {partner_id}, entity_type: {entity_type}, get custom fields api initiated."
             )
-            fields: list[TalkoContract.CustomFieldResponse] = (
-                await custom_field_service.get_custom_fields(
-                    partner_id, entity_type.value
-                )
+            fields: list[TalkoContract.CustomFieldResponse] = await custom_field_service.get_custom_fields(
+                partner_id, entity_type.value
             )
             return TalkoSuccessResponse(data=fields)
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error retrieving custom fields: {}.".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error retrieving custom fields: {str(e)}.")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
-    @custom_field_router.patch(
-        "/{field_id}", response_model=TalkoContract.CustomFieldCreationUpdationResponse
-    )
+    @custom_field_router.patch("/{field_id}", response_model=TalkoContract.CustomFieldCreationUpdationResponse)
     @permission_check(TalkoPermissionDependency)
     @inject
     async def update_custom_field(
         request: Request,
         field_id: str,
         update_data: TalkoContract.CustomFieldUpdate,
-        custom_field_service: TalkoCustomFieldService = Depends(
-            Provide[TalkoContainer.custom_field_service]
-        ),
+        custom_field_service: TalkoCustomFieldService = Depends(Provide[TalkoContainer.custom_field_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> TalkoContract.CustomFieldCreationUpdationResponse:
         try:
             current_user_data: dict = request.state.user
             partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
             talko_service_logger.info(
-                "Partner: {}, update custom field {} api initiated. data: {}".format(
-                    partner_id, field_id, update_data
-                )
+                f"Partner: {partner_id}, update custom field {field_id} api initiated. data: {update_data}"
             )
             updated_field: TalkoContract.CustomFieldCreationUpdationResponse = (
-                await custom_field_service.update_custom_field(
-                    partner_id, field_id, update_data
-                )
+                await custom_field_service.update_custom_field(partner_id, field_id, update_data)
             )
             return TalkoSuccessResponse(data=updated_field)
         except TalkoBadRequestError as e:
             return TalkoBadRequestResponse(detail=str(e))
-        except TalkoResourceNotFound as e:
+        except TalkoResourceNotFound:
             return TalkoResourceNotFoundResponse(detail=NOT_FOUND)
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error updating custom field: {}.".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error updating custom field: {str(e)}.")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
-    @custom_field_router.delete(
-        "/{field_id}", response_model=TalkoContract.CustomFieldCreationUpdationResponse
-    )
+    @custom_field_router.delete("/{field_id}", response_model=TalkoContract.CustomFieldCreationUpdationResponse)
     @permission_check(TalkoPermissionDependency)
     @inject
     async def delete_custom_field(
         request: Request,
         field_id: str,
-        custom_field_service: TalkoCustomFieldService = Depends(
-            Provide[TalkoContainer.custom_field_service]
-        ),
+        custom_field_service: TalkoCustomFieldService = Depends(Provide[TalkoContainer.custom_field_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> TalkoContract.CustomFieldCreationUpdationResponse:
         try:
             current_user_data: dict = request.state.user
             partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
-            talko_service_logger.info(
-                "Partner: {}, delete custom field {} api initiated.".format(
-                    partner_id, field_id
-                )
-            )
+            talko_service_logger.info(f"Partner: {partner_id}, delete custom field {field_id} api initiated.")
             deleted_field: TalkoContract.CustomFieldCreationUpdationResponse = (
                 await custom_field_service.delete_custom_field(partner_id, field_id)
             )
             return TalkoSuccessResponse(data=deleted_field)
         except TalkoBadRequestError as e:
             return TalkoBadRequestResponse(detail=str(e))
-        except TalkoResourceNotFound as e:
+        except TalkoResourceNotFound:
             return TalkoResourceNotFoundResponse(detail=NOT_FOUND)
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error deleting custom field: {}.".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error deleting custom field: {str(e)}.")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)

@@ -1,0 +1,84 @@
+name: Build and Push to AWS ECR (talko)
+
+# Required GitHub secrets:
+#   AWS_REGION            e.g. ap-south-1 (or set AWS_REGION secret; defaults to ap-south-1)
+#   AWS_ROLE_TO_ASSUME    IAM role ARN for OIDC (recommended), e.g. arn:aws:iam::<account>:role/github-ecr-push
+#   -- or --
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY  (fallback if OIDC role not set)
+#   ECR_REPOSITORY        e.g. talko-service (defaults to talko-service)
+#   ACTIONS_DEPLOY_KEY    PAT for private submodule digital_assets (existing secret)
+#
+# Required AWS setup (one-time, ap-south-1):
+#   aws ecr create-repository --repository-name talko-service --region ap-south-1
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION || 'ap-south-1' }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY || 'talko-service' }}
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: recursive
+          token: ${{ secrets.ACTIONS_DEPLOY_KEY || github.token }}
+
+      - name: Configure AWS credentials (OIDC role)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (access keys fallback)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=,format=short
+            type=ref,event=tag
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

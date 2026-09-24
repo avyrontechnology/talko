@@ -1,10 +1,7 @@
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from pydantic import ValidationError
 
-from src.components.call_management import messages as call_messages
 from src.components.call_management.dto import TalkoContract
 from src.components.call_management.helper import TalkoCallProcessorHelper
 from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
@@ -81,9 +78,7 @@ class TestCallProcessorHelperCompleteCoverage:
         }
 
         # Should not raise
-        await self.helper.validate_given_did(
-            did="911111111111", partner_id=123, workspace_id=1
-        )
+        await self.helper.validate_given_did(did="911111111111", partner_id=123, workspace_id=1)
 
     @pytest.mark.asyncio
     async def test_validate_given_did_available_status_succeeds(self):
@@ -101,9 +96,7 @@ class TestCallProcessorHelperCompleteCoverage:
             "status": "Available",
         }
 
-        await self.helper.validate_given_did(
-            did="911111111111", partner_id=123, workspace_id=1
-        )
+        await self.helper.validate_given_did(did="911111111111", partner_id=123, workspace_id=1)
 
     @pytest.mark.asyncio
     async def test_validate_given_did_cooling_period_rejected(self):
@@ -116,9 +109,7 @@ class TestCallProcessorHelperCompleteCoverage:
         }
 
         with pytest.raises(TalkoBadRequestError, match="cannot be used for calls"):
-            await self.helper.validate_given_did(
-                did="911111111111", partner_id=123, workspace_id=1
-            )
+            await self.helper.validate_given_did(did="911111111111", partner_id=123, workspace_id=1)
 
     @pytest.mark.asyncio
     async def test_validate_given_did_not_exists(self):
@@ -163,9 +154,7 @@ class TestCallProcessorHelperCompleteCoverage:
         # If the message is "DID is restricted to workspace 99"
         # This regex "restricted to workspace" should match unless the wording is different
         with pytest.raises(TalkoBadRequestError, match="restricted to workspace"):
-            await self.helper.validate_given_did(
-                did="911111111111", partner_id=123, workspace_id=1
-            )
+            await self.helper.validate_given_did(did="911111111111", partner_id=123, workspace_id=1)
 
     @pytest.mark.asyncio
     async def test_validate_given_did_no_workspace_restriction(self):
@@ -178,9 +167,7 @@ class TestCallProcessorHelperCompleteCoverage:
         }
 
         # Should not raise
-        await self.helper.validate_given_did(
-            did="911111111111", partner_id=123, workspace_id=1
-        )
+        await self.helper.validate_given_did(did="911111111111", partner_id=123, workspace_id=1)
 
     @pytest.mark.asyncio
     async def test_select_did_workspace_enabled_no_id(self):
@@ -204,12 +191,8 @@ class TestCallProcessorHelperCompleteCoverage:
             "did_indices": {"1": 0},
         }
 
-        self.did_management_service.get_dids_by_partner_workspace_and_vendor.return_value = [
-            "911111111111"
-        ]
-        self.repository.update_partner_config_did_indices.return_value = {
-            "did_indices": {"1": 1}
-        }
+        self.did_management_service.get_dids_by_partner_workspace_and_vendor.return_value = ["911111111111"]
+        self.repository.update_partner_config_did_indices.return_value = {"did_indices": {"1": 1}}
 
         result = await self.helper.select_did(
             partner_config=partner_config,
@@ -236,13 +219,9 @@ class TestCallProcessorHelperCompleteCoverage:
 
         # No agent mapping found
         self.agent_mapping_repository.get_agent_did_mapping.return_value = None
-        self.repository.update_partner_config_did_indices.return_value = {
-            "did_indices": {"round_robin": 1}
-        }
+        self.repository.update_partner_config_did_indices.return_value = {"did_indices": {"round_robin": 1}}
 
-        result = await self.helper.select_did(
-            partner_config=partner_config, partner_id=123, user_id=456
-        )
+        result = await self.helper.select_did(partner_config=partner_config, partner_id=123, user_id=456)
 
         assert result in ["911111111111", "922222222222"]
 
@@ -255,17 +234,13 @@ class TestCallProcessorHelperCompleteCoverage:
             "did_indices": {"round_robin": 0},
         }
 
-        self.did_management_service.get_dids_by_partner_and_vendor.return_value = [
-            "911111111111"
-        ]
+        self.did_management_service.get_dids_by_partner_and_vendor.return_value = ["911111111111"]
 
         # Update fails
         self.repository.update_partner_config_did_indices.return_value = None
 
         with pytest.raises(TalkoResourceNotFound):
-            await self.helper.select_did(
-                partner_config=partner_config, partner_id=123, user_id=456
-            )
+            await self.helper.select_did(partner_config=partner_config, partner_id=123, user_id=456)
 
     def test_prepare_cdr_exception(self):
         """Test prepare_cdr exception handling"""
@@ -426,14 +401,12 @@ class TestCallProcessorHelperCompleteCoverage:
         cdr = self.repository.insert_cdr.call_args[0][0]
         # Should be None because 0 is falsy
         assert cdr["lead_id"] is None
-        assert cdr["lead_name"] is None
+        assert cdr["lead_name"] == ""
 
     @pytest.mark.asyncio
     async def test_get_vendor_handler_with_vendor_config_id(self):
         """Test getting vendor handler with vendor_config_id"""
-        self.repository.get_vendor_config.return_value = {
-            "vendor_type": TalkoVendorType.ACEFHONE.value
-        }
+        self.repository.get_vendor_config.return_value = {"vendor_type": TalkoVendorType.ACEFHONE.value}
 
         handler = await self.helper.get_vendor_handler("v1", "config123")
         assert handler is not None
@@ -452,9 +425,7 @@ class TestCallProcessorHelperCompleteCoverage:
             "911111111111",
             "922222222222",
         ]
-        self.repository.update_partner_config_did_indices.return_value = {
-            "did_indices": {"1": 1}
-        }
+        self.repository.update_partner_config_did_indices.return_value = {"did_indices": {"1": 1}}
 
         result = await self.helper.select_did(
             partner_config=partner_config,
@@ -477,9 +448,7 @@ class TestCallProcessorHelperCompleteCoverage:
         self.did_management_service.get_dids_by_partner_and_vendor.return_value = []
 
         with pytest.raises(TalkoResourceNotFound):
-            await self.helper.select_did(
-                partner_config=partner_config, partner_id=123, user_id=456
-            )
+            await self.helper.select_did(partner_config=partner_config, partner_id=123, user_id=456)
 
     def test_prepare_cdr_with_all_fields(self):
         """Test prepare_cdr with all optional fields"""
@@ -532,9 +501,7 @@ class TestCallProcessorHelperCompleteCoverage:
     async def test_get_partner_config_exception_in_try_block(self):
         """Test exception handling in get_partner_config"""
         # Make get_partner_config_by_partner_id raise an exception
-        self.repository.get_partner_config_by_partner_id.side_effect = Exception(
-            "Database connection failed"
-        )
+        self.repository.get_partner_config_by_partner_id.side_effect = Exception("Database connection failed")
 
         with pytest.raises(Exception, match="Database connection failed"):
             await self.helper.get_partner_config(123)
@@ -638,7 +605,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
         result = self.helper.decrypt_lead_data(call_data)
 
-        assert result == None
+        assert result == {}
 
     @patch.object(TalkoRSAKeyHandler, "load_private_key")
     @patch.object(TalkoRSAKeyHandler, "decrypt_with_private_key")
@@ -676,9 +643,7 @@ class TestCallProcessorHelperCompleteCoverage:
             "933333333333",
         ]
 
-        self.repository.update_partner_config_did_indices.return_value = {
-            "did_indices": {"5": 2}
-        }
+        self.repository.update_partner_config_did_indices.return_value = {"did_indices": {"5": 2}}
 
         result = await self.helper.select_did(
             partner_config=partner_config,
@@ -705,9 +670,7 @@ class TestCallProcessorHelperCompleteCoverage:
             "933333333333",
         ]
 
-        self.repository.update_partner_config_did_indices.return_value = {
-            "did_indices": {"round_robin": 0}
-        }
+        self.repository.update_partner_config_did_indices.return_value = {"did_indices": {"round_robin": 0}}
 
         result = await self.helper.select_did(
             partner_config=partner_config,
@@ -732,9 +695,7 @@ class TestCallProcessorHelperCompleteCoverage:
             "922222222222",
         ]
 
-        self.repository.update_partner_config_did_indices.return_value = {
-            "did_indices": {"round_robin": 0, "10": 1}
-        }
+        self.repository.update_partner_config_did_indices.return_value = {"did_indices": {"round_robin": 0, "10": 1}}
 
         result = await self.helper.select_did(
             partner_config=partner_config,
@@ -791,14 +752,10 @@ class TestCallProcessorHelperCompleteCoverage:
         """Test that select_did propagates and logs exceptions"""
         partner_config = {"enable_round_robin": True, "vendor_id": "v1"}
 
-        self.did_management_service.get_dids_by_partner_and_vendor.side_effect = (
-            Exception("DID service error")
-        )
+        self.did_management_service.get_dids_by_partner_and_vendor.side_effect = Exception("DID service error")
 
         with pytest.raises(Exception, match="DID service error"):
-            await self.helper.select_did(
-                partner_config=partner_config, partner_id=123, user_id=456
-            )
+            await self.helper.select_did(partner_config=partner_config, partner_id=123, user_id=456)
 
         self.logger.error.assert_called()
 
@@ -815,9 +772,7 @@ class TestCallProcessorHelperCompleteCoverage:
     @pytest.mark.asyncio
     async def test_get_partner_config_general_exception(self):
         """Covers lines 107-111: Error handling for DB failures."""
-        self.repository.get_partner_config_by_partner_id.side_effect = Exception(
-            "DB Down"
-        )
+        self.repository.get_partner_config_by_partner_id.side_effect = Exception("DB Down")
         with pytest.raises(Exception, match="DB Down"):
             await self.helper.get_partner_config(123)
 
@@ -826,9 +781,7 @@ class TestCallProcessorHelperCompleteCoverage:
         """Covers lines 255-261: Validation error when workspace is required."""
         partner_config = {"enable_workspace": True, "vendor_id": "v1"}
         with pytest.raises(TalkoBadRequestError, match="Workspace ID is required"):
-            await self.helper.select_did(
-                partner_config, 123, 456, workspace_id=None
-            )
+            await self.helper.select_did(partner_config, 123, 456, workspace_id=None)
 
     @pytest.mark.asyncio
     async def test_select_did_no_dids_available_error(self):
@@ -850,17 +803,11 @@ class TestCallProcessorHelperCompleteCoverage:
             "vendor_id": "v1",
             "did_indices": {"round_robin": 0},
         }
-        self.did_management_service.get_dids_by_partner_agent_workspace_and_vendor.return_value = [
-            "9111"
-        ]
+        self.did_management_service.get_dids_by_partner_agent_workspace_and_vendor.return_value = ["9111"]
 
         # Mock get_agent_assign_did_in_agent_mapping to return None
-        with patch.object(
-            self.helper, "get_agent_assign_did_in_agent_mapping", return_value=None
-        ):
-            with patch.object(
-                self.helper, "_assign_round_robin_did", return_value="9111"
-            ) as mock_rr:
+        with patch.object(self.helper, "get_agent_assign_did_in_agent_mapping", return_value=None):
+            with patch.object(self.helper, "_assign_round_robin_did", return_value="9111") as mock_rr:
                 res = await self.helper.select_did(partner_config, 123, 456)
                 assert res == "9111"
                 mock_rr.assert_called_once()
@@ -911,10 +858,7 @@ class TestCallProcessorHelperCompleteCoverage:
         with pytest.raises(TalkoResourceNotFound):
             await self.helper.get_partner_config(999)
 
-        assert any(
-            "Partner config for partner_id 999 not found" in str(c)
-            for c in self.logger.error.call_args_list
-        )
+        assert any("Partner config for partner_id 999 not found" in str(c) for c in self.logger.error.call_args_list)
 
     @pytest.mark.asyncio
     async def test_get_agent_assign_did_assigned_did_not_in_active_pool(self):
@@ -936,9 +880,7 @@ class TestCallProcessorHelperCompleteCoverage:
     @pytest.mark.asyncio
     async def test_get_agent_assign_did_exception_handling(self):
         """Test exception handling in get_agent_assign_did_in_agent_mapping"""
-        self.agent_mapping_repository.get_agent_did_mapping.side_effect = Exception(
-            "Database error"
-        )
+        self.agent_mapping_repository.get_agent_did_mapping.side_effect = Exception("Database error")
 
         with pytest.raises(Exception, match="Database error"):
             await self.helper.get_agent_assign_did_in_agent_mapping(
@@ -1015,13 +957,11 @@ class TestCallProcessorHelperCompleteCoverage:
 
         result = self.helper.decrypt_lead_data(call_data)
 
-        assert result == None
+        assert result == {}
 
     @patch.object(TalkoRSAKeyHandler, "load_private_key")
     @patch.object(TalkoRSAKeyHandler, "decrypt_with_private_key")
-    def test_decrypt_lead_data_value_error_logs_and_raises(
-        self, mock_decrypt, mock_load
-    ):
+    def test_decrypt_lead_data_value_error_logs_and_raises(self, mock_decrypt, mock_load):
         """Test ValueError handling and logging in decrypt_lead_data"""
         mock_load.return_value = MagicMock()
         mock_decrypt.side_effect = ValueError("Hex decryption failed")
@@ -1044,9 +984,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
     @patch.object(TalkoRSAKeyHandler, "load_private_key")
     @patch.object(TalkoRSAKeyHandler, "decrypt_with_private_key")
-    def test_decrypt_lead_data_general_exception_logs_and_raises(
-        self, mock_decrypt, mock_load
-    ):
+    def test_decrypt_lead_data_general_exception_logs_and_raises(self, mock_decrypt, mock_load):
         """Test general Exception handling in decrypt_lead_data"""
         mock_load.return_value = MagicMock()
         mock_decrypt.side_effect = RuntimeError("Unexpected crypto error")
@@ -1112,7 +1050,7 @@ class TestCallProcessorHelperCompleteCoverage:
         cdr = self.repository.insert_cdr.call_args[0][0]
         # Falsy values should become None
         assert cdr["lead_id"] is None
-        assert cdr["lead_name"] is None
+        assert cdr["lead_name"] == ""
 
     @pytest.mark.asyncio
     async def test_create_incoming_cdr_lead_id_none_stays_none(self):
@@ -1136,7 +1074,7 @@ class TestCallProcessorHelperCompleteCoverage:
 
         cdr = self.repository.insert_cdr.call_args[0][0]
         assert cdr["lead_id"] is None
-        assert cdr["lead_name"] is None
+        assert cdr["lead_name"] == ""
 
     @pytest.mark.asyncio
     async def test_get_agent_assign_did_with_workspace_mismatch(self):

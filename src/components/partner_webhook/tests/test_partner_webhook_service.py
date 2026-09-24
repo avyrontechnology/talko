@@ -44,9 +44,9 @@ class TestPartnerWebhookService:
         inserted_doc = service.repository.insert_config.call_args[0][0]
         assert "signing_secret_encrypted" in inserted_doc
         # The raw secret must never appear in what gets persisted.
-        assert result.signing_secret_last_4 not in inserted_doc.get(
-            "signing_secret_encrypted", ""
-        ) or True  # ciphertext is unrelated to plaintext substrings; sanity only
+        assert (
+            result.signing_secret_last_4 not in inserted_doc.get("signing_secret_encrypted", "") or True
+        )  # ciphertext is unrelated to plaintext substrings; sanity only
 
     async def test_get_active_config_for_delivery(self, service):
         service.repository.find_config_by_partner_id.return_value = {

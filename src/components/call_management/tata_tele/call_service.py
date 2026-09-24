@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -24,8 +24,8 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
         self,
         to_number: str,
         from_number: str,
-        call_url: Optional[str] = None,
-        agent_number: Optional[str] = None,
+        call_url: str | None = None,
+        agent_number: str | None = None,
         enable_ai_bridge: bool = False,  # ← NEW
     ) -> dict:
         """
@@ -51,33 +51,19 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
         """
         try:
             self.logger.info(
-                "{} call handler started. to={} from={} agent={} ai_bridge={}".format(
-                    self.vendor_type,
-                    to_number,
-                    from_number,
-                    agent_number,
-                    enable_ai_bridge,
-                )
+                f"{self.vendor_type} call handler started. to={to_number} from={from_number} agent={agent_number} ai_bridge={enable_ai_bridge}"
             )
 
             endpoint: str = self.config.get("endpoint")
             auth_credentials: dict = self.config.get("auth_credentials", {})
 
-            self.logger.debug(
-                "{} endpoint={} auth={}".format(
-                    self.vendor_type, endpoint, auth_credentials
-                )
-            )
+            self.logger.debug(f"{self.vendor_type} endpoint={endpoint} auth={auth_credentials}")
 
             if enable_ai_bridge:
                 # Use new vendor_config field
-                c2c_handler: dict = self.vendor_config.get(
-                    "c2c_support_url_handler", {}
-                )
+                c2c_handler: dict = self.vendor_config.get("c2c_support_url_handler", {})
                 if not c2c_handler:
-                    raise ValueError(
-                        "c2c_support_url_handler not configured in vendor config"
-                    )
+                    raise ValueError("c2c_support_url_handler not configured in vendor config")
 
                 endpoint: str = c2c_handler["endpoint"]
                 api_key: str = c2c_handler["api_key"]
@@ -94,11 +80,7 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
                 )
 
                 headers: dict = c2c_handler.get("headers", {})
-                self.logger.info(
-                    "{} AI bridge mode — using c2c_support endpoint".format(
-                        self.vendor_type
-                    )
-                )
+                self.logger.info(f"{self.vendor_type} AI bridge mode — using c2c_support endpoint")
             else:
                 # Normal C2C mode — unchanged behaviour
                 if not agent_number:
@@ -113,7 +95,7 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
                     "get_call_id": 1,
                 }
 
-            self.logger.debug("{} payload={}".format(self.vendor_type, payload))
+            self.logger.debug(f"{self.vendor_type} payload={payload}")
 
             headers: dict = {
                 "Content-Type": "application/json",
@@ -121,40 +103,26 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
             }
 
             async with httpx.AsyncClient() as client:
-                self.logger.info(
-                    "Making {} API call to {}".format(self.vendor_type, endpoint)
-                )
+                self.logger.info(f"Making {self.vendor_type} API call to {endpoint}")
                 response = await client.post(endpoint, json=payload, headers=headers)
-                self.logger.debug("{} response={}".format(self.vendor_type, response))
+                self.logger.debug(f"{self.vendor_type} response={response}")
                 if response.status_code == 200:
                     json_data = response.json()
-                    self.logger.info(
-                        "{} API call successful: {}".format(self.vendor_type, json_data)
-                    )
+                    self.logger.info(f"{self.vendor_type} API call successful: {json_data}")
                     return json_data
                 elif response.status_code == 400:
                     error_data = response.json()
                     error_message = error_data.get("message")
-                    self.logger.error(
-                        "Invalid parameters in {} API call: {}".format(
-                            self.vendor_type, error_message
-                        )
-                    )
+                    self.logger.error(f"Invalid parameters in {self.vendor_type} API call: {error_message}")
                     raise ValueError(INVALID_PARAMETER.format(error_message))
                 elif response.status_code != 200:
                     self.logger.error(
-                        "Unexpected {} API response: {} - {}".format(
-                            self.vendor_type, response.status_code, response.json()
-                        )
+                        f"Unexpected {self.vendor_type} API response: {response.status_code} - {response.json()}"
                     )
-                    raise ValueError(
-                        UNEXPECTED_API_RESPONSE.format(response.status_code)
-                    )
+                    raise ValueError(UNEXPECTED_API_RESPONSE.format(response.status_code))
         except Exception as e:
-            self.logger.error(
-                "Failed to make {} API call: {}".format(self.vendor_type, str(e))
-            )
-            raise ValueError("{} API call failed: {}".format(self.vendor_type, str(e)))
+            self.logger.error(f"Failed to make {self.vendor_type} API call: {str(e)}")
+            raise ValueError(f"{self.vendor_type} API call failed: {str(e)}")
 
     async def hangup_call(self, call_id: str) -> dict:
         """
@@ -170,11 +138,7 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
             ValueError: If hangup_url_handler is not configured, or the API call fails.
         """
         try:
-            self.logger.info(
-                "{} hangup handler started. call_id={}".format(
-                    self.vendor_type, call_id
-                )
-            )
+            self.logger.info(f"{self.vendor_type} hangup handler started. call_id={call_id}")
 
             hangup_config: dict = self.vendor_config.get("hangup_url_handler", {})
             if not hangup_config:
@@ -189,57 +153,31 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
             }
             payload: dict = {"call_id": call_id}
 
-            self.logger.debug(
-                "{} hangup endpoint={} payload={}".format(
-                    self.vendor_type, endpoint, payload
-                )
-            )
+            self.logger.debug(f"{self.vendor_type} hangup endpoint={endpoint} payload={payload}")
 
             async with httpx.AsyncClient() as client:
-                self.logger.info(
-                    "Making {} hangup API call to {}".format(self.vendor_type, endpoint)
-                )
+                self.logger.info(f"Making {self.vendor_type} hangup API call to {endpoint}")
                 response = await client.post(endpoint, json=payload, headers=headers)
-                self.logger.debug(
-                    "{} hangup response={}".format(self.vendor_type, response)
-                )
+                self.logger.debug(f"{self.vendor_type} hangup response={response}")
                 if response.status_code == 200:
                     json_data = response.json()
-                    self.logger.info(
-                        "{} hangup API call successful: {}".format(
-                            self.vendor_type, json_data
-                        )
-                    )
+                    self.logger.info(f"{self.vendor_type} hangup API call successful: {json_data}")
                     return json_data
                 elif response.status_code == 400:
                     error_data = response.json()
-                    error_message = error_data.get("message") or error_data.get(
-                        "Message"
-                    )
-                    self.logger.error(
-                        "Invalid parameters in {} hangup API call: {}".format(
-                            self.vendor_type, error_message
-                        )
-                    )
+                    error_message = error_data.get("message") or error_data.get("Message")
+                    self.logger.error(f"Invalid parameters in {self.vendor_type} hangup API call: {error_message}")
                     raise ValueError(INVALID_PARAMETER.format(error_message))
                 else:
                     self.logger.error(
-                        "Unexpected {} hangup API response: {} - {}".format(
-                            self.vendor_type, response.status_code, response.text
-                        )
+                        f"Unexpected {self.vendor_type} hangup API response: {response.status_code} - {response.text}"
                     )
-                    raise ValueError(
-                        UNEXPECTED_API_RESPONSE.format(response.status_code)
-                    )
+                    raise ValueError(UNEXPECTED_API_RESPONSE.format(response.status_code))
         except ValueError:
             raise
         except Exception as e:
-            self.logger.error(
-                "Failed to make {} hangup API call: {}".format(self.vendor_type, str(e))
-            )
-            raise ValueError(
-                "{} hangup API call failed: {}".format(self.vendor_type, str(e))
-            )
+            self.logger.error(f"Failed to make {self.vendor_type} hangup API call: {str(e)}")
+            raise ValueError(f"{self.vendor_type} hangup API call failed: {str(e)}")
 
     async def transfer_call(self, call_id: str, destination_number: str) -> dict:
         """
@@ -257,9 +195,7 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
         """
         try:
             self.logger.info(
-                "{} transfer_call started. call_id={} destination={}".format(
-                    self.vendor_type, call_id, destination_number
-                )
+                f"{self.vendor_type} transfer_call started. call_id={call_id} destination={destination_number}"
             )
 
             transfer_handler: dict = self.vendor_config.get("transfer_url_handler", {})
@@ -281,50 +217,26 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
             }
 
             async with httpx.AsyncClient() as client:
-                self.logger.info(
-                    "Making {} transfer API call to {}".format(
-                        self.vendor_type, endpoint
-                    )
-                )
+                self.logger.info(f"Making {self.vendor_type} transfer API call to {endpoint}")
                 response = await client.post(endpoint, json=payload, headers=headers)
-                self.logger.debug(
-                    "{} transfer response={}".format(self.vendor_type, response)
-                )
+                self.logger.debug(f"{self.vendor_type} transfer response={response}")
                 if response.status_code == 200:
                     json_data = response.json()
-                    self.logger.info(
-                        "{} transfer API call successful: {}".format(
-                            self.vendor_type, json_data
-                        )
-                    )
+                    self.logger.info(f"{self.vendor_type} transfer API call successful: {json_data}")
                     return json_data
                 elif response.status_code == 400:
                     error_data = response.json()
                     error_message = error_data.get("message")
-                    self.logger.error(
-                        "Invalid parameters in {} transfer API call: {}".format(
-                            self.vendor_type, error_message
-                        )
-                    )
+                    self.logger.error(f"Invalid parameters in {self.vendor_type} transfer API call: {error_message}")
                     raise ValueError(INVALID_PARAMETER.format(error_message))
                 else:
                     self.logger.error(
-                        "Unexpected {} transfer API response: {} - {}".format(
-                            self.vendor_type, response.status_code, response.text
-                        )
+                        f"Unexpected {self.vendor_type} transfer API response: {response.status_code} - {response.text}"
                     )
-                    raise ValueError(
-                        UNEXPECTED_API_RESPONSE.format(response.status_code)
-                    )
+                    raise ValueError(UNEXPECTED_API_RESPONSE.format(response.status_code))
         except Exception as e:
-            self.logger.error(
-                "Failed to make {} transfer API call: {}".format(
-                    self.vendor_type, str(e)
-                )
-            )
-            raise ValueError(
-                "{} transfer API call failed: {}".format(self.vendor_type, str(e))
-            )
+            self.logger.error(f"Failed to make {self.vendor_type} transfer API call: {str(e)}")
+            raise ValueError(f"{self.vendor_type} transfer API call failed: {str(e)}")
 
     async def find_live_call_id(
         self,
@@ -332,7 +244,7 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
         customer_number: str,
         max_attempts: int = 3,
         poll_interval: float = 0.25,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Best-effort lookup of a Tata call_id for a call that's still ringing
         or connecting, via the live_calls API.
@@ -359,8 +271,7 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
         live_calls_config: dict = self.vendor_config.get("live_calls_url_handler", {})
         if not live_calls_config:
             self.logger.debug(
-                "{} live_calls_url_handler not configured — skipping live "
-                "call_id lookup".format(self.vendor_type)
+                f"{self.vendor_type} live_calls_url_handler not configured — skipping live call_id lookup"
             )
             return None
 
@@ -383,53 +294,34 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
                         )
                         if response.status_code == 200:
                             data: Any = response.json()
-                            results: List[Dict[str, Any]] = (
-                                data.get("results", [])
-                                if isinstance(data, dict)
-                                else (data or [])
+                            results: list[dict[str, Any]] = (
+                                data.get("results", []) if isinstance(data, dict) else (data or [])
                             )
                             for call in results:
                                 candidate = str(call.get("customer_number") or "")
-                                if (
-                                    normalized_customer
-                                    and candidate[-10:] == normalized_customer
-                                ):
+                                if normalized_customer and candidate[-10:] == normalized_customer:
                                     found_call_id = call.get("call_id")
                                     if found_call_id:
                                         self.logger.info(
-                                            "{} live_calls resolved call_id={} "
-                                            "attempt={}".format(
-                                                self.vendor_type,
-                                                found_call_id,
-                                                attempt + 1,
-                                            )
+                                            f"{self.vendor_type} live_calls resolved call_id={found_call_id} "
+                                            f"attempt={attempt + 1}"
                                         )
                                         return str(found_call_id)
                         else:
                             self.logger.debug(
-                                "{} live_calls poll attempt={} status={}".format(
-                                    self.vendor_type, attempt + 1, response.status_code
-                                )
+                                f"{self.vendor_type} live_calls poll attempt={attempt + 1} status={response.status_code}"
                             )
                     except Exception as e:
-                        self.logger.debug(
-                            "{} live_calls poll attempt={} failed: {}".format(
-                                self.vendor_type, attempt + 1, str(e)
-                            )
-                        )
+                        self.logger.debug(f"{self.vendor_type} live_calls poll attempt={attempt + 1} failed: {str(e)}")
 
                     if attempt < max_attempts - 1:
                         await asyncio.sleep(poll_interval)
         except Exception as e:
-            self.logger.warning(
-                "{} live_calls lookup failed entirely: {}".format(
-                    self.vendor_type, str(e)
-                )
-            )
+            self.logger.warning(f"{self.vendor_type} live_calls lookup failed entirely: {str(e)}")
             return None
 
         self.logger.info(
-            "{} live_calls did not resolve call_id within {} attempts for "
-            "customer_number={}".format(self.vendor_type, max_attempts, customer_number)
+            f"{self.vendor_type} live_calls did not resolve call_id within {max_attempts} attempts for "
+            f"customer_number={customer_number}"
         )
         return None

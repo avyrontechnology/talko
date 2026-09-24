@@ -1,5 +1,3 @@
-import pytest
-
 from src.components.common.constants import (
     TalkoCurrentUserMap,
     TalkoErrorPrompt,

@@ -5,9 +5,7 @@ UNEXPECTED_API_RESPONSE = "Unexpected response: {}"
 CALL_PLACED_SUCCESSFULLY = "call placed successfully"
 HANGUP_URL_HANDLER_NOT_CONFIGURED = "hangup_url_handler not configured in vendor config"
 CALL_TRANSFERRED_SUCCESSFULLY = "call transferred successfully"
-TRANSFER_URL_HANDLER_NOT_CONFIGURED = (
-    "transfer_url_handler not configured in vendor config"
-)
+TRANSFER_URL_HANDLER_NOT_CONFIGURED = "transfer_url_handler not configured in vendor config"
 
 # call hangup
 CALL_ID_REQUIRED_FOR_HANGUP = "call_id is required"
@@ -38,10 +36,6 @@ UNEXPECTED_ERROR_TRANSFERRING_CALL = "Unexpected error transferring call"
 
 # helper
 NO_ASSIGNED_DID_AVAILABLE_TO_AGENT = "No assigned DID available for agent"
-INVALID_PARTNER_CONFIGURATION = (
-    "Invalid partner configuration: No DID assignment strategy enabled"
-)
-FAILED_TO_DECRYPT_LEAD_SECRET_AS_HEX = (
-    "Failed to decrypt lead_secret as hex. Ensure it is a valid hex string."
-)
+INVALID_PARTNER_CONFIGURATION = "Invalid partner configuration: No DID assignment strategy enabled"
+FAILED_TO_DECRYPT_LEAD_SECRET_AS_HEX = "Failed to decrypt lead_secret as hex. Ensure it is a valid hex string."
 NO_VALID_PHONE_NUMBER_FOUND_FOR_LEAD = "No valid phone number found for lead."

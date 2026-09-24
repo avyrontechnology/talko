@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, field_validator
 
@@ -13,7 +13,7 @@ class TalkoContract:
         solution: str
         sr_number: str
         customer: str
-        agent: Optional[int] = None
+        agent: int | None = None
         call_status: str
         customer_status: str
         agent_status: str
@@ -21,191 +21,191 @@ class TalkoContract:
         talk_time: int
         total_call_duration: Any
         talk_time: Any
-        call_actions: List[str]
-        call_recording: Optional[str] = None
+        call_actions: list[str]
+        call_recording: str | None = None
         call_uuid: str
         hangup_by: str
-        disposition: Optional[str] = None
-        sub_disposition: Optional[str] = None
-        notes: Optional[str] = None
-        voice_email: Optional[str] = None
-        dtmf_extension: Optional[str] = None
-        queue: Optional[str] = None
-        partner_id: Optional[int] = None
-        lead_id: Optional[int] = None
-        entity_type: Optional[str] = None
-        entity_id: Optional[int] = None
+        disposition: str | None = None
+        sub_disposition: str | None = None
+        notes: str | None = None
+        voice_email: str | None = None
+        dtmf_extension: str | None = None
+        queue: str | None = None
+        partner_id: int | None = None
+        lead_id: int | None = None
+        entity_type: str | None = None
+        entity_id: int | None = None
 
     class CDRResponse(BaseModel):
         id: str
         action: str
         calling_mode: str
-        date_time: Optional[int] = None
+        date_time: int | None = None
         solution: str
         sr_number: str
-        customer: Optional[Union[int, str]] = None
-        agent: Optional[int] = None
+        customer: int | str | None = None
+        agent: int | None = None
         call_status: str
         customer_status: str
         agent_status: str
-        total_call_duration: Optional[int] = 0
-        talk_time: Optional[int] = 0
-        call_actions: List[str]
+        total_call_duration: int | None = 0
+        talk_time: int | None = 0
+        call_actions: list[str]
         call_uuid: str
         hangup_by: str
-        partner_id: Optional[int] = None
-        created_at: Optional[int] = None
-        updated_at: Optional[int] = None
+        partner_id: int | None = None
+        created_at: int | None = None
+        updated_at: int | None = None
 
-        call_id: Optional[str] = None
-        call_recording: Optional[str] = None
-        disposition: Optional[str] = None
-        sub_disposition: Optional[str] = None
-        notes: Optional[str] = None
-        voice_email: Optional[str] = None
-        dtmf_extension: Optional[str] = None
-        queue: Optional[str] = None
-        agent_number: Optional[str] = None
-        agent_number_with_prefix: Optional[str] = None
-        agent_name: Optional[str] = None
-        client_number: Optional[str] = None
-        did_number: Optional[str] = None
-        reason: Optional[str] = None
-        hangup_cause: Optional[str] = None
-        contact_details: Optional[Dict[str, Any]] = None
-        missed_agents: List[Any] = []
-        call_flow: List[Any] = []
-        accountid: Optional[str] = None
-        agent_ring_time: Optional[str] = None
-        billing_circle: Optional[Union[str, Dict[str, Optional[str]]]] = None
-        agent_hangup_data: Optional[Any] = None
-        transfer_missed_agent: List[Any] = []
-        call_hint: Optional[str] = None
-        support_api_call: Optional[bool] = False
-        lead_id: Optional[int] = None
-        entity_type: Optional[str] = None
-        entity_id: Optional[int] = None
-        sid: Optional[str] = None
-        sname: Optional[str] = None
-        is_incoming_from_broadcast: Optional[bool] = False
-        caller_id_number: Optional[str] = None
-        sip_agent_ids: Optional[Any] = None
-        dialer_call_details: Optional[Any] = None
-        custom_status: Optional[str] = None
-        is_whatsapp: Optional[int] = 0
-        lead_data: List[Any] = []
-        lead_name: Optional[str] = None
-        voicemail_recording: Optional[bool] = False
-        call_duration: Optional[int] = 0
-        answered_seconds: Optional[int] = 0
-        minutes_consumed: Optional[int] = 0
-        charges: Optional[int] = 0
-        department_name: Optional[str] = None
-        detailed_description: Optional[str] = None
-        start_stamp: Optional[Union[int, str]] = None
-        end_stamp: Optional[Union[int, str]] = None
-        ivr_id: Optional[str] = None
-        answer_agent_number: Optional[str] = None
-        answer_stamp: Optional[Union[int, str]] = None
-        billsec: Optional[str] = None
-        outbound_sec: Optional[str] = None
-        call_connected: Optional[str] = None
-        aws_call_recording_identifier: Optional[str] = None
-        campaign_name: Optional[str] = None
-        campaign_id: Optional[Union[int, str]] = None
-        customer_ring_time: Optional[str] = None
-        reason_key: Optional[str] = None
-        vendor_id: Optional[str] = None
-        vendor_config_id: Optional[str] = None
-        custom_fields: Optional[Dict[str, Any]] = None
+        call_id: str | None = None
+        call_recording: str | None = None
+        disposition: str | None = None
+        sub_disposition: str | None = None
+        notes: str | None = None
+        voice_email: str | None = None
+        dtmf_extension: str | None = None
+        queue: str | None = None
+        agent_number: str | None = None
+        agent_number_with_prefix: str | None = None
+        agent_name: str | None = None
+        client_number: str | None = None
+        did_number: str | None = None
+        reason: str | None = None
+        hangup_cause: str | None = None
+        contact_details: dict[str, Any] | None = None
+        missed_agents: list[Any] = []
+        call_flow: list[Any] = []
+        accountid: str | None = None
+        agent_ring_time: str | None = None
+        billing_circle: str | dict[str, str | None] | None = None
+        agent_hangup_data: Any | None = None
+        transfer_missed_agent: list[Any] = []
+        call_hint: str | None = None
+        support_api_call: bool | None = False
+        lead_id: int | None = None
+        entity_type: str | None = None
+        entity_id: int | None = None
+        sid: str | None = None
+        sname: str | None = None
+        is_incoming_from_broadcast: bool | None = False
+        caller_id_number: str | None = None
+        sip_agent_ids: Any | None = None
+        dialer_call_details: Any | None = None
+        custom_status: str | None = None
+        is_whatsapp: int | None = 0
+        lead_data: list[Any] = []
+        lead_name: str | None = None
+        voicemail_recording: bool | None = False
+        call_duration: int | None = 0
+        answered_seconds: int | None = 0
+        minutes_consumed: int | None = 0
+        charges: int | None = 0
+        department_name: str | None = None
+        detailed_description: str | None = None
+        start_stamp: int | str | None = None
+        end_stamp: int | str | None = None
+        ivr_id: str | None = None
+        answer_agent_number: str | None = None
+        answer_stamp: int | str | None = None
+        billsec: str | None = None
+        outbound_sec: str | None = None
+        call_connected: str | None = None
+        aws_call_recording_identifier: str | None = None
+        campaign_name: str | None = None
+        campaign_id: int | str | None = None
+        customer_ring_time: str | None = None
+        reason_key: str | None = None
+        vendor_id: str | None = None
+        vendor_config_id: str | None = None
+        custom_fields: dict[str, Any] | None = None
 
     class CallLogResponse(BaseModel):
         # Core fields
         id: str
         action: str
         calling_mode: str
-        date_time: Optional[int] = None
+        date_time: int | None = None
         solution: str
         sr_number: str
-        customer: Optional[Union[int, str]] = None
-        agent: Optional[int] = None
+        customer: int | str | None = None
+        agent: int | None = None
         call_status: str
         customer_status: str
         agent_status: str
-        total_call_duration: Optional[int] = 0
-        talk_time: Optional[int] = 0
-        call_actions: List[str]
+        total_call_duration: int | None = 0
+        talk_time: int | None = 0
+        call_actions: list[str]
         call_uuid: str
         hangup_by: str
-        partner_id: Optional[int] = None
-        created_at: Optional[int] = None
-        updated_at: Optional[int] = None
+        partner_id: int | None = None
+        created_at: int | None = None
+        updated_at: int | None = None
 
         # Additional fields from TalkoCDR
-        call_id: Optional[str] = None
-        call_recording: Optional[str] = None
-        disposition: Optional[str] = None
-        sub_disposition: Optional[str] = None
-        notes: Optional[str] = None
-        voice_email: Optional[str] = None
-        dtmf_extension: Optional[str] = None
-        queue: Optional[str] = None
-        agent_number: Optional[str] = None
-        agent_number_with_prefix: Optional[str] = None
-        client_number: Optional[str] = None
-        did_number: Optional[str] = None
-        reason: Optional[str] = None
-        hangup_cause: Optional[str] = None
-        contact_details: Optional[Dict[str, Any]] = None
-        missed_agents: List[Any] = []
-        accountid: Optional[str] = None
-        agent_ring_time: Optional[str] = None
-        billing_circle: Optional[Union[str, Dict[str, Optional[str]]]] = None
-        agent_hangup_data: Optional[Any] = None
-        transfer_missed_agent: List[Any] = []
-        call_hint: Optional[str] = None
-        support_api_call: Optional[bool] = False
-        lead_id: Optional[int] = None
-        entity_type: Optional[str] = None
-        entity_id: Optional[int] = None
-        sid: Optional[str] = None
-        sname: Optional[str] = None
-        is_incoming_from_broadcast: Optional[bool] = False
-        caller_id_number: Optional[str] = None
-        sip_agent_ids: Optional[Any] = None
-        dialer_call_details: Optional[Any] = None
-        custom_status: Optional[str] = None
-        is_whatsapp: Optional[int] = 0
-        lead_data: List[Any] = []
-        lead_name: Optional[str] = None
-        voicemail_recording: Optional[bool] = False
-        call_duration: Optional[int] = 0
-        answered_seconds: Optional[int] = 0
-        minutes_consumed: Optional[int] = 0
-        charges: Optional[int] = 0
-        department_name: Optional[str] = None
-        detailed_description: Optional[str] = None
-        start_stamp: Optional[int] = None
-        end_stamp: Optional[int] = None
-        ivr_id: Optional[str] = None
-        answer_agent_number: Optional[str] = None
-        answer_stamp: Optional[int] = None
-        billsec: Optional[str] = None
-        outbound_sec: Optional[str] = None
-        call_connected: Optional[str] = None
-        aws_call_recording_identifier: Optional[str] = None
-        campaign_name: Optional[str] = None
-        campaign_id: Optional[Union[int, str]] = None
-        customer_ring_time: Optional[str] = None
-        reason_key: Optional[str] = None
-        answered_agent_number: Optional[str] = None
-        event_type: Optional[str] = None
-        action_performed_by: Optional[str] = None
-        do_recording_url: Optional[str] = None
-        vendor_id: Optional[str] = None
-        vendor_config_id: Optional[str] = None
-        display_name: Optional[str] = None
-        custom_fields: Optional[Dict[str, Any]] = None
+        call_id: str | None = None
+        call_recording: str | None = None
+        disposition: str | None = None
+        sub_disposition: str | None = None
+        notes: str | None = None
+        voice_email: str | None = None
+        dtmf_extension: str | None = None
+        queue: str | None = None
+        agent_number: str | None = None
+        agent_number_with_prefix: str | None = None
+        client_number: str | None = None
+        did_number: str | None = None
+        reason: str | None = None
+        hangup_cause: str | None = None
+        contact_details: dict[str, Any] | None = None
+        missed_agents: list[Any] = []
+        accountid: str | None = None
+        agent_ring_time: str | None = None
+        billing_circle: str | dict[str, str | None] | None = None
+        agent_hangup_data: Any | None = None
+        transfer_missed_agent: list[Any] = []
+        call_hint: str | None = None
+        support_api_call: bool | None = False
+        lead_id: int | None = None
+        entity_type: str | None = None
+        entity_id: int | None = None
+        sid: str | None = None
+        sname: str | None = None
+        is_incoming_from_broadcast: bool | None = False
+        caller_id_number: str | None = None
+        sip_agent_ids: Any | None = None
+        dialer_call_details: Any | None = None
+        custom_status: str | None = None
+        is_whatsapp: int | None = 0
+        lead_data: list[Any] = []
+        lead_name: str | None = None
+        voicemail_recording: bool | None = False
+        call_duration: int | None = 0
+        answered_seconds: int | None = 0
+        minutes_consumed: int | None = 0
+        charges: int | None = 0
+        department_name: str | None = None
+        detailed_description: str | None = None
+        start_stamp: int | None = None
+        end_stamp: int | None = None
+        ivr_id: str | None = None
+        answer_agent_number: str | None = None
+        answer_stamp: int | None = None
+        billsec: str | None = None
+        outbound_sec: str | None = None
+        call_connected: str | None = None
+        aws_call_recording_identifier: str | None = None
+        campaign_name: str | None = None
+        campaign_id: int | str | None = None
+        customer_ring_time: str | None = None
+        reason_key: str | None = None
+        answered_agent_number: str | None = None
+        event_type: str | None = None
+        action_performed_by: str | None = None
+        do_recording_url: str | None = None
+        vendor_id: str | None = None
+        vendor_config_id: str | None = None
+        display_name: str | None = None
+        custom_fields: dict[str, Any] | None = None
 
         @field_validator("total_call_duration", "talk_time", mode="before")
         def handle_int_fields(cls, v):
@@ -236,40 +236,40 @@ class TalkoContract:
     class CallRecordHistoryResponse(BaseModel):
         """Slimmed-down response model for call record history with limited fields."""
 
-        partner_id: Optional[int] = None
-        agent: Optional[int] = None
-        lead_id: Optional[int] = None
-        entity_type: Optional[str] = None
-        entity_id: Optional[int] = None
-        workspace_id: Optional[int] = None
+        partner_id: int | None = None
+        agent: int | None = None
+        lead_id: int | None = None
+        entity_type: str | None = None
+        entity_id: int | None = None
+        workspace_id: int | None = None
         calling_mode: str
         call_status: str
-        call_recording: Optional[str] = None
-        lead_number: Optional[Union[int, str]] = None
-        total_call_duration: Optional[int] = 0
-        talk_time: Optional[int] = 0
-        did_number: Optional[str] = None
-        agent_number: Optional[str] = None
-        reason: Optional[str] = None
-        hangup_cause: Optional[str] = None
-        reason_key: Optional[str] = None
+        call_recording: str | None = None
+        lead_number: int | str | None = None
+        total_call_duration: int | None = 0
+        talk_time: int | None = 0
+        did_number: str | None = None
+        agent_number: str | None = None
+        reason: str | None = None
+        hangup_cause: str | None = None
+        reason_key: str | None = None
         hangup_by: str
-        created_at: Optional[int] = None
-        action_performed_by: Optional[str] = None
-        lead_call_status: Optional[str] = None
-        agent_call_status: Optional[str] = None
-        call_connected: Optional[Union[int, str]] = None
-        lead_name: Optional[str] = None
-        call_type: Optional[str] = None
-        do_recording_url: Optional[str] = None
-        number_type: Optional[str] = None
-        lead_secret: Optional[str] = None
-        call_id: Optional[str] = None
-        call_uuid: Optional[str] = None
-        vendor_id: Optional[str] = None
-        vendor_config_id: Optional[str] = None
-        display_name: Optional[str] = None
-        custom_fields: Optional[Dict[str, Any]] = None
+        created_at: int | None = None
+        action_performed_by: str | None = None
+        lead_call_status: str | None = None
+        agent_call_status: str | None = None
+        call_connected: int | str | None = None
+        lead_name: str | None = None
+        call_type: str | None = None
+        do_recording_url: str | None = None
+        number_type: str | None = None
+        lead_secret: str | None = None
+        call_id: str | None = None
+        call_uuid: str | None = None
+        vendor_id: str | None = None
+        vendor_config_id: str | None = None
+        display_name: str | None = None
+        custom_fields: dict[str, Any] | None = None
 
         @field_validator("total_call_duration", "talk_time", mode="before")
         def handle_int_fields(cls, v):
@@ -285,7 +285,7 @@ class TalkoContract:
                 return 0
 
     class AgentCallRecordHistoryResponse(BaseModel):
-        call_record: List["TalkoContract.CallRecordHistoryResponse"] = []
+        call_record: list[TalkoContract.CallRecordHistoryResponse] = []
         total_count: int
 
         @field_validator("call_record", mode="before")
@@ -296,7 +296,7 @@ class TalkoContract:
             return v
 
     class AgentCallLogResponse(BaseModel):
-        call_histories: List["TalkoContract.CallLogResponse"] = []
+        call_histories: list[TalkoContract.CallLogResponse] = []
         total_count: int
 
         @field_validator("call_histories", mode="before")
@@ -307,19 +307,19 @@ class TalkoContract:
             return v
 
     class CallRecordHistoryPayload(BaseModel):
-        lead_id: Optional[int] = None
-        entity_type: Optional[str] = None
-        entity_id: Optional[int] = None
-        workspace_id: Optional[int] = None
-        time_range: Optional[str] = None
-        call_status: Optional[List[str]] = None
-        agents: Optional[List[int]] = None
-        phone_number: Optional[str] = None
-        talk_time_range: Optional[List[str]] = None
-        call_type: Optional[str] = None
-        did_number: Optional[str] = None
-        is_masking_enabled: Optional[bool] = True
-        custom_fields: Optional[Dict[str, Any]] = None
+        lead_id: int | None = None
+        entity_type: str | None = None
+        entity_id: int | None = None
+        workspace_id: int | None = None
+        time_range: str | None = None
+        call_status: list[str] | None = None
+        agents: list[int] | None = None
+        phone_number: str | None = None
+        talk_time_range: list[str] | None = None
+        call_type: str | None = None
+        did_number: str | None = None
+        is_masking_enabled: bool | None = True
+        custom_fields: dict[str, Any] | None = None
 
         @field_validator("call_status")
         def validate_call_status(cls, v):
@@ -344,9 +344,7 @@ class TalkoContract:
             if v is not None:
                 valid_call_types = ["incoming", "outgoing"]
                 if v not in valid_call_types:
-                    raise ValueError(
-                        f"Invalid call_type: {v}. Allowed values: {valid_call_types}"
-                    )
+                    raise ValueError(f"Invalid call_type: {v}. Allowed values: {valid_call_types}")
             return v
 
         @field_validator("time_range")
@@ -357,19 +355,15 @@ class TalkoContract:
                     start = int(start)
                     end = int(end)
                     if start > end:
-                        raise ValueError(
-                            "start_time must be less than or equal to end_time"
-                        )
+                        raise ValueError("start_time must be less than or equal to end_time")
                 except (ValueError, AttributeError):
-                    raise ValueError(
-                        "time_range must be in format 'start_time-end_time' with valid integers"
-                    )
+                    raise ValueError("time_range must be in format 'start_time-end_time' with valid integers")
             return v
 
     class SetCDRCustomFieldsRequest(BaseModel):
-        custom_fields: Dict[str, Any]
+        custom_fields: dict[str, Any]
 
     class SetCDRCustomFieldsResponse(BaseModel):
         call_id: str
-        custom_fields: Dict[str, Any]
+        custom_fields: dict[str, Any]
         message: str

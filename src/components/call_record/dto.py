@@ -1,10 +1,9 @@
-from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+
+from pydantic import BaseModel
 
 
 class TalkoContract:
-
     class CreateCallRecordReq(BaseModel):
         caller: str
         receiver: str
@@ -16,10 +15,10 @@ class TalkoContract:
         message: str
 
     class UpdateCallRecordReq(BaseModel):
-        caller: Optional[str]
-        receiver: Optional[str]
-        duration: Optional[int]
-        timestamp: Optional[datetime]
+        caller: str | None
+        receiver: str | None
+        duration: int | None
+        timestamp: datetime | None
 
     class UpdateCallRecordResp(BaseModel):
         record_id: str

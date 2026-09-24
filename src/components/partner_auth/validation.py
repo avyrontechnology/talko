@@ -16,6 +16,6 @@ class TalkoPartnerApiKeyValidator:
     async def validate_key_exists(self, id: str) -> dict:
         api_key = await self.repository.find_by_id(id)
         if not api_key:
-            self.logger.error("Partner api key with id {} not found".format(id))
+            self.logger.error(f"Partner api key with id {id} not found")
             raise TalkoResourceNotFound(PARTNER_API_KEY_NOT_FOUND)
         return api_key

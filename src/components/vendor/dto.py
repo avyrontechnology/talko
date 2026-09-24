@@ -1,6 +1,3 @@
-from datetime import datetime
-from typing import Optional
-
 from pydantic import BaseModel
 
 from src.utils.enums import TalkoVendorType
@@ -25,5 +22,5 @@ class TalkoContract:
         slug: str
         is_active: bool
         vendor_type: TalkoVendorType
-        created_at: Optional[int] = None
-        updated_at: Optional[int] = None
+        created_at: int | None = None
+        updated_at: int | None = None

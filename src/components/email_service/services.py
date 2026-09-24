@@ -1,5 +1,4 @@
 import json
-from typing import Dict, List, Optional, Union
 
 import requests
 from pydantic import BaseModel, EmailStr, ValidationError
@@ -31,22 +30,20 @@ class TalkoEmailService:
         self.sender_email = sender_email
         self.template_env = template_env
 
-    def _validate_emails(self, emails: List[str], label: str) -> None:
+    def _validate_emails(self, emails: list[str], label: str) -> None:
         """Validate a list of email addresses."""
         if not emails:
-            self.logger.error("{} email list cannot be empty".format(label))
+            self.logger.error(f"{label} email list cannot be empty")
             raise ValueError(email_messages.EMPTY_EMAIL_LIST.format(label))
 
         for email in emails:
             try:
                 TalkoValidateEmail(email=email)
             except ValidationError:
-                self.logger.error("Invalid {} email: {}".format(label, email))
+                self.logger.error(f"Invalid {label} email: {email}")
                 raise ValueError(email_messages.INVALID_EMAIL.format(label, email))
 
-    def _render_html_content(
-        self, body: Union[str, Dict], html_template: Optional[str] = None
-    ) -> Optional[str]:
+    def _render_html_content(self, body: str | dict, html_template: str | None = None) -> str | None:
         """
         Render HTML template with provided body data.
 
@@ -60,29 +57,25 @@ class TalkoEmailService:
         if not html_template:
             return None
         try:
-            self.logger.debug("Rendering HTML template: {}".format(html_template))
+            self.logger.debug(f"Rendering HTML template: {html_template}")
             template = self.template_env.get_template(html_template)
-            html_content = template.render(
-                **body if isinstance(body, dict) else {"body": body}
-            )
+            html_content = template.render(**body if isinstance(body, dict) else {"body": body})
             return html_content
         except Exception as e:
-            self.logger.error(
-                "Failed to render HTML template {}: {}".format(html_template, str(e))
-            )
+            self.logger.error(f"Failed to render HTML template {html_template}: {str(e)}")
             raise
 
     def send_email(
         self,
-        to_emails: List[str],
+        to_emails: list[str],
         subject: str,
-        body: Union[str, Dict],
-        cc_emails: Optional[List[str]] = None,
-        bcc_emails: Optional[List[str]] = None,
-        html_template: Optional[str] = None,
-        attachments: Optional[List[Dict[str, str]]] = None,
-        channel_key: Optional[str] = None,
-    ) -> Dict:
+        body: str | dict,
+        cc_emails: list[str] | None = None,
+        bcc_emails: list[str] | None = None,
+        html_template: str | None = None,
+        attachments: list[dict[str, str]] | None = None,
+        channel_key: str | None = None,
+    ) -> dict:
         """
         Send an email via the email microservice API.
 
@@ -98,22 +91,18 @@ class TalkoEmailService:
         Returns:
             Dict: API response
         """
-        self.logger.info(
-            "Sending email to {} with subject: {}".format(to_emails, subject)
-        )
+        self.logger.info(f"Sending email to {to_emails} with subject: {subject}")
         self._validate_inputs(to_emails, subject, body, cc_emails, bcc_emails)
-        payload = self._build_payload(
-            to_emails, subject, body, cc_emails, bcc_emails, html_template, attachments
-        )
+        payload = self._build_payload(to_emails, subject, body, cc_emails, bcc_emails, html_template, attachments)
         return self._make_api_call(payload, channel_key)
 
     def _validate_inputs(
         self,
-        to_emails: List[str],
+        to_emails: list[str],
         subject: str,
-        body: Union[str, Dict],
-        cc_emails: Optional[List[str]],
-        bcc_emails: Optional[List[str]],
+        body: str | dict,
+        cc_emails: list[str] | None,
+        bcc_emails: list[str] | None,
     ) -> None:
         """Validate email inputs."""
         self._validate_emails(to_emails, "To")
@@ -130,14 +119,14 @@ class TalkoEmailService:
 
     def _build_payload(
         self,
-        to_emails: List[str],
+        to_emails: list[str],
         subject: str,
-        body: Union[str, Dict],
-        cc_emails: Optional[List[str]],
-        bcc_emails: Optional[List[str]],
-        html_template: Optional[str],
-        attachments: Optional[List[Dict[str, str]]],
-    ) -> Dict:
+        body: str | dict,
+        cc_emails: list[str] | None,
+        bcc_emails: list[str] | None,
+        html_template: str | None,
+        attachments: list[dict[str, str]] | None,
+    ) -> dict:
         """Build the API payload."""
         payload = {
             "to_emails": to_emails,
@@ -154,7 +143,7 @@ class TalkoEmailService:
             payload["attachments"] = attachments
         return payload
 
-    def _make_api_call(self, payload: Dict, channel_key: Optional[str] = None) -> Dict:
+    def _make_api_call(self, payload: dict, channel_key: str | None = None) -> dict:
         """Make API call with retry logic."""
         effective_channel = channel_key or self.channel_key
         headers = {
@@ -163,21 +152,13 @@ class TalkoEmailService:
         }
         for attempt in range(3):
             try:
-                response = requests.post(
-                    self.api_url, json=payload, headers=headers, timeout=10
-                )
+                response = requests.post(self.api_url, json=payload, headers=headers, timeout=10)
                 response.raise_for_status()
                 result = response.json()
-                self.logger.info(
-                    "Email sent: task_id={}, to={}".format(
-                        result.get("task_id"), payload["to_emails"]
-                    )
-                )
+                self.logger.info("Email sent: task_id={}, to={}".format(result.get("task_id"), payload["to_emails"]))
                 return result
             except Exception as e:
-                self.logger.warning("Attempt {} failed: {}".format(attempt + 1, str(e)))
+                self.logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
                 if attempt == 2:
-                    self.logger.error(
-                        "Failed to send email after 3 attempts: {}".format(str(e))
-                    )
+                    self.logger.error(f"Failed to send email after 3 attempts: {str(e)}")
                     raise ValueError(email_messages.API_CALL_FAILED.format(str(e)))

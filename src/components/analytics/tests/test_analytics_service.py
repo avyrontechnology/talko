@@ -5,12 +5,10 @@ import pytest
 from src.components.analytics.dto import TalkoAnalyticsResponse
 from src.components.analytics.enums import TalkoAnalyticsType
 from src.components.analytics.services import TalkoAnalyticsService
-from src.grpc_client.constants import TalkoGrpcServices
 
 
 @pytest.mark.asyncio
 class TestAnalyticsService:
-
     async def test_get_analytics_success_without_agents(self):
         """Test generic analytics retrieval without agent-specific enrichment"""
         # Arrange
@@ -42,12 +40,8 @@ class TestAnalyticsService:
         # Assert
         assert result == fake_response
         assert not hasattr(result, "total_count")  # Ensure no total_count at root
-        mock_logger.info.assert_any_call(
-            "Processing analytics for partner_id: 123, analytics_type: generic_type"
-        )
-        mock_logger.info.assert_any_call(
-            "Successfully retrieved analytics for partner_id: 123"
-        )
+        mock_logger.info.assert_any_call("Processing analytics for partner_id: 123, analytics_type: generic_type")
+        mock_logger.info.assert_any_call("Successfully retrieved analytics for partner_id: 123")
         mock_analytics_base.process_analytics.assert_awaited_once_with(
             current_user_id=1,
             partner_id=123,
@@ -98,9 +92,7 @@ class TestAnalyticsService:
         )
 
         # Patch gRPC client
-        with patch(
-            "src.components.analytics.services.TalkoRPCServiceFactory.get_service"
-        ) as mock_get_service:
+        with patch("src.components.analytics.services.TalkoRPCServiceFactory.get_service") as mock_get_service:
             mock_grpc_client = AsyncMock()
             mock_grpc_client.get_workspace_users_details = AsyncMock(
                 return_value={1: {"name": "Alice"}, 2: {"name": "Bob"}}
@@ -111,9 +103,7 @@ class TestAnalyticsService:
             result = await service.get_analytics(
                 current_user_id=1,
                 partner_id=123,
-                analytics_request={
-                    "analytics_type": TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value
-                },
+                analytics_request={"analytics_type": TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value},
                 limit=10,
                 offset=1,
             )
@@ -123,27 +113,17 @@ class TestAnalyticsService:
             assert agent_names == ["Alice", "Bob"]
             assert result.data["total_count"] == 2
             assert not hasattr(result, "total_count")  # Ensure no total_count at root
-            assert (
-                result.data["agents"][0]["total_placed_calls"] == 8
-            )  # Verify total_placed_calls
-            assert (
-                result.data["agents"][1]["total_placed_calls"] == 4
-            )  # Verify total_placed_calls
-            mock_grpc_client.get_workspace_users_details.assert_awaited_once_with(
-                [1, 2]
-            )
+            assert result.data["agents"][0]["total_placed_calls"] == 8  # Verify total_placed_calls
+            assert result.data["agents"][1]["total_placed_calls"] == 4  # Verify total_placed_calls
+            mock_grpc_client.get_workspace_users_details.assert_awaited_once_with([1, 2])
             mock_logger.info.assert_any_call(
                 "Processing analytics for partner_id: 123, analytics_type: agent_call_analytics"
             )
-            mock_logger.info.assert_any_call(
-                "Successfully retrieved analytics for partner_id: 123"
-            )
+            mock_logger.info.assert_any_call("Successfully retrieved analytics for partner_id: 123")
             mock_analytics_base.process_analytics.assert_awaited_once_with(
                 current_user_id=1,
                 partner_id=123,
-                analytics_request={
-                    "analytics_type": TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value
-                },
+                analytics_request={"analytics_type": TalkoAnalyticsType.AGENT_CALL_ANALYTICS.value},
                 limit=10,
                 offset=1,
             )
@@ -172,9 +152,7 @@ class TestAnalyticsService:
 
         # Assert
         assert str(exc_info.value) == "boom"
-        mock_logger.error.assert_any_call(
-            "Error processing analytics for partner_id: 123: boom"
-        )
+        mock_logger.error.assert_any_call("Error processing analytics for partner_id: 123: boom")
         mock_analytics_base.process_analytics.assert_awaited_once_with(
             current_user_id=1,
             partner_id=123,

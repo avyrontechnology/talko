@@ -1,10 +1,11 @@
+import logging
+
 from fastapi import UploadFile
 
-from src.components.digital_assets.logger_adapter import TalkoLoggerAdapter
 from src.components.digital_assets.storage.factory import TalkoFactoryStorageManager
 from src.core.environment import TalkoENV
 
-logger = TalkoLoggerAdapter().get_logger()
+logger = logging.getLogger(__name__)
 
 
 class TalkoStorageHelper:
@@ -18,7 +19,7 @@ class TalkoStorageHelper:
         provider = TalkoENV.STORAGE_SERVICE_PROVIDER
         if not provider:
             raise ValueError("STORAGE_SERVICE_PROVIDER is not set.")
-        logger.info("Using storage provider: {}".format(provider))
+        logger.info(f"Using storage provider: {provider}")
         return TalkoFactoryStorageManager.get_storage_class(provider)
 
     @staticmethod

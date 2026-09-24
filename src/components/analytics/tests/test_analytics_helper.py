@@ -41,16 +41,14 @@ async def test_filter_and_format_data(helper):
             analytics_constants.DATE_TIME: int(datetime.now().timestamp() * 1000),
         }
     ]
-    filtered_docs, formatted_data, total_periods, current_month = (
-        await helper.filter_and_format_data(
-            cdrs,
-            TalkoMetric.TOTAL_CALLS.value,
-            TalkoTimeInterval.DAYS.value,
-            1700000000000,
-            1700086400000,
-            10,
-            1,
-        )
+    filtered_docs, formatted_data, total_periods, current_month = await helper.filter_and_format_data(
+        cdrs,
+        TalkoMetric.TOTAL_CALLS.value,
+        TalkoTimeInterval.DAYS.value,
+        1700000000000,
+        1700086400000,
+        10,
+        1,
     )
     assert isinstance(filtered_docs, list)
     assert isinstance(formatted_data, list)
@@ -96,34 +94,26 @@ def test_calculate_total_count_call_duration(helper):
 
 def test_generate_periods_day(helper):
     now = datetime.now(pytz.timezone("Asia/Kolkata"))
-    periods = helper._generate_periods(
-        TalkoTimeInterval.DAYS.value, now, now + timedelta(days=2)
-    )
+    periods = helper._generate_periods(TalkoTimeInterval.DAYS.value, now, now + timedelta(days=2))
     assert len(periods) == 3
 
 
 def test_generate_periods_week(helper):
     now = datetime.now(pytz.timezone("Asia/Kolkata"))
-    periods = helper._generate_periods(
-        TalkoTimeInterval.WEEKS.value, now, now + timedelta(days=14)
-    )
+    periods = helper._generate_periods(TalkoTimeInterval.WEEKS.value, now, now + timedelta(days=14))
     assert all(isinstance(p, tuple) for p in periods)
 
 
 def test_generate_periods_month(helper):
     now = datetime(2024, 1, 1, tzinfo=pytz.UTC)
-    periods = helper._generate_periods(
-        TalkoTimeInterval.MONTHS.value, now, now + timedelta(days=60)
-    )
+    periods = helper._generate_periods(TalkoTimeInterval.MONTHS.value, now, now + timedelta(days=60))
     assert all(isinstance(p, tuple) for p in periods)
 
 
 def test_paginate_periods(helper):
     now = datetime.now(pytz.timezone("Asia/Kolkata"))
     periods = [now + timedelta(days=i) for i in range(60)]
-    result, current_month = helper._paginate_periods(
-        periods, TalkoTimeInterval.DAYS.value, 10, 1
-    )
+    result, current_month = helper._paginate_periods(periods, TalkoTimeInterval.DAYS.value, 10, 1)
     assert isinstance(result, list)
     assert isinstance(current_month, (str, type(None)))
 

@@ -1,39 +1,24 @@
-import time
-import httpx
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, Optional
+from typing import Any
 
-from dateutil.relativedelta import relativedelta
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse
 
 from src.components.call_management import messages as call_messages
-from src.components.call_management.agent_dialplan_resolver import TalkoAgentDialPlanResolver
 from src.components.call_management.dto import TalkoContract
 from src.components.call_management.services import TalkoCallService
-from src.components.cdr.repository import TalkoCDRRepository
 from src.components.common.auth_context import get_current_auth_context
 from src.components.common.constants import TalkoCurrentUserMap
 from src.components.common.responses import (
     TalkoBadRequestResponse,
     TalkoInternalServerErrorResponse,
     TalkoResourceNotFoundResponse,
-    TalkoSuccessResponse,
 )
-from src.components.integrations.console.maglo_constants import TalkoMagloApiConstants
 from src.components.rbac.permission_dependency import TalkoPermissionDependency
 from src.components.rbac.permission_injector import permission_check
 from src.core.container import TalkoContainer
 from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 from src.loggers.talko_service_logger import TalkoServiceLogger
-
-WRONG_AGENT_ID = 6
-PARTNER_ID = 2
-LOOKBACK_MONTHS = 2
-LOOKBACK_DAYS = 2
-MAGLO_BASE_URL = "https://maglo-service.makunaiglobal.ai"
-MAGLO_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc19hY3RpdmUiOnRydWUsInVzZXJfc2Vzc2lvbl9pZCI6IjQxMTBlNzk2LTk0YjctNDY1NC1iMjk5LThiODE2YjI3ZWY1ZiIsInVzZXJfaWQiOjExODYsIm5hbWUiOiJUcnVwdGkgV2FkZWthciIsInBhcnRuZXJfaWQiOjM2MywiaXNfbWFnbG9fZW5hYmxlZCI6dHJ1ZSwiaXNfYmFiYmxlcl9lbmFibGVkIjp0cnVlLCJpc19ob2xsZXJfZW5hYmxlZCI6dHJ1ZSwiaXNfaW50ZXJuYWwiOmZhbHNlLCJpc193YWxsZXRfZW5hYmxlZCI6ZmFsc2UsImlzX21hZ2xvX2FwcF9lbmFibGVkIjp0cnVlLCJzdWJzY3JpcHRpb25fbW9kZSI6InNhbGVzX21hbmFnZWQiLCJleHAiOjE3Nzg0NjE0MzJ9.J5TSBp67uy9fJmoGs0jBOrBBmCg_oELO-gUoAfnorPk"
 
 
 class TalkoCallController:
@@ -41,9 +26,7 @@ class TalkoCallController:
 
     call_router = APIRouter()
 
-    @call_router.post(
-        "", response_model=TalkoContract.CallResponse, status_code=status.HTTP_201_CREATED
-    )
+    @call_router.post("", response_model=TalkoContract.CallResponse, status_code=status.HTTP_201_CREATED)
     @permission_check(TalkoPermissionDependency)
     @inject
     async def initiate_call(
@@ -65,19 +48,13 @@ class TalkoCallController:
             TalkoContract.CallResponse: The response containing call initiation details.
         """
         try:
-            talko_service_logger.info("Received call request: {}".format(call_data))
+            talko_service_logger.info(f"Received call request: {call_data}")
             auth_ctx = get_current_auth_context(request)
             user_id: int = auth_ctx.user_id  # None when called via API-KEY
             partner_id: int = auth_ctx.partner_id
-            talko_service_logger.info(
-                "User: {}, partner: {}, initiated call api.".format(user_id, partner_id)
-            )
-            call_response: TalkoContract.CallResponse = await call_service.initiate_call(
-                call_data, user_id, partner_id
-            )
-            talko_service_logger.info(
-                "Call initiated successfully: {}".format(call_response)
-            )
+            talko_service_logger.info(f"User: {user_id}, partner: {partner_id}, initiated call api.")
+            call_response: TalkoContract.CallResponse = await call_service.initiate_call(call_data, user_id, partner_id)
+            talko_service_logger.info(f"Call initiated successfully: {call_response}")
             return JSONResponse(
                 status_code=status.HTTP_201_CREATED,
                 content={
@@ -86,25 +63,17 @@ class TalkoCallController:
                 },
             )
         except ValueError as e:
-            talko_service_logger.error(
-                "Error in initiating call api: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in initiating call api: {str(e)}")
             return TalkoBadRequestResponse(detail=call_messages.SOMETHING_WENT_WRONG)
         except TalkoResourceNotFound as e:
-            talko_service_logger.error(
-                "Error in initiate call api resource: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in initiate call api resource: {str(e)}")
             return TalkoResourceNotFoundResponse(detail=call_messages.SOMETHING_WENT_WRONG)
         except TalkoBadRequestError as e:
-            talko_service_logger.error(
-                "Error in initiate call api resource: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in initiate call api resource: {str(e)}")
             return TalkoBadRequestResponse(detail=call_messages.CALL_INITIATION_FAILED)
         except Exception as e:
             talko_service_logger.error(f"Unexpected error initiating call: {str(e)}")
-            raise TalkoInternalServerErrorResponse(
-                detail=call_messages.UNEXPECTED_ERROR_INITIATING_CALL
-            )
+            return TalkoInternalServerErrorResponse(detail=call_messages.UNEXPECTED_ERROR_INITIATING_CALL)
 
     @call_router.post(
         "/hangup",
@@ -132,28 +101,18 @@ class TalkoCallController:
             JSONResponse: The vendor's hangup result.
         """
         try:
-            talko_service_logger.info(
-                "Received hangup call request: {}".format(hangup_data)
-            )
+            talko_service_logger.info(f"Received hangup call request: {hangup_data}")
             auth_ctx = get_current_auth_context(request)
-            user_id: Optional[int] = auth_ctx.user_id  # None when called via API-KEY
+            user_id: int | None = auth_ctx.user_id  # None when called via API-KEY
             partner_id: int = auth_ctx.partner_id
-            talko_service_logger.info(
-                "User: {}, partner: {}, initiated hangup call api.".format(
-                    user_id, partner_id
-                )
+            talko_service_logger.info(f"User: {user_id}, partner: {partner_id}, initiated hangup call api.")
+            hangup_response: TalkoContract.HangupCallResponse = await call_service.hangup_call(
+                hangup_data.call_id,
+                user_id,
+                partner_id,
+                hangup_data.enable_ai_bridge or False,
             )
-            hangup_response: TalkoContract.HangupCallResponse = (
-                await call_service.hangup_call(
-                    hangup_data.call_id,
-                    user_id,
-                    partner_id,
-                    hangup_data.enable_ai_bridge or False,
-                )
-            )
-            talko_service_logger.info(
-                "Hangup call completed: {}".format(hangup_response)
-            )
+            talko_service_logger.info(f"Hangup call completed: {hangup_response}")
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={
@@ -162,18 +121,14 @@ class TalkoCallController:
                 },
             )
         except TalkoResourceNotFound as e:
-            talko_service_logger.error(
-                "Error in hangup call api resource: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in hangup call api resource: {str(e)}")
             return TalkoResourceNotFoundResponse(detail=call_messages.SOMETHING_WENT_WRONG)
         except ValueError as e:
-            talko_service_logger.error("Error in hangup call api: {}".format(str(e)))
+            talko_service_logger.error(f"Error in hangup call api: {str(e)}")
             return TalkoBadRequestResponse(detail=call_messages.CALL_HANGUP_FAILED)
         except Exception as e:
             talko_service_logger.error(f"Unexpected error hanging up call: {str(e)}")
-            raise TalkoInternalServerErrorResponse(
-                detail=call_messages.UNEXPECTED_ERROR_HANGUP_CALL
-            )
+            return TalkoInternalServerErrorResponse(detail=call_messages.UNEXPECTED_ERROR_HANGUP_CALL)
 
     @call_router.post(
         "/transfer",
@@ -202,25 +157,17 @@ class TalkoCallController:
             TalkoContract.CallTransferResponse: Result of the transfer request.
         """
         try:
-            talko_service_logger.info(
-                "Received call transfer request: {}".format(transfer_data)
-            )
+            talko_service_logger.info(f"Received call transfer request: {transfer_data}")
             auth_ctx = get_current_auth_context(request)
             partner_id: int = auth_ctx.partner_id
-            talko_service_logger.info(
-                "Partner: {}, initiated call transfer api.".format(partner_id)
-            )
+            talko_service_logger.info(f"Partner: {partner_id}, initiated call transfer api.")
             await call_service.transfer_call(
                 transfer_data.call_id,
                 transfer_data.destination_number,
                 partner_id,
                 transfer_data.enable_ai_bridge or False,
             )
-            talko_service_logger.info(
-                "Call transferred successfully: call_id={}".format(
-                    transfer_data.call_id
-                )
-            )
+            talko_service_logger.info(f"Call transferred successfully: call_id={transfer_data.call_id}")
             return JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={
@@ -229,25 +176,234 @@ class TalkoCallController:
                 },
             )
         except ValueError as e:
-            talko_service_logger.error(
-                "Error in transferring call api: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in transferring call api: {str(e)}")
             return TalkoBadRequestResponse(detail=call_messages.SOMETHING_WENT_WRONG)
         except TalkoResourceNotFound as e:
-            talko_service_logger.error(
-                "Error in transfer call api resource: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in transfer call api resource: {str(e)}")
             return TalkoResourceNotFoundResponse(detail=call_messages.SOMETHING_WENT_WRONG)
         except TalkoBadRequestError as e:
-            talko_service_logger.error(
-                "Error in transfer call api resource: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in transfer call api resource: {str(e)}")
             return TalkoBadRequestResponse(detail=call_messages.CALL_TRANSFER_FAILED)
         except Exception as e:
             talko_service_logger.error(f"Unexpected error transferring call: {str(e)}")
-            raise TalkoInternalServerErrorResponse(
-                detail=call_messages.UNEXPECTED_ERROR_TRANSFERRING_CALL
+            return TalkoInternalServerErrorResponse(detail=call_messages.UNEXPECTED_ERROR_TRANSFERRING_CALL)
+
+    # NOTE (grpc disabled for now): gRPC telephony control plane commented out.
+    # @call_router.post(
+    #     "/grpc/hangup",
+    #     status_code=status.HTTP_200_OK,
+    # )
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def grpc_hangup_call(
+        request: Request,
+        hangup_data: TalkoContract.GrpcHangupRequest,
+        call_service: TalkoCallService = Depends(Provide[TalkoContainer.call_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> JSONResponse:
+        """Hang up via the gRPC TelephonyControl plane (non-Tata vendors)."""
+        try:
+            response = await call_service.grpc_hangup_call(hangup_data.call_id, hangup_data.vendor_config_id)
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"status": "success", "data": response.model_dump()},
             )
+        except TalkoResourceNotFound as e:
+            talko_service_logger.error(f"gRPC hangup resource missing: {str(e)}")
+            return TalkoResourceNotFoundResponse(detail=str(e))
+        except Exception as e:
+            talko_service_logger.error(f"gRPC hangup failed: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=str(e))
+
+    # NOTE (grpc disabled for now): gRPC telephony control plane commented out.
+    # @call_router.post(
+    #     "/grpc/transfer",
+    #     status_code=status.HTTP_200_OK,
+    # )
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def grpc_transfer_call(
+        request: Request,
+        transfer_data: TalkoContract.GrpcTransferRequest,
+        call_service: TalkoCallService = Depends(Provide[TalkoContainer.call_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> JSONResponse:
+        """Blind-transfer via the gRPC TelephonyControl plane."""
+        try:
+            result = await call_service.grpc_transfer_call(
+                transfer_data.call_id,
+                transfer_data.destination_number,
+                transfer_data.vendor_config_id,
+            )
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"status": "success", "data": result},
+            )
+        except TalkoResourceNotFound as e:
+            talko_service_logger.error(f"gRPC transfer resource missing: {str(e)}")
+            return TalkoResourceNotFoundResponse(detail=str(e))
+        except Exception as e:
+            talko_service_logger.error(f"gRPC transfer failed: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=str(e))
+
+    # NOTE (grpc disabled for now): gRPC telephony control plane commented out.
+    # @call_router.get(
+    #     "/grpc/status",
+    #     status_code=status.HTTP_200_OK,
+    # )
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def grpc_call_status(
+        request: Request,
+        call_id: str = Query(...),
+        vendor_config_id: str = Query(""),
+        call_service: TalkoCallService = Depends(Provide[TalkoContainer.call_service]),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+    ) -> JSONResponse:
+        """Poll signalling state via the gRPC TelephonyControl plane."""
+        try:
+            result = await call_service.grpc_call_status(call_id, vendor_config_id)
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"status": "success", "data": result},
+            )
+        except TalkoResourceNotFound as e:
+            talko_service_logger.error(f"gRPC status resource missing: {str(e)}")
+            return TalkoResourceNotFoundResponse(detail=str(e))
+        except Exception as e:
+            talko_service_logger.error(f"gRPC status failed: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=str(e))
+
+    @call_router.post("/supervise", status_code=status.HTTP_200_OK)
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def start_supervise(
+        request: Request,
+        payload: TalkoContract.SuperviseRequest,
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+        supervision_service=Depends(Provide[TalkoContainer.supervision_service]),
+    ) -> JSONResponse:
+        """Start a supervisor session (listen | whisper | barge) on a live call."""
+        try:
+            auth_ctx = get_current_auth_context(request)
+            session = await supervision_service.start_supervise(
+                call_id=payload.call_id,
+                partner_id=auth_ctx.partner_id,
+                supervisor_id=payload.supervisor_id,
+                mode=payload.mode,
+                room_name=payload.room_name,
+            )
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"status": "success", "data": session},
+            )
+        except TalkoBadRequestError as e:
+            return TalkoBadRequestResponse(detail=str(e))
+        except Exception as e:
+            talko_service_logger.error(f"Supervise start failed: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=str(e))
+
+    @call_router.delete("/supervise", status_code=status.HTTP_200_OK)
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def stop_supervise(
+        request: Request,
+        call_id: str = Query(...),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+        supervision_service=Depends(Provide[TalkoContainer.supervision_service]),
+    ) -> JSONResponse:
+        """End the supervisor session on a live call."""
+        try:
+            auth_ctx = get_current_auth_context(request)
+            session = await supervision_service.stop_supervise(call_id, auth_ctx.partner_id)
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"status": "success", "data": session},
+            )
+        except TalkoResourceNotFound as e:
+            return TalkoResourceNotFoundResponse(detail=str(e))
+        except Exception as e:
+            talko_service_logger.error(f"Supervise stop failed: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=str(e))
+
+    @call_router.get("/supervise", status_code=status.HTTP_200_OK)
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def get_supervise(
+        request: Request,
+        call_id: str = Query(...),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+        supervision_service=Depends(Provide[TalkoContainer.supervision_service]),
+    ) -> JSONResponse:
+        """Fetch the active supervisor session for a call (if any)."""
+        try:
+            session = await supervision_service.get_supervise(call_id)
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"status": "success", "data": session},
+            )
+        except Exception as e:
+            talko_service_logger.error(f"Supervise fetch failed: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=str(e))
+
+    @call_router.post("/transfer/attended-start", status_code=status.HTTP_200_OK)
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def attended_transfer_start(
+        request: Request,
+        payload: TalkoContract.AttendedTransferStart,
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+        supervision_service=Depends(Provide[TalkoContainer.supervision_service]),
+    ) -> JSONResponse:
+        """Stage 1 of warm transfer: park consult intent for target_number."""
+        try:
+            auth_ctx = get_current_auth_context(request)
+            staged = await supervision_service.start_attended(
+                call_id=payload.call_id,
+                partner_id=auth_ctx.partner_id,
+                target_number=payload.target_number,
+            )
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={"status": "success", "data": staged},
+            )
+        except TalkoBadRequestError as e:
+            return TalkoBadRequestResponse(detail=str(e))
+        except Exception as e:
+            talko_service_logger.error(f"Attended start failed: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=str(e))
+
+    @call_router.post("/transfer/attended-complete", status_code=status.HTTP_200_OK)
+    @permission_check(TalkoPermissionDependency)
+    @inject
+    async def attended_transfer_complete(
+        request: Request,
+        call_id: str = Query(...),
+        destination_number: str = Query(""),
+        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
+        supervision_service=Depends(Provide[TalkoContainer.supervision_service]),
+        call_service: TalkoCallService = Depends(Provide[TalkoContainer.call_service]),
+    ) -> JSONResponse:
+        """Stage 2 of warm transfer: run the blind-transfer leg, then clear stage."""
+        try:
+            auth_ctx = get_current_auth_context(request)
+            staged = await supervision_service.complete_attended(call_id, auth_ctx.partner_id)
+            target = destination_number or staged.get("target_number", "")
+            vendor_response = await call_service.transfer_call(call_id, target, auth_ctx.partner_id, False)
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "status": "success",
+                    "data": {"staged": staged, "vendor_response": vendor_response},
+                },
+            )
+        except TalkoResourceNotFound as e:
+            return TalkoResourceNotFoundResponse(detail=str(e))
+        except TalkoBadRequestError as e:
+            return TalkoBadRequestResponse(detail=str(e))
+        except Exception as e:
+            talko_service_logger.error(f"Attended complete failed: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=str(e))
 
     @call_router.post("/webhook")
     @inject
@@ -274,8 +430,8 @@ class TalkoCallController:
             webhook_handler: dict = call_service.get_webhook_handler(vendor, type)
             return await webhook_handler.process_webhook(payload)
         except Exception as e:
-            talko_service_logger.error("Webhook processing failed: {}".format(str(e)))
-            raise TalkoInternalServerErrorResponse(detail=str(e))
+            talko_service_logger.error(f"Webhook processing failed: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=str(e))
 
     @call_router.post("/api/dialplan", status_code=status.HTTP_200_OK)
     @inject
@@ -296,31 +452,21 @@ class TalkoCallController:
             JSONResponse: Response from the dialplan service.
         """
         try:
-            talko_service_logger.info(
-                "Delegating generate dialplan request to service"
-            )
+            talko_service_logger.info("Delegating generate dialplan request to service")
             response = await call_service.generate_dialplan_response(request)
-            talko_service_logger.info(
-                "Generated dialplan response delegated: {}".format(response)
-            )
+            talko_service_logger.info(f"Generated dialplan response delegated: {response}")
             return JSONResponse(response)
         except Exception as e:
-            talko_service_logger.error(
-                f"Error in generate_dialplan_response delegation: {str(e)}"
-            )
-            raise TalkoInternalServerErrorResponse(
-                detail=call_messages.UNEXPECTED_ERROR_INITIATING_CALL
-            )
+            talko_service_logger.error(f"Error in generate_dialplan_response delegation: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=call_messages.UNEXPECTED_ERROR_INITIATING_CALL)
 
     @call_router.get("/details", status_code=status.HTTP_200_OK)
     @permission_check(TalkoPermissionDependency)
     @inject
     async def get_call_details(
         request: Request,
-        call_id: Optional[str] = Query(
-            None, description="Call ID from the vendor (e.g. Tata Tele)"
-        ),
-        call_uuid: Optional[str] = Query(
+        call_id: str | None = Query(None, description="Call ID from the vendor (e.g. Tata Tele)"),
+        call_uuid: str | None = Query(
             None,
             description="Optional Call UUID for vendors that support it (e.g. Tata Tele)",
         ),
@@ -340,12 +486,10 @@ class TalkoCallController:
             partner_id: int = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
 
             talko_service_logger.info(
-                "User {} (partner {}) requested call details - call_id: {}, call_uuid: {}, vendor_config_id: {}".format(
-                    user_id, partner_id, call_id, call_uuid, vendor_config_id
-                )
+                f"User {user_id} (partner {partner_id}) requested call details - call_id: {call_id}, call_uuid: {call_uuid}, vendor_config_id: {vendor_config_id}"
             )
 
-            result: Dict[str, Any] = await call_service.get_call_details(
+            result: dict[str, Any] = await call_service.get_call_details(
                 call_id=call_id,
                 call_uuid=call_uuid,
                 vendor_config_id=vendor_config_id,
@@ -357,248 +501,13 @@ class TalkoCallController:
             )
 
         except TalkoBadRequestError as e:
-            talko_service_logger.error(
-                "BadRequest in get_call_details: {}".format(str(e))
-            )
+            talko_service_logger.error(f"BadRequest in get_call_details: {str(e)}")
             return TalkoBadRequestResponse(detail=str(e))
 
         except TalkoResourceNotFound as e:
-            talko_service_logger.error(
-                "TalkoResourceNotFound in get_call_details: {}".format(str(e))
-            )
+            talko_service_logger.error(f"TalkoResourceNotFound in get_call_details: {str(e)}")
             return TalkoResourceNotFoundResponse(detail=str(e))
 
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error in get_call_details: {}".format(str(e))
-            )
-            raise TalkoInternalServerErrorResponse(detail="Failed to fetch call details")
-
-    @call_router.patch(
-        "/recovery/clicktocall-agent/fix",
-        status_code=status.HTTP_200_OK,
-    )
-    @inject
-    async def fix_clicktocall_agent(
-        dry_run: bool = Query(
-            False, description="If true, preview only — no writes performed"
-        ),
-        cdr_repository: TalkoCDRRepository = Depends(Provide[TalkoContainer.cdr_repository]),
-        talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-    ) -> JSONResponse:
-        """
-        Fix wrongly updated agent field for partner_id=2 click-to-call CDRs.
-        Scoped to last 2 days (based on created_at timestamp in ms).
-        Fetches correct assigned_to agent from Maglo lead_request API using lead_id.
-        Processes 30 records per API call.
-        """
-        try:
-            talko_service_logger.info(
-                "clicktocall agent recovery triggered — dry_run={}".format(dry_run)
-            )
-
-            # ── TIME RANGE ───────────────────────────────────────────
-            now_utc = datetime.now(timezone.utc)
-            two_days_ago = now_utc - timedelta(days=LOOKBACK_DAYS)
-            since_ms = int(two_days_ago.timestamp() * 1000)
-            now_ms = int(now_utc.timestamp() * 1000)
-
-            time_range = {
-                "from": two_days_ago.isoformat(),
-                "to": now_utc.isoformat(),
-                "from_ms": since_ms,
-                "to_ms": now_ms,
-            }
-
-            query = {
-                "partner_id": PARTNER_ID,
-                # "calling_mode": "clicktocall",
-                "lead_id": {"$exists": True, "$ne": None},
-                "agent": WRONG_AGENT_ID,
-                # "created_at": {
-                #     "$gte": since_ms,
-                #     "$lte": now_ms,
-                # },
-            }
-
-            # ── DRY RUN / PREVIEW ────────────────────────────────────
-            if dry_run:
-                all_affected = await cdr_repository.get_cdrs_by_criteria(query)
-                count = len(all_affected)
-                sample = all_affected[:5]
-
-                result = {
-                    "dry_run": True,
-                    "time_range": time_range,
-                    "total_affected": count,
-                    "sample_records": [
-                        {
-                            "cdr_id": str(r["_id"]),
-                            "customer": r.get("customer"),
-                            "lead_id": r.get("lead_id"),
-                            "workspace_id": r.get("workspace_id"),
-                            "agent": r.get("agent"),
-                            "created_at": r.get("created_at"),
-                            "created_at_human": (
-                                datetime.fromtimestamp(
-                                    r["created_at"] / 1000, tz=timezone.utc
-                                ).isoformat()
-                                if r.get("created_at")
-                                else None
-                            ),
-                        }
-                        for r in sample
-                    ],
-                }
-                talko_service_logger.info(
-                    "Dry run completed — total_affected: {}".format(count)
-                )
-                return JSONResponse(
-                    status_code=status.HTTP_200_OK,
-                    content={"status": "success", "data": result},
-                )
-
-            # ── APPLY FIX — 30 records per call ──────────────────────
-            batch = await cdr_repository.get_cdrs_by_criteria(query, limit=500)
-            total_found = len(batch)
-            results = []
-            fixed = skipped = failed = 0
-
-            async with httpx.AsyncClient(timeout=10) as client:
-                for cdr in batch:
-                    cdr_id = str(cdr["_id"])
-                    lead_id = cdr.get("lead_id")
-                    customer_number: str = cdr.get("customer", "")
-                    workspace_id = cdr.get("workspace_id")
-
-                    base_record = {
-                        "cdr_id": cdr_id,
-                        "lead_id": lead_id,
-                        "customer_number": customer_number,
-                        "workspace_id": workspace_id,
-                        "old_agent": WRONG_AGENT_ID,
-                        "new_agent": None,
-                    }
-
-                    # ── SKIP GUARDS ───────────────────────────────────
-                    if not lead_id:
-                        results.append(
-                            {**base_record, "status": "skipped", "reason": "No lead_id in TalkoCDR"}
-                        )
-                        skipped += 1
-                        continue
-
-                    if not customer_number:
-                        results.append(
-                            {**base_record, "status": "skipped", "reason": "No customer number in TalkoCDR"}
-                        )
-                        skipped += 1
-                        continue
-
-                    if not workspace_id:
-                        results.append(
-                            {**base_record, "status": "skipped", "reason": "No workspace_id in TalkoCDR"}
-                        )
-                        skipped += 1
-                        continue
-
-                    try:
-                        # ── CALL MAGLO LEAD REQUEST API ───────────────
-                        url = "{}/maglo-service/v1/lead_request/{}".format(
-                            MAGLO_BASE_URL, lead_id
-                        )
-                        response = await client.get(
-                            url,
-                            headers={
-                                "accept": "application/json",
-                                "Authorization": "Bearer {}".format(MAGLO_TOKEN),
-                            },
-                        )
-
-                        if response.status_code != 200:
-                            talko_service_logger.warning(
-                                "Maglo API returned {} for lead_id={}: {}".format(
-                                    response.status_code, lead_id, response.text
-                                )
-                            )
-                            results.append(
-                                {
-                                    **base_record,
-                                    "status": "skipped",
-                                    "reason": "Maglo API error: status={}".format(
-                                        response.status_code
-                                    ),
-                                }
-                            )
-                            skipped += 1
-                            continue
-
-                        lead_data = response.json().get("data", {})
-                        correct_agent = lead_data.get("assigned_to")
-
-                        if not correct_agent:
-                            results.append(
-                                {
-                                    **base_record,
-                                    "status": "skipped",
-                                    "reason": "Maglo returned no assigned_to",
-                                }
-                            )
-                            skipped += 1
-                            continue
-
-                        # ── UPDATE TalkoCDR ────────────────────────────────
-                        await cdr_repository.update_one(
-                            {"_id": cdr["_id"]},
-                            {"$set": {"agent": correct_agent}},
-                        )
-
-                        talko_service_logger.info(
-                            "TalkoCDR {} fixed — agent {} → {} (lead_id={})".format(
-                                cdr_id, WRONG_AGENT_ID, correct_agent, lead_id
-                            )
-                        )
-                        results.append(
-                            {**base_record, "new_agent": correct_agent, "status": "fixed"}
-                        )
-                        fixed += 1
-
-                    except Exception as e:
-                        talko_service_logger.error(
-                            "Failed to fix TalkoCDR {} (lead_id={}): {}".format(
-                                cdr_id, lead_id, str(e)
-                            )
-                        )
-                        results.append(
-                            {**base_record, "status": "failed", "reason": str(e)}
-                        )
-                        failed += 1
-
-            result = {
-                "dry_run": False,
-                "time_range": time_range,
-                "batch_size": 30,
-                "total_found": total_found,
-                "fixed": fixed,
-                "skipped": skipped,
-                "failed": failed,
-                "results": results,
-            }
-
-            talko_service_logger.info(
-                "Fix completed — total_found: {}, fixed: {}, skipped: {}, failed: {}".format(
-                    total_found, fixed, skipped, failed
-                )
-            )
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={"status": "success", "data": result},
-            )
-
-        except Exception as e:
-            talko_service_logger.error(
-                "Error in fix_clicktocall_agent: {}".format(str(e))
-            )
-            raise TalkoInternalServerErrorResponse(
-                detail="Failed to process clicktocall agent recovery"
-            )
+            talko_service_logger.error(f"Unexpected error in get_call_details: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail="Failed to fetch call details")

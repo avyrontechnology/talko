@@ -18,15 +18,11 @@ class TestPartnerWebhookValidator:
         with pytest.raises(ValueError):
             validator.validate_url_is_https("http://example.com/webhook")
 
-    async def test_check_config_does_not_already_exist_passes_when_absent(
-        self, validator
-    ):
+    async def test_check_config_does_not_already_exist_passes_when_absent(self, validator):
         validator.repository.find_config_by_partner_id.return_value = None
         await validator.check_config_does_not_already_exist(1)  # no raise
 
-    async def test_check_config_does_not_already_exist_raises_when_present(
-        self, validator
-    ):
+    async def test_check_config_does_not_already_exist_raises_when_present(self, validator):
         validator.repository.find_config_by_partner_id.return_value = {"partner_id": 1}
         with pytest.raises(ValueError):
             await validator.check_config_does_not_already_exist(1)

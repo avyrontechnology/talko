@@ -1,5 +1,3 @@
-from typing import Union
-
 from bson import ObjectId
 
 from src.components.vendor.models import TalkoVendorModel
@@ -15,9 +13,7 @@ class TalkoVendorConfigRepository:
     Repository class for handling all database operations related to Vendor Configurations.
     """
 
-    def __init__(
-        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
-    ):
+    def __init__(self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger):
         """
         Initialize the repository with database manager and logger.
 
@@ -41,21 +37,15 @@ class TalkoVendorConfigRepository:
         :return: The ID of the inserted document as a string.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
-            ) as collection:
+            async with self.__db_manager.collection(TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG) as collection:
                 result = await collection.insert_one(config_dict)
-                self.__logger.info(
-                    "Inserted vendor config with ID: {}".format(result.inserted_id)
-                )
+                self.__logger.info(f"Inserted vendor config with ID: {result.inserted_id}")
                 return str(result.inserted_id)
         except Exception as e:
-            self.__logger.error("Failed to insert vendor config: {}".format(str(e)))
+            self.__logger.error(f"Failed to insert vendor config: {str(e)}")
             raise
 
-    async def check_vendor_config_exists_for_existing_vendor(
-        self, vendor_id: ObjectId
-    ) -> bool:
+    async def check_vendor_config_exists_for_existing_vendor(self, vendor_id: ObjectId) -> bool:
         """
         Check if a vendor configuration exists for the given vendor ID.
 
@@ -63,27 +53,15 @@ class TalkoVendorConfigRepository:
         :return: True if config exists, False otherwise.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
-            ) as collection:
+            async with self.__db_manager.collection(TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG) as collection:
                 exists = await collection.find_one({"vendor_id": vendor_id}) is not None
-                self.__logger.info(
-                    "Vendor config exists for vendor_id {}: {}".format(
-                        vendor_id, exists
-                    )
-                )
+                self.__logger.info(f"Vendor config exists for vendor_id {vendor_id}: {exists}")
                 return exists
         except Exception as e:
-            self.__logger.error(
-                "Failed to check vendor config existence for vendor_id {}: {}".format(
-                    vendor_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to check vendor config existence for vendor_id {vendor_id}: {str(e)}")
             raise
 
-    async def check_vendor_config_exists_for_existing_vendor_using_pk_id(
-        self, id: ObjectId
-    ) -> bool:
+    async def check_vendor_config_exists_for_existing_vendor_using_pk_id(self, id: ObjectId) -> bool:
         """
         Check if a vendor configuration exists for the given config primary key (_id).
 
@@ -91,25 +69,15 @@ class TalkoVendorConfigRepository:
         :return: True if config exists, False otherwise.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
-            ) as collection:
+            async with self.__db_manager.collection(TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG) as collection:
                 exists = await collection.find_one({"_id": id}) is not None
-                self.__logger.info(
-                    "Vendor config exists for vendor_id {}: {}".format(id, exists)
-                )
+                self.__logger.info(f"Vendor config exists for vendor_id {id}: {exists}")
                 return exists
         except Exception as e:
-            self.__logger.error(
-                "Failed to check vendor config existence for vendor_id {}: {}".format(
-                    id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to check vendor config existence for vendor_id {id}: {str(e)}")
             raise
 
-    async def find_all_configs(
-        self, include_inactive_vendors: bool = False
-    ) -> Union[dict, list[dict], None]:
+    async def find_all_configs(self, include_inactive_vendors: bool = False) -> dict | list[dict] | None:
         """
         Retrieve all vendor configurations, optionally excluding inactive vendors.
 
@@ -130,11 +98,7 @@ class TalkoVendorConfigRepository:
                         }
                     },
                     {self.__unwind: self.__vendor},
-                    (
-                        {self.__match: self.__vendor_is_active}
-                        if not include_inactive_vendors
-                        else {}
-                    ),
+                    ({self.__match: self.__vendor_is_active} if not include_inactive_vendors else {}),
                     {
                         self.__project: {
                             "_id": 1,
@@ -148,10 +112,10 @@ class TalkoVendorConfigRepository:
 
                 return result
         except Exception as e:
-            self.__logger.error("Failed to retrieve vendor configs: {}".format(str(e)))
+            self.__logger.error(f"Failed to retrieve vendor configs: {str(e)}")
             raise
 
-    async def find_config_by_id(self, config_id: ObjectId) -> Union[dict, None]:
+    async def find_config_by_id(self, config_id: ObjectId) -> dict | None:
         """
         Retrieve a specific vendor configuration by its ID, joined with vendor data.
 
@@ -197,11 +161,7 @@ class TalkoVendorConfigRepository:
                 return result
 
         except Exception as e:
-            self.__logger.error(
-                "Failed to find vendor config for config_id {}: {}".format(
-                    config_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to find vendor config for config_id {config_id}: {str(e)}")
             raise
 
     async def find_configs_by_vendor_id(self, vendor_id: ObjectId) -> list[dict]:
@@ -239,11 +199,7 @@ class TalkoVendorConfigRepository:
                     result.append(config)
                 return result
         except Exception as e:
-            self.__logger.error(
-                "Failed to find vendor configs for vendor_id {}: {}".format(
-                    vendor_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to find vendor configs for vendor_id {vendor_id}: {str(e)}")
             raise
 
     async def get_vendor_config_by_vendor_type(self, vendor_type: str) -> list[dict]:
@@ -295,14 +251,10 @@ class TalkoVendorConfigRepository:
                 return result
 
         except Exception as e:
-            self.__logger.error(
-                f"Failed to find vendor configs for vendor_type {vendor_type}: {str(e)}"
-            )
+            self.__logger.error(f"Failed to find vendor configs for vendor_type {vendor_type}: {str(e)}")
             raise
 
-    async def update_vendor_config(
-        self, config_id: ObjectId, update_dict: dict
-    ) -> dict:
+    async def update_vendor_config(self, config_id: ObjectId, update_dict: dict) -> dict:
         """
         Update a vendor configuration by its ID.
 
@@ -312,29 +264,17 @@ class TalkoVendorConfigRepository:
         :raises ValueError: If the config is not found.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
-            ) as collection:
+            async with self.__db_manager.collection(TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG) as collection:
                 result = await collection.find_one_and_update(
                     {"_id": config_id}, {"$set": update_dict}, return_document=True
                 )
                 if not result:
-                    self.__logger.error(
-                        VENDOR_CONFIG_FOR_VENDOR_ID_NOT_FOUND.format(config_id)
-                    )
-                    raise ValueError(
-                        VENDOR_CONFIG_FOR_VENDOR_ID_NOT_FOUND.format(config_id)
-                    )
-                self.__logger.info(
-                    "Updated vendor config for vendor_id {}".format(config_id)
-                )
+                    self.__logger.error(VENDOR_CONFIG_FOR_VENDOR_ID_NOT_FOUND.format(config_id))
+                    raise ValueError(VENDOR_CONFIG_FOR_VENDOR_ID_NOT_FOUND.format(config_id))
+                self.__logger.info(f"Updated vendor config for vendor_id {config_id}")
                 return result
         except Exception as e:
-            self.__logger.error(
-                "Failed to update vendor config for vendor_id {}: {}".format(
-                    config_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to update vendor config for vendor_id {config_id}: {str(e)}")
             raise
 
     async def update_did_lists(
@@ -387,25 +327,15 @@ class TalkoVendorConfigRepository:
                     {"vendor_id": vendor_id}, {SET: update_ops}, return_document=True
                 )
                 if not result:
-                    self.__logger.error(
-                        "Vendor config for vendor_id {} not found".format(vendor_id)
-                    )
+                    self.__logger.error(f"Vendor config for vendor_id {vendor_id} not found")
                     raise ValueError("Vendor config for vendor_id not found.")
-                self.__logger.info(
-                    "Updated DID lists for vendor_id {}".format(vendor_id)
-                )
+                self.__logger.info(f"Updated DID lists for vendor_id {vendor_id}")
                 return result
         except Exception as e:
-            self.__logger.error(
-                "Failed to update DID lists for vendor_id {}: {}".format(
-                    vendor_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to update DID lists for vendor_id {vendor_id}: {str(e)}")
             raise
 
-    async def update_vendor_config_by_vendor_id(
-        self, vendor_id: ObjectId, update_dict: dict
-    ) -> dict:
+    async def update_vendor_config_by_vendor_id(self, vendor_id: ObjectId, update_dict: dict) -> dict:
         """
         Update a vendor configuration document based on the given vendor_id.
 
@@ -421,25 +351,15 @@ class TalkoVendorConfigRepository:
             Exception: If any error occurs during the database operation.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
-            ) as collection:
+            async with self.__db_manager.collection(TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG) as collection:
                 result = await collection.find_one_and_update(
                     {"vendor_id": vendor_id}, update_dict, return_document=True
                 )
                 if not result:
-                    self.__logger.error(
-                        "No vendor config found for vendor_id {}".format(vendor_id)
-                    )
+                    self.__logger.error(f"No vendor config found for vendor_id {vendor_id}")
                     raise ValueError("No vendor config found for vendor_id.")
-                self.__logger.info(
-                    "Updated vendor config for vendor_id: {}".format(vendor_id)
-                )
+                self.__logger.info(f"Updated vendor config for vendor_id: {vendor_id}")
                 return result
         except Exception as e:
-            self.__logger.error(
-                "Failed to update vendor config for vendor_id {}: {}".format(
-                    vendor_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to update vendor config for vendor_id {vendor_id}: {str(e)}")
             raise

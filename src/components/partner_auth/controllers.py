@@ -45,34 +45,26 @@ class TalkoPartnerApiKeyController:
     async def create_api_key(
         request: Request,
         data: TalkoContract.ApiKeyCreate,
-        partner_api_key_service: TalkoPartnerApiKeyService = Depends(
-            Provide[TalkoContainer.partner_api_key_service]
-        ),
+        partner_api_key_service: TalkoPartnerApiKeyService = Depends(Provide[TalkoContainer.partner_api_key_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ):
         try:
             current_user_data: dict = request.state.user
             user_id = current_user_data.get(TalkoCurrentUserMap.USER_ID)
             talko_service_logger.info(
-                "User: {}, create partner api key api initiated for partner_id: {}".format(
-                    user_id, data.partner_id
-                )
+                f"User: {user_id}, create partner api key api initiated for partner_id: {data.partner_id}"
             )
             # Keys are issued into the body partner: superadmins may onboard
             # any partner, everyone else only their own scope.
-            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
             try:
-                await resolve_effective_partner_id(
-                    request, grpc_client, talko_service_logger, data.partner_id
-                )
+                await resolve_effective_partner_id(request, grpc_client, talko_service_logger, data.partner_id)
             except TalkoSuperadminDenied as denied:
                 return TalkoForbiddenPermissionResponse(detail=str(denied))
             created = await partner_api_key_service.create_api_key(data, user_id)
             return TalkoResourceCreatedResponse(data=created)
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error creating partner api key: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error creating partner api key: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @router.get("", response_model=list[TalkoContract.ApiKeyListItem])
@@ -81,18 +73,14 @@ class TalkoPartnerApiKeyController:
     async def list_api_keys(
         request: Request,
         partner_id: int = Query(...),
-        partner_api_key_service: TalkoPartnerApiKeyService = Depends(
-            Provide[TalkoContainer.partner_api_key_service]
-        ),
+        partner_api_key_service: TalkoPartnerApiKeyService = Depends(Provide[TalkoContainer.partner_api_key_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ):
         try:
-            talko_service_logger.info(
-                "Listing partner api keys for partner_id: {}".format(partner_id)
-            )
+            talko_service_logger.info(f"Listing partner api keys for partner_id: {partner_id}")
             # Segregation: non-superadmins may only list their own partner's keys.
             current_user_data: dict = request.state.user
-            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
             if not await is_superadmin(request, grpc_client, talko_service_logger):
                 own = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
                 if own is not None:
@@ -100,26 +88,20 @@ class TalkoPartnerApiKeyController:
             keys = await partner_api_key_service.list_api_keys(partner_id)
             return TalkoSuccessResponse(data=keys)
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error listing partner api keys: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error listing partner api keys: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
-    @router.post(
-        "/{id}/revoke", response_model=TalkoContract.ApiKeyRevokeResponse
-    )
+    @router.post("/{id}/revoke", response_model=TalkoContract.ApiKeyRevokeResponse)
     @permission_check(TalkoPermissionDependency)
     @inject
     async def revoke_api_key(
         request: Request,
         id: str,
-        partner_api_key_service: TalkoPartnerApiKeyService = Depends(
-            Provide[TalkoContainer.partner_api_key_service]
-        ),
+        partner_api_key_service: TalkoPartnerApiKeyService = Depends(Provide[TalkoContainer.partner_api_key_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ):
         try:
-            talko_service_logger.info("Revoking partner api key {}".format(id))
+            talko_service_logger.info(f"Revoking partner api key {id}")
             revoked = await partner_api_key_service.revoke_api_key(id)
             return TalkoSuccessResponse(data=revoked)
         except TalkoResourceNotFound:
@@ -127,7 +109,5 @@ class TalkoPartnerApiKeyController:
         except ValueError:
             return TalkoBadRequestResponse(detail=SOMETHING_WENT_WRONG)
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error revoking partner api key {}: {}".format(id, str(e))
-            )
+            talko_service_logger.error(f"Unexpected error revoking partner api key {id}: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)

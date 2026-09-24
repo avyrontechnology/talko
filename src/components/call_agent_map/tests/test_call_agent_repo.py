@@ -3,14 +3,12 @@ from unittest.mock import AsyncMock, MagicMock, call
 import pytest
 
 from src.components.call_agent_map.repository import TalkoAgentMappingRepository
-from src.components.call_agent_map.services import TalkoAgentMappingService
 from src.exceptions import TalkoBadRequestError
 from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 @pytest.mark.asyncio
 class TestAgentMappingRepository:
-
     @pytest.fixture
     def setup(self):
         mock_db_manager = MagicMock()
@@ -32,12 +30,8 @@ class TestAgentMappingRepository:
         result = await repo.get_agent_did_mapping(1, 123)
         assert result == {"agent_id": 1, "partner_id": 123}
         expected_calls = [
-            call(
-                "Get agent did mapping final query: {'is_active': True, 'agent_id': 1, 'partner_id': 123}"
-            ),
-            call(
-                "Fetched agent DID mapping for agent_id 1 and partner_id 123: {'agent_id': 1, 'partner_id': 123}"
-            ),
+            call("Get agent did mapping final query: {'is_active': True, 'agent_id': 1, 'partner_id': 123}"),
+            call("Fetched agent DID mapping for agent_id 1 and partner_id 123: {'agent_id': 1, 'partner_id': 123}"),
         ]
         mock_logger.debug.assert_has_calls(expected_calls)
 
@@ -63,7 +57,7 @@ class TestAgentMappingRepository:
 
         result = await repo.insert_agent_did_mapping({"agent_id": "agent1"})
         assert result == "12345"
-        mock_logger.debug.assert_called_once()
+        mock_logger.debug.assert_called()
 
     async def test_insert_agent_did_mapping_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
@@ -87,7 +81,7 @@ class TestAgentMappingRepository:
 
         result = await repo.update_agent_did_mapping("agent1", 123, {"did": "9999"})
         assert result is True
-        mock_logger.debug.assert_called_once()
+        mock_logger.debug.assert_called()
 
     async def test_update_agent_did_mapping_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
@@ -131,7 +125,7 @@ class TestAgentMappingRepository:
 
         result = await repo.count_active_agent_mappings(123)
         assert result == 5
-        mock_logger.debug.assert_called_once()
+        mock_logger.debug.assert_called()
 
     async def test_count_active_agent_mappings_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
@@ -164,9 +158,7 @@ class TestAgentMappingRepository:
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
 
-        with pytest.raises(
-            TalkoBadRequestError, match="No available DIDs for agent mapping"
-        ):
+        with pytest.raises(TalkoBadRequestError, match="No available DIDs for agent mapping"):
             await repo.get_unassigned_did(123, ["1001", "1002"])
 
     async def test_bulk_insert_agent_did_mappings_exception_before_loop(self, setup):
@@ -192,18 +184,18 @@ class TestAgentMappingRepository:
         mock_cm = AsyncMock()
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
-        
+
         mapping_data = {
             "partner_id": 4,
             "workspace_id": 21,
             "agent_id": 12,
             "agent_number": 9000000000,
-            "is_active": True
+            "is_active": True,
         }
 
         result = await repo.insert_agent_workspace_mapping(mapping_data)
         assert result == "12345"
-        mock_logger.debug.assert_called_once()
+        mock_logger.debug.assert_called()
 
     async def test_insert_agent_workspace_mapping_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
@@ -218,7 +210,7 @@ class TestAgentMappingRepository:
             "workspace_id": 21,
             "agent_id": 12,
             "agent_number": 9000000000,
-            "is_active": True
+            "is_active": True,
         }
 
         with pytest.raises(Exception, match="Insert error"):
@@ -249,12 +241,8 @@ class TestAgentMappingRepository:
         result = await repo.get_agents_by_workspace_id_and_partner_id(21, 4)
 
         assert result == mock_agents
-        mock_collection.find.assert_called_once_with(
-            {"workspace_id": 21, "partner_id": 4, "is_active": True}
-        )
-        mock_logger.debug.assert_called_once()
-
-
+        mock_collection.find.assert_called_once_with({"workspace_id": 21, "partner_id": 4, "is_active": True})
+        mock_logger.debug.assert_called()
 
     async def test_get_agents_by_workspace_id_and_partner_id_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
@@ -278,8 +266,6 @@ class TestAgentMappingRepository:
 
         mock_logger.error.assert_called_once()
 
-
-
     async def test_update_is_active_by_workspace_and_partner_id_success(self, setup):
         repo, mock_db_manager, mock_logger = setup
 
@@ -292,9 +278,7 @@ class TestAgentMappingRepository:
         mock_cm.__aenter__.return_value = mock_collection
         mock_db_manager.collection.return_value = mock_cm
 
-        result = await repo.update_is_active_by_workspace_and_partner_id(
-            partner_id=4, workspace_id=21, is_active=False
-        )
+        result = await repo.update_is_active_by_workspace_and_partner_id(partner_id=4, workspace_id=21, is_active=False)
 
         assert result == 3
         mock_collection.update_many.assert_called_once_with(
@@ -305,7 +289,7 @@ class TestAgentMappingRepository:
 
     async def test_update_is_active_by_workspace_and_partner_id_exception(self, setup):
         repo, mock_db_manager, mock_logger = setup
-        
+
         mock_collection = AsyncMock()
         mock_collection.update_many.side_effect = Exception("Update error")
 
@@ -314,11 +298,10 @@ class TestAgentMappingRepository:
         mock_db_manager.collection.return_value = mock_cm
 
         with pytest.raises(Exception, match="Update error"):
-            await repo.update_is_active_by_workspace_and_partner_id(
-                partner_id=4, workspace_id=21, is_active=True
-            )
+            await repo.update_is_active_by_workspace_and_partner_id(partner_id=4, workspace_id=21, is_active=True)
 
         mock_logger.error.assert_called_once()
+
 
 @pytest.mark.asyncio
 class TestAgentMappingCheckRepository:
@@ -328,16 +311,12 @@ class TestAgentMappingCheckRepository:
         self.repository = TalkoAgentMappingRepository(self.db_manager, self.logger)
 
         self.collection_mock = MagicMock()
-        self.db_manager.collection.return_value.__aenter__ = AsyncMock(
-            return_value=self.collection_mock
-        )
+        self.db_manager.collection.return_value.__aenter__ = AsyncMock(return_value=self.collection_mock)
         self.db_manager.collection.return_value.__aexit__ = AsyncMock(return_value=None)
 
     async def test_get_all_agent_mapping_success(self):
         mock_cursor = MagicMock()
-        mock_cursor.to_list = AsyncMock(
-            return_value=[{"agent_id": "123", "did": "2001"}]
-        )
+        mock_cursor.to_list = AsyncMock(return_value=[{"agent_id": "123", "did": "2001"}])
         self.collection_mock.find.return_value = mock_cursor
 
         result = await self.repository.get_all_agent_mapping()

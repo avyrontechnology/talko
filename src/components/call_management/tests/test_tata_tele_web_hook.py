@@ -14,16 +14,13 @@ from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 
 @pytest.mark.asyncio
 class TestTataTeleWebhookHandler:
-
     @pytest.fixture(autouse=True)
     def setup(self):
         self.logger = MagicMock()
         self.call_repository = AsyncMock()
         self.vendor = "tata_tele"
 
-        self.handler = TalkoTataTeleWebhookHandler(
-            self.logger, self.call_repository, self.vendor
-        )
+        self.handler = TalkoTataTeleWebhookHandler(self.logger, self.call_repository, self.vendor)
         self.handler.datetime_util = MagicMock()
 
         # Mock field mappings so updates become predictable
@@ -61,7 +58,7 @@ class TestTataTeleWebhookHandler:
         assert response == {"status": "success", "call_id": "abc123"}
 
         self.call_repository.update_cdr.assert_called_once_with(
-            "some_id", {"status": "completed", "updated_at": "2025-07-29"}
+            "some_id", {"status": "completed", "lead_name": "", "updated_at": "2025-07-29"}
         )
 
     async def test_webhook_missing_call_id(self):
@@ -84,9 +81,7 @@ class TestTataTeleWebhookHandler:
 
     async def test_webhook_failed_update(self):
         payload = {"call_id": "abc123", "status": "completed"}
-        self.call_repository.get_cdr_by_call_id_or_uuid.return_value = {
-            "_id": "some_id"
-        }
+        self.call_repository.get_cdr_by_call_id_or_uuid.return_value = {"_id": "some_id"}
         self.call_repository.update_cdr.return_value = False
 
         with pytest.raises(TalkoBadRequestError) as exc:
@@ -104,20 +99,14 @@ class TestTataTeleWebhookHandler:
         self.call_repository.get_cdr_by_call_id_or_uuid.return_value = cdr
         self.call_repository.update_cdr.return_value = True
 
-        self.handler.datetime_util.convert_date_time.side_effect = (
-            lambda x: f"converted-{x}"
-        )
+        self.handler.datetime_util.convert_date_time.side_effect = lambda x: f"converted-{x}"
         self.handler.datetime_util.get_current_time.return_value = "NOW"
 
         response = await self.handler.process_webhook(payload)
         assert response["status"] == "success"
 
-        self.handler.datetime_util.convert_date_time.assert_any_call(
-            "2025-08-01T10:00:00Z"
-        )
-        self.handler.datetime_util.convert_date_time.assert_any_call(
-            "2025-08-01T10:10:00Z"
-        )
+        self.handler.datetime_util.convert_date_time.assert_any_call("2025-08-01T10:00:00Z")
+        self.handler.datetime_util.convert_date_time.assert_any_call("2025-08-01T10:10:00Z")
 
     async def test_int_fields_converted(self):
         payload = {"call_id": "abc123", "duration": "12", "outbound_sec": "10"}
@@ -127,7 +116,7 @@ class TestTataTeleWebhookHandler:
 
         self.handler.datetime_util.get_current_time.return_value = "NOW"
 
-        response = await self.handler.process_cdr_api_payload(payload, call_id="abc123")
+        await self.handler.process_cdr_api_payload(payload, call_id="abc123")
 
         updates = self.call_repository.update_cdr.call_args[0][1]
         assert updates["total_call_duration"] == 12
@@ -160,9 +149,7 @@ class TestTataTeleWebhookHandler:
 
         self.handler.call_repository.get_cdr_by_call_id_or_uuid.return_value = cdr
         self.handler.call_repository.update_cdr.return_value = True
-        self.handler.datetime_util.get_current_time.return_value = (
-            "2025-08-10T12:00:00Z"
-        )
+        self.handler.datetime_util.get_current_time.return_value = "2025-08-10T12:00:00Z"
 
         response = await self.handler.process_webhook(payload)
         assert response["status"] == "success"
@@ -174,7 +161,7 @@ class TestTataTeleWebhookHandler:
     async def test_answered_agent_number_from_missed_agents(self):
         payload = {
             "call_id": "abc123",
-            "missed_agents": {"agent_number": "999888777666"},
+            "missed_agent": {"agent_number": "999888777666"},
         }
         cdr = {
             "_id": "some_id",
@@ -185,7 +172,7 @@ class TestTataTeleWebhookHandler:
         self.call_repository.update_cdr.return_value = True
         self.handler.datetime_util.get_current_time.return_value = "NOW"
 
-        response = await self.handler.process_webhook(payload)
+        await self.handler.process_webhook(payload)
 
         updates = self.call_repository.update_cdr.call_args[0][1]
         assert updates["agent"] == 22
@@ -205,9 +192,7 @@ class TestTataTeleWebhookHandler:
 
         self.handler.call_repository.get_cdr_by_call_id_or_uuid.return_value = cdr
         self.handler.call_repository.update_cdr.return_value = True
-        self.handler.datetime_util.get_current_time.return_value = (
-            "2025-08-10T12:00:00Z"
-        )
+        self.handler.datetime_util.get_current_time.return_value = "2025-08-10T12:00:00Z"
 
         response = await self.handler.process_webhook(payload)
         assert response["status"] == "success"
@@ -218,7 +203,6 @@ class TestTataTeleWebhookHandler:
 
 @pytest.mark.asyncio
 class TestResultsBranch:
-
     async def test_process_payload_with_results_key(self):
         handler = TalkoTataTeleWebhookHandler(MagicMock(), AsyncMock(), "tata_tele")
         handler.datetime_util = MagicMock()
@@ -245,9 +229,7 @@ class TestRelayToMakunai:
     relay (shared via TalkoWebhookHandler._relay_to_makunai) must fire from here.
     """
 
-    _HTTPX_PATCH_PATH = (
-        "src.components.call_management.handlers.webhook_base_handler.httpx.AsyncClient"
-    )
+    _HTTPX_PATCH_PATH = "src.components.call_management.handlers.webhook_base_handler.httpx.AsyncClient"
 
     def _make_handler(self):
         logger = MagicMock()
@@ -332,9 +314,7 @@ class TestRelayToMakunai:
         call_repository.update_cdr.return_value = True
 
         payload = {"call_id": "abc123", "status": "completed"}
-        with patch(
-            self._HTTPX_PATCH_PATH, side_effect=RuntimeError("connection refused")
-        ):
+        with patch(self._HTTPX_PATCH_PATH, side_effect=RuntimeError("connection refused")):
             response = await handler.process_webhook(payload)
 
         assert response == {"status": "success", "call_id": "abc123"}
@@ -345,9 +325,7 @@ class TestWebhookEventTrigger:
     """A completed call (source=WEBHOOK, call_status answered/missed) must
     enqueue a partner webhook delivery — see partner_webhook/tasks.py."""
 
-    _DELIVER_PATCH_PATH = (
-        "src.components.partner_webhook.tasks.deliver_webhook_event.apply_async"
-    )
+    _DELIVER_PATCH_PATH = "src.components.partner_webhook.tasks.deliver_webhook_event.apply_async"
 
     def _make_handler(self):
         logger = MagicMock()

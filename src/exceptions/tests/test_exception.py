@@ -1,11 +1,12 @@
 import pytest
+
 from src.exceptions import (
     TalkoBadRequestError,
     TalkoConflictError,
-    TalkoLoggerException,
-    TalkoResourceNotFound,
     TalkoInvalidAnalyticTypeError,
+    TalkoLoggerException,
     TalkoPayloadValidationError,
+    TalkoResourceNotFound,
 )
 
 
@@ -79,8 +80,6 @@ def test_payload_validation_error_default_message():
 def test_payload_validation_error_custom_message_and_example():
     example = {"field": "value"}
     with pytest.raises(TalkoPayloadValidationError) as exc:
-        raise TalkoPayloadValidationError(
-            message="Invalid payload", example_payload=example
-        )
+        raise TalkoPayloadValidationError(message="Invalid payload", example_payload=example)
     assert str(exc.value) == "Invalid payload"
     assert exc.value.example_payload == example

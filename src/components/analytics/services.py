@@ -1,4 +1,4 @@
-from typing import Any, Dict, Union
+from typing import Any
 
 from src.components.analytics.base import TalkoAnalyticsBase
 from src.components.analytics.dto import TalkoAnalyticsResponse
@@ -21,16 +21,14 @@ class TalkoAnalyticsService:
         self,
         current_user_id: int,
         partner_id: int,
-        analytics_request: Dict[str, Any],
+        analytics_request: dict[str, Any],
         limit: int,
         offset: int,
     ) -> TalkoAnalyticsResponse:
         try:
-            analytics_type: Union[str, None] = analytics_request.get("analytics_type")
+            analytics_type: str | None = analytics_request.get("analytics_type")
             self.__talko_service_logger.info(
-                "Processing analytics for partner_id: {}, analytics_type: {}".format(
-                    partner_id, analytics_type
-                )
+                f"Processing analytics for partner_id: {partner_id}, analytics_type: {analytics_type}"
             )
 
             result: TalkoAnalyticsResponse = await self.__analytics_base.process_analytics(
@@ -49,23 +47,16 @@ class TalkoAnalyticsService:
             ]:
                 agent_ids = [agent["agent_id"] for agent in result.data["agents"]]
                 if agent_ids:
-                    grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
-                    agent_data: Dict[int, Dict[str, Any]] = (
-                        await grpc_client.get_workspace_users_details(agent_ids)
-                    )
-                    for agent in result.data["agents"]:
-                        agent["agent_name"] = agent_data.get(agent["agent_id"], {}).get(
-                            "name", ""
-                        )
+                    grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
+                    if grpc_client is None:
+                        self.__talko_service_logger.warning("gRPC disabled — skipping agent-name enrichment")
+                    else:
+                        agent_data: dict[int, dict[str, Any]] = await grpc_client.get_workspace_users_details(agent_ids)
+                        for agent in result.data["agents"]:
+                            agent["agent_name"] = agent_data.get(agent["agent_id"], {}).get("name", "")
 
-            self.__talko_service_logger.info(
-                "Successfully retrieved analytics for partner_id: {}".format(partner_id)
-            )
+            self.__talko_service_logger.info(f"Successfully retrieved analytics for partner_id: {partner_id}")
             return result
         except Exception as e:
-            self.__talko_service_logger.error(
-                "Error processing analytics for partner_id: {}: {}".format(
-                    partner_id, str(e)
-                )
-            )
+            self.__talko_service_logger.error(f"Error processing analytics for partner_id: {partner_id}: {str(e)}")
             raise

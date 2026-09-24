@@ -6,7 +6,6 @@ from src.components.call_management.handlers.webhook_base_handler import TalkoWe
 
 
 class TestWebhookHandler:
-
     @pytest.mark.asyncio
     async def test_abstract_base_functionality(self):
         """Test basic initialization and hit the 'pass' lines via super()."""
@@ -23,9 +22,7 @@ class TestWebhookHandler:
         mock_logger = MagicMock()
         mock_call_repo = MagicMock()
 
-        handler = MockWebhookHandler(
-            logger=mock_logger, call_repository=mock_call_repo, vendor_type="tata_tele"
-        )
+        handler = MockWebhookHandler(logger=mock_logger, call_repository=mock_call_repo, vendor_type="tata_tele")
 
         await handler.process_webhook({})
         await handler.process_cdr_api_payload({})

@@ -1,7 +1,7 @@
-# TEMPORARY: partner_config.ai_vendor_config_id isn't reliably populated/threaded
-# through yet for every partner, so hangup_call/transfer_call hardcode this known-good
-# AI-bridge vendor_config_id for enable_ai_bridge=True calls instead of trusting
-# per-partner config. Remove once ai_vendor_config_id is reliably set for all partners.
+# LEGACY FALLBACK ONLY: used when a partner has enable_ai_bridge=True but no
+# ai_vendor_config_id on its partner_config (see
+# TalkoCallService._resolve_vendor_config_id, which warns loudly in that case).
+# Backfill ai_vendor_config_id per partner; do not reference this directly.
 AI_BRIDGE_VENDOR_CONFIG_ID = "6a902efa7157c16288fc8087"
 
 TATA_WEBHOOK_FIELD_MAPPINGS = {
@@ -94,6 +94,58 @@ WEBHOOK = "webhook"
 SIMULTANEOUS = "simultaneous"
 ORDERBY = "order_by"
 API = "api"
+
+
+# OTOBA CDR API field mapping (OTOBA key -> TalkoCDR field).
+# Covers OTOBA's documented snake_case keys plus the camelCase variants
+# seen in the wild; unknown keys are ignored downstream. Mirrors the
+# shape of TATA_CDR_FIELD_MAPPING so the same _process_payload logic applies
+# after normalization in TalkoOtobaWebhookHandler.
+OTOBA_CDR_FIELD_MAPPING = {
+    "call_id": "call_id",
+    "callId": "call_id",
+    "uuid": "call_uuid",
+    "call_uuid": "call_uuid",
+    "callUuid": "call_uuid",
+    "direction": "calling_mode",
+    "call_direction": "calling_mode",
+    "status": "call_status",
+    "call_status": "call_status",
+    "callStatus": "call_status",
+    "did_number": "did_number",
+    "didNumber": "did_number",
+    "caller_id_number": "caller_id_number",
+    "callerIdNumber": "caller_id_number",
+    "agent_number": "agent_number",
+    "agentNumber": "agent_number",
+    "agent_name": "agent_name",
+    "agentName": "agent_name",
+    "customer_number": "customer",
+    "customerNumber": "customer",
+    "client_number": "client_number",
+    "duration": "total_call_duration",
+    "call_duration": "total_call_duration",
+    "callDuration": "total_call_duration",
+    "billsec": "billsec",
+    "billSec": "billsec",
+    "answered_seconds": "talk_time",
+    "answeredSeconds": "talk_time",
+    "talk_time": "talk_time",
+    "start_stamp": "start_stamp",
+    "startTime": "start_stamp",
+    "end_stamp": "end_stamp",
+    "endTime": "end_stamp",
+    "answer_stamp": "answer_stamp",
+    "answerTime": "answer_stamp",
+    "hangup_cause": "hangup_cause",
+    "hangupCause": "hangup_cause",
+    "reason_key": "reason_key",
+    "reasonKey": "reason_key",
+    "recording_url": "call_recording",
+    "recordingUrl": "call_recording",
+    "customer_status": "customer_status",
+    "agent_status": "agent_status",
+}
 
 
 DIALER_FIELD_MAPPING = {

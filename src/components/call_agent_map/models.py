@@ -1,15 +1,12 @@
-from typing import List, Optional
-
-from bson import ObjectId
 from pydantic import ConfigDict
 
 from src.utils.timestamped_model import TalkoTimestampedModel
 
 
 class TalkoAgentDidMappingModel(TalkoTimestampedModel):
-    partner_id: Optional[int] = None  # ID of the partner
-    agent_id: Optional[int] = None  # ID of the agent
-    did: Optional[List[str]] = None  # Direct Inward Dialing number from vendor
+    partner_id: int | None = None  # ID of the partner
+    agent_id: int | None = None  # ID of the agent
+    did: list[str] | None = None  # Direct Inward Dialing number from vendor
     is_active: bool  # Active status
 
     class CollectionName:
@@ -19,10 +16,10 @@ class TalkoAgentDidMappingModel(TalkoTimestampedModel):
 
 
 class TalkoAgentWorkspaceMappingModel(TalkoTimestampedModel):
-    partner_id: Optional[int] = None  # Partner identifier
+    partner_id: int | None = None  # Partner identifier
     workspace_id: int  # Workspace identifier
     agent_id: int  # Agent identifier
-    agent_number: Optional[str] = None  # Agent's phone number
+    agent_number: str | None = None  # Agent's phone number
     is_active: bool = True  # Active status of the mapping
 
     class CollectionName:

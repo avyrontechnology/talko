@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from bson import ObjectId
 
@@ -55,32 +55,22 @@ class TalkoCustomFieldValidator:
 
         return field_slug
 
-    async def validate_slug_unique(
-        self, partner_id: int, entity_type: str, field_slug: str
-    ) -> None:
-        existing: Optional[Dict[str, Any]] = await self.__repository.find_by_slug(
-            partner_id, entity_type, field_slug
-        )
+    async def validate_slug_unique(self, partner_id: int, entity_type: str, field_slug: str) -> None:
+        existing: dict[str, Any] | None = await self.__repository.find_by_slug(partner_id, entity_type, field_slug)
         if existing:
             self.__logger.error(CUSTOM_FIELD_SLUG_ALREADY_EXISTS.format(field_slug))
-            raise TalkoDuplicateResourceError(
-                CUSTOM_FIELD_SLUG_ALREADY_EXISTS.format(field_slug)
-            )
+            raise TalkoDuplicateResourceError(CUSTOM_FIELD_SLUG_ALREADY_EXISTS.format(field_slug))
 
-    async def validate_custom_field_exists(
-        self, field_id: ObjectId, partner_id: int
-    ) -> Dict[str, Any]:
-        field: Optional[Dict[str, Any]] = await self.__repository.find_by_id(field_id)
+    async def validate_custom_field_exists(self, field_id: ObjectId, partner_id: int) -> dict[str, Any]:
+        field: dict[str, Any] | None = await self.__repository.find_by_id(field_id)
         if not field or field.get("partner_id") != partner_id:
-            self.__logger.error(
-                "Custom field {} not found for partner {}.".format(field_id, partner_id)
-            )
+            self.__logger.error(f"Custom field {field_id} not found for partner {partner_id}.")
             raise TalkoResourceNotFound(CUSTOM_FIELD_NOT_FOUND)
         return field
 
     async def validate_and_normalize_values(
-        self, partner_id: int, entity_type: str, values: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, partner_id: int, entity_type: str, values: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Validate submitted custom field values against the partner's active
         field definitions for the given entity_type, coercing each value to
@@ -89,30 +79,24 @@ class TalkoCustomFieldValidator:
         if not values:
             raise TalkoBadRequestError("No custom field values provided.")
 
-        definitions: List[Dict[str, Any]] = await self.__repository.find_all(
+        definitions: list[dict[str, Any]] = await self.__repository.find_all(
             partner_id, entity_type, include_inactive=False
         )
-        definitions_by_slug: Dict[str, Dict[str, Any]] = {
-            d["field_slug"]: d for d in definitions
-        }
+        definitions_by_slug: dict[str, dict[str, Any]] = {d["field_slug"]: d for d in definitions}
 
-        normalized: Dict[str, Any] = {}
+        normalized: dict[str, Any] = {}
         for slug, value in values.items():
             definition = definitions_by_slug.get(slug)
             if not definition:
                 self.__logger.error(
-                    "Unknown or inactive custom field slug '{}' for partner {}, entity_type {}.".format(
-                        slug, partner_id, entity_type
-                    )
+                    f"Unknown or inactive custom field slug '{slug}' for partner {partner_id}, entity_type {entity_type}."
                 )
-                raise TalkoBadRequestError(
-                    "Unknown or inactive custom field: '{}'.".format(slug)
-                )
+                raise TalkoBadRequestError(f"Unknown or inactive custom field: '{slug}'.")
             normalized[slug] = self.__coerce_value(definition, value)
 
         return normalized
 
-    def __coerce_value(self, definition: Dict[str, Any], value: Any) -> Any:
+    def __coerce_value(self, definition: dict[str, Any], value: Any) -> Any:
         slug: str = definition["field_slug"]
         data_type: str = definition["data_type"]
 
@@ -121,42 +105,28 @@ class TalkoCustomFieldValidator:
 
         if data_type == TalkoCustomFieldDataType.STRING.value:
             if not isinstance(value, str):
-                raise TalkoBadRequestError(
-                    "Custom field '{}' expects a string value.".format(slug)
-                )
+                raise TalkoBadRequestError(f"Custom field '{slug}' expects a string value.")
             return value
 
         if data_type == TalkoCustomFieldDataType.NUMBER.value:
             if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise TalkoBadRequestError(
-                    "Custom field '{}' expects a numeric value.".format(slug)
-                )
+                raise TalkoBadRequestError(f"Custom field '{slug}' expects a numeric value.")
             return value
 
         if data_type == TalkoCustomFieldDataType.BOOLEAN.value:
             if not isinstance(value, bool):
-                raise TalkoBadRequestError(
-                    "Custom field '{}' expects a boolean value.".format(slug)
-                )
+                raise TalkoBadRequestError(f"Custom field '{slug}' expects a boolean value.")
             return value
 
         if data_type == TalkoCustomFieldDataType.DATE.value:
             if isinstance(value, bool) or not isinstance(value, int):
-                raise TalkoBadRequestError(
-                    "Custom field '{}' expects an epoch-millisecond integer value.".format(
-                        slug
-                    )
-                )
+                raise TalkoBadRequestError(f"Custom field '{slug}' expects an epoch-millisecond integer value.")
             return value
 
         if data_type == TalkoCustomFieldDataType.CHOICE.value:
-            choice_options: List[str] = definition.get("choice_options") or []
+            choice_options: list[str] = definition.get("choice_options") or []
             if value not in choice_options:
-                raise TalkoBadRequestError(
-                    "Custom field '{}' expects one of {}.".format(slug, choice_options)
-                )
+                raise TalkoBadRequestError(f"Custom field '{slug}' expects one of {choice_options}.")
             return value
 
-        raise TalkoBadRequestError(
-            "Unsupported data_type for custom field '{}'.".format(slug)
-        )
+        raise TalkoBadRequestError(f"Unsupported data_type for custom field '{slug}'.")

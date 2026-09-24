@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, Dict
+from typing import Any
 
 import httpx
 from celery import shared_task
@@ -17,9 +17,7 @@ from src.core.container import TalkoContainer
     soft_time_limit=30,
     time_limit=45,
 )
-def deliver_webhook_event(
-    self, partner_id: int, event_type: str, event_id: str, payload: Dict[str, Any]
-) -> str:
+def deliver_webhook_event(self, partner_id: int, event_type: str, event_id: str, payload: dict[str, Any]) -> str:
     """Thin asyncio.run() wrapper — all delivery logic lives in
     TalkoPartnerWebhookService.deliver_event so it stays unit-testable
     without going through asyncio.run() (see that method's docstring).

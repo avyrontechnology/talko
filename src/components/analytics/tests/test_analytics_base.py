@@ -9,7 +9,7 @@ from src.components.analytics.dto import (
     TalkoDashboardFollowupTrendsRequest,
     TalkoPartnerWorkspaceRequest,
 )
-from src.components.analytics.enums import TalkoAnalyticsType, TalkoMetric, TalkoTimeInterval
+from src.components.analytics.enums import TalkoAnalyticsType, TalkoTimeInterval
 from src.exceptions import TalkoInvalidAnalyticTypeError, TalkoPayloadValidationError
 
 
@@ -73,9 +73,7 @@ class TestAnalyticsBase:
     async def test_process_analytics_invalid_payload(self, setup_analytics_base):
         service, mock_processor, mock_logger = setup_analytics_base
 
-        mock_processor._get_total_agent_talk_time.side_effect = AssertionError(
-            "Processor method should not be called"
-        )
+        mock_processor._get_total_agent_talk_time.side_effect = AssertionError("Processor method should not be called")
 
         request = {
             "analytics_type": TalkoAnalyticsType.TOTAL_AGENT_TALK_TIME.value,
@@ -89,14 +87,12 @@ class TestAnalyticsBase:
             await service.process_analytics(1, 123, request, limit=10, offset=1)
 
         mock_processor._get_total_agent_talk_time.assert_not_awaited()
-        assert (
-            f"Invalid payload for analytics type '{TalkoAnalyticsType.TOTAL_AGENT_TALK_TIME.value}'"
-            in str(exc_info.value)
+        assert f"Invalid payload for analytics type '{TalkoAnalyticsType.TOTAL_AGENT_TALK_TIME.value}'" in str(
+            exc_info.value
         )
 
         assert any(
-            f"Invalid payload for analytics type {TalkoAnalyticsType.TOTAL_AGENT_TALK_TIME.value}:"
-            in str(call)
+            f"Invalid payload for analytics type {TalkoAnalyticsType.TOTAL_AGENT_TALK_TIME.value}:" in str(call)
             for call in mock_logger.error.call_args_list
         )
 
@@ -119,9 +115,7 @@ class TestAnalyticsBase:
         mock_processor._get_partner_workspace.assert_awaited_once_with(
             current_user_id=1,
             partner_id=123,
-            request_data=TalkoPartnerWorkspaceRequest(
-                time_range="1743465600000-1746057600000"
-            ),
+            request_data=TalkoPartnerWorkspaceRequest(time_range="1743465600000-1746057600000"),
             limit=10,
             offset=1,
         )
@@ -129,9 +123,7 @@ class TestAnalyticsBase:
             f"Error processing analytics {TalkoAnalyticsType.PARTNER_WORKSPACE.value}: boom"
         )
 
-    async def test_process_analytics_dashboard_call_trends_success(
-        self, setup_analytics_base
-    ):
+    async def test_process_analytics_dashboard_call_trends_success(self, setup_analytics_base):
         service, mock_processor, mock_logger = setup_analytics_base
 
         expected_data = {
@@ -167,7 +159,7 @@ class TestAnalyticsBase:
                 time_range="1722470400000-1726444800000",
                 workspace_id=[40, 41],
                 metric_filter="agent_missed_calls",
-                trend_basis="Weekly",
+                trend_basis="WEEKS",
             ),
             limit=10,
             offset=0,
@@ -176,14 +168,10 @@ class TestAnalyticsBase:
             f"Successfully generated analytics for {TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value}"
         )
 
-    async def test_process_analytics_dashboard_call_trends_invalid_payload(
-        self, setup_analytics_base
-    ):
+    async def test_process_analytics_dashboard_call_trends_invalid_payload(self, setup_analytics_base):
         service, mock_processor, mock_logger = setup_analytics_base
 
-        mock_processor._get_dashboard_call_trends.side_effect = AssertionError(
-            "Processor method should not be called"
-        )
+        mock_processor._get_dashboard_call_trends.side_effect = AssertionError("Processor method should not be called")
 
         request = {
             "analytics_type": TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value,
@@ -198,13 +186,11 @@ class TestAnalyticsBase:
         with pytest.raises(TalkoPayloadValidationError) as exc_info:
             await service.process_analytics(1, 123, request, limit=10, offset=0)
 
-        assert (
-            f"Invalid payload for analytics type '{TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value}'"
-            in str(exc_info.value)
+        assert f"Invalid payload for analytics type '{TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value}'" in str(
+            exc_info.value
         )
 
         assert any(
-            f"Invalid payload for analytics type {TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value}:"
-            in str(call)
+            f"Invalid payload for analytics type {TalkoAnalyticsType.DASHBOARD_CALL_TRENDS.value}:" in str(call)
             for call in mock_logger.error.call_args_list
         )

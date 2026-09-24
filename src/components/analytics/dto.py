@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -10,16 +9,16 @@ from src.components.cdr.constants import TalkoEntityType
 
 class TalkoAnalyticsRequest(BaseModel):
     analytics_type: str
-    data: Dict
+    data: dict
 
     model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
 
 
 class TalkoAgentCallAnalyticsRequest(BaseModel):
-    time_range: Optional[str] = None
-    agents: Optional[List[int]] = None
-    workspace_id: Optional[List[int]] = None
-    entity_type: Optional[str] = TalkoEntityType.LEAD.value
+    time_range: str | None = None
+    agents: list[int] | None = None
+    workspace_id: list[int] | None = None
+    entity_type: str | None = TalkoEntityType.LEAD.value
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -34,10 +33,10 @@ class TalkoAgentCallAnalyticsRequest(BaseModel):
 
 
 class TalkoTotalAgentTalkTimeRequest(BaseModel):
-    time_range: Optional[str] = None
-    agents: Optional[List[int]] = None
-    workspace_id: Optional[List[int]] = None
-    entity_type: Optional[str] = TalkoEntityType.LEAD.value
+    time_range: str | None = None
+    agents: list[int] | None = None
+    workspace_id: list[int] | None = None
+    entity_type: str | None = TalkoEntityType.LEAD.value
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -52,10 +51,10 @@ class TalkoTotalAgentTalkTimeRequest(BaseModel):
 
 
 class TalkoAgentTalkTimeDistributionRequest(BaseModel):
-    time_range: Optional[str] = None
-    agents: Optional[List[int]] = None
-    workspace_id: Optional[List[int]] = None
-    entity_type: Optional[str] = TalkoEntityType.LEAD.value
+    time_range: str | None = None
+    agents: list[int] | None = None
+    workspace_id: list[int] | None = None
+    entity_type: str | None = TalkoEntityType.LEAD.value
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -70,9 +69,9 @@ class TalkoAgentTalkTimeDistributionRequest(BaseModel):
 
 
 class TalkoPartnerWorkspaceRequest(BaseModel):
-    time_range: Optional[str] = None
-    workspace_id: Optional[List[int]] = None
-    entity_type: Optional[str] = TalkoEntityType.LEAD.value
+    time_range: str | None = None
+    workspace_id: list[int] | None = None
+    entity_type: str | None = TalkoEntityType.LEAD.value
 
     @field_validator("time_range")
     def validate_time_range(cls, time_range):
@@ -95,9 +94,9 @@ class TalkoPartnerWorkspaceRequest(BaseModel):
 
 
 class TalkoDashboardFollowupTrendsRequest(BaseModel):
-    time_range: Optional[str] = None
-    workspace_id: Optional[List[int]] = None
-    entity_type: Optional[str] = TalkoEntityType.LEAD.value
+    time_range: str | None = None
+    workspace_id: list[int] | None = None
+    entity_type: str | None = TalkoEntityType.LEAD.value
     metric_filter: str
     trend_basis: str
 
@@ -153,4 +152,4 @@ class TalkoDashboardFollowupTrendsRequest(BaseModel):
 
 class TalkoAnalyticsResponse(BaseModel):
     analytics_type: str
-    data: Dict
+    data: dict

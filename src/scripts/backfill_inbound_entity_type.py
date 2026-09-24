@@ -29,11 +29,7 @@ async def backfill(apply: bool) -> None:
         query = {"action": "inbound", "entity_type": None}
         total = await collection.count_documents(query)
         with_lead = await collection.count_documents({**query, "lead_id": {"$ne": None}})
-        logger.info(
-            "Found {} inbound CDRs with entity_type=None ({} have lead_id set)".format(
-                total, with_lead
-            )
-        )
+        logger.info(f"Found {total} inbound CDRs with entity_type=None ({with_lead} have lead_id set)")
 
         if not apply:
             logger.info("Dry run only, no writes made. Re-run with --apply to update.")
@@ -56,24 +52,14 @@ async def backfill(apply: bool) -> None:
                 updated_without_lead += 1
             await collection.update_one({"_id": doc["_id"]}, {"$set": update})
 
-        logger.info(
-            "Backfilled entity_type/entity_id/entity_name from lead_id on {} CDRs".format(
-                updated_with_lead
-            )
-        )
-        logger.info(
-            "Defaulted entity_type=Lead (no lead_id) on {} CDRs".format(
-                updated_without_lead
-            )
-        )
+        logger.info(f"Backfilled entity_type/entity_id/entity_name from lead_id on {updated_with_lead} CDRs")
+        logger.info(f"Defaulted entity_type=Lead (no lead_id) on {updated_without_lead} CDRs")
 
     await db_manager.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--apply", action="store_true", help="Actually write updates (default: dry run)"
-    )
+    parser.add_argument("--apply", action="store_true", help="Actually write updates (default: dry run)")
     args = parser.parse_args()
     asyncio.run(backfill(args.apply))

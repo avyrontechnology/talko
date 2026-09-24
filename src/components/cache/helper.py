@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from redis import asyncio as aioredis
 
@@ -25,7 +25,7 @@ class TalkoCacheHelper:
         key: str,
         value: Any,
         prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO,
-        ttl: Optional[int] = None,
+        ttl: int | None = None,
     ) -> bool:
         try:
             serialized_value = json.dumps(
@@ -34,29 +34,25 @@ class TalkoCacheHelper:
             )
             full_key = f"{prefix.value}{key}"
             await self._redis_pool.set(full_key, serialized_value, ex=ttl)
-            self.__logger.info("Successfully set cache for key: {}".format(full_key))
+            self.__logger.info(f"Successfully set cache for key: {full_key}")
             return True
         except Exception as e:
-            self.__logger.error(
-                "Error setting cache for key: {}, error: {}".format(full_key, str(e))
-            )
+            self.__logger.error(f"Error setting cache for key: {full_key}, error: {str(e)}")
             return False
 
     async def get_cache(
         self, key: str, prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO
-    ) -> Optional[Any]:
+    ) -> Any | None:
         try:
             full_key = f"{prefix.value}{key}"
             value = await self._redis_pool.get(full_key)
             if value is None:
-                self.__logger.info("Cache miss for key: {}".format(full_key))
+                self.__logger.info(f"Cache miss for key: {full_key}")
                 return None
-            self.__logger.info("Cache hit for key: {}".format(full_key))
+            self.__logger.info(f"Cache hit for key: {full_key}")
             return json.loads(value.decode("utf-8"))
         except Exception as e:
-            self.__logger.error(
-                "Error getting cache for key: {}, error: {}".format(full_key, str(e))
-            )
+            self.__logger.error(f"Error getting cache for key: {full_key}, error: {str(e)}")
             return None
 
     async def delete_cache(
@@ -65,21 +61,17 @@ class TalkoCacheHelper:
         try:
             full_key = f"{prefix.value}{key}"
             result = bool(await self._redis_pool.delete(full_key))
-            self.__logger.info(
-                "Successfully deleted cache for key: {}".format(full_key)
-            )
+            self.__logger.info(f"Successfully deleted cache for key: {full_key}")
             return result
         except Exception as e:
-            self.__logger.error(
-                "Error deleting cache for key: {}, error: {}".format(full_key, str(e))
-            )
+            self.__logger.error(f"Error deleting cache for key: {full_key}, error: {str(e)}")
             return False
 
     async def bulk_set_cache(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO,
-        ttl: Optional[int] = None,
+        ttl: int | None = None,
     ) -> bool:
         try:
             pipeline = self._redis_pool.pipeline()
@@ -93,72 +85,52 @@ class TalkoCacheHelper:
                 full_keys.append(full_key)
                 pipeline.set(full_key, serialized_value, ex=ttl)
             await pipeline.execute()
-            self.__logger.info(
-                "Successfully bulk set cache for keys: {}".format(", ".join(full_keys))
-            )
+            self.__logger.info("Successfully bulk set cache for keys: {}".format(", ".join(full_keys)))
             return True
         except Exception as e:
-            self.__logger.error(
-                "Error bulk setting cache for keys: {}, error: {}".format(
-                    ", ".join(full_keys), str(e)
-                )
-            )
+            self.__logger.error("Error bulk setting cache for keys: {}, error: {}".format(", ".join(full_keys), str(e)))
             return False
 
     async def bulk_get_cache(
         self,
-        keys: List[str],
+        keys: list[str],
         prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         try:
             full_keys = [f"{prefix.value}{key}" for key in keys]
             values = await self._redis_pool.mget(full_keys)
             result = {}
-            for key, value in zip(keys, values):
+            for key, value in zip(keys, values, strict=True):
                 if value is not None:
                     result[key] = json.loads(value.decode("utf-8"))
-                    self.__logger.info(
-                        "Cache hit for key: {}".format(f"{prefix.value}{key}")
-                    )
+                    self.__logger.info("Cache hit for key: {}".format(f"{prefix.value}{key}"))
                 else:
-                    self.__logger.info(
-                        "Cache miss for key: {}".format(f"{prefix.value}{key}")
-                    )
+                    self.__logger.info("Cache miss for key: {}".format(f"{prefix.value}{key}"))
             return result
         except Exception as e:
-            self.__logger.error(
-                "Error bulk getting cache for keys: {}, error: {}".format(
-                    ", ".join(full_keys), str(e)
-                )
-            )
+            self.__logger.error("Error bulk getting cache for keys: {}, error: {}".format(", ".join(full_keys), str(e)))
             return {}
 
     async def bulk_delete_cache(
         self,
-        keys: List[str],
+        keys: list[str],
         prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.MAGLO,
     ) -> int:
         try:
             full_keys = [f"{prefix.value}{key}" for key in keys]
             await self._redis_pool.delete(*full_keys)
-            self.__logger.info(
-                "Successfully bulk deleted cache for keys: {}".format(
-                    ", ".join(full_keys)
-                )
-            )
+            self.__logger.info("Successfully bulk deleted cache for keys: {}".format(", ".join(full_keys)))
             return True
         except Exception as e:
             self.__logger.error(
-                "Error bulk deleting cache for keys: {}, error: {}".format(
-                    ", ".join(full_keys), str(e)
-                )
+                "Error bulk deleting cache for keys: {}, error: {}".format(", ".join(full_keys), str(e))
             )
             return False
 
     async def clear_pattern(
         self,
         prefix: TalkoRedisCache.KeysPrefix,
-        pattern: Optional[Union[str, List[str]]] = None,
+        pattern: str | list[str] | None = None,
     ) -> bool:
         try:
             patterns = [pattern] if isinstance(pattern, str) else (pattern or [""])
@@ -174,24 +146,12 @@ class TalkoCacheHelper:
                 )
             if all_keys:
                 await self._redis_pool.delete(*all_keys)
-                self.__logger.info(
-                    "Successfully cleared cache for {} keys across patterns".format(
-                        len(all_keys)
-                    )
-                )
+                self.__logger.info(f"Successfully cleared cache for {len(all_keys)} keys across patterns")
             else:
-                self.__logger.info(
-                    "No keys found for any patterns with prefix: {}".format(
-                        prefix.value
-                    )
-                )
+                self.__logger.info(f"No keys found for any patterns with prefix: {prefix.value}")
             return True
         except Exception as e:
-            self.__logger.error(
-                "Error clearing cache for prefix: {}, error: {}".format(
-                    prefix.value, str(e)
-                )
-            )
+            self.__logger.error(f"Error clearing cache for prefix: {prefix.value}, error: {str(e)}")
             return False
 
     async def incr_with_ttl(
@@ -199,7 +159,7 @@ class TalkoCacheHelper:
         key: str,
         ttl_seconds: int,
         prefix: TalkoRedisCache.KeysPrefix = TalkoRedisCache.KeysPrefix.CONSOLE,
-    ) -> Optional[int]:
+    ) -> int | None:
         full_key = f"{prefix.value}{key}"
         try:
             pipe = self._redis_pool.pipeline()
@@ -208,9 +168,7 @@ class TalkoCacheHelper:
             results = await pipe.execute()
             return int(results[0])
         except Exception as e:
-            self.__logger.error(
-                "incr_with_ttl failed for key={}, err={}".format(full_key, str(e))
-            )
+            self.__logger.error(f"incr_with_ttl failed for key={full_key}, err={str(e)}")
             return None
 
 

@@ -1,5 +1,4 @@
 import asyncio
-from typing import Optional
 
 from redis import asyncio as aioredis
 
@@ -9,8 +8,8 @@ from src.core.environment import TalkoENV
 # The old implementation called aioredis.from_url() on every
 # _get_redis() call, which created a new TCP connection each time.
 # For PSTN calls this added 200-800ms on the first Redis op per call.
-_redis_pool: Optional[aioredis.Redis] = None
-_redis_pool_lock: Optional[asyncio.Lock] = None
+_redis_pool: aioredis.Redis | None = None
+_redis_pool_lock: asyncio.Lock | None = None
 
 
 def _get_lock() -> asyncio.Lock:
@@ -32,14 +31,7 @@ async def get_redis_client() -> aioredis.Redis:
         if _redis_pool is not None:
             return _redis_pool
 
-        url = "{protocol}://{username}:{password}@{host}:{port}/{db}".format(
-            protocol=TalkoENV.CACHE_PROTOCOL,
-            username=TalkoENV.CACHE_USERNAME,
-            password=TalkoENV.CACHE_PASSWORD,
-            host=TalkoENV.CACHE_HOST,
-            port=TalkoENV.CACHE_PORT,
-            db=TalkoENV.CACHE_DB,
-        )
+        url = f"{TalkoENV.CACHE_PROTOCOL}://{TalkoENV.CACHE_USERNAME}:{TalkoENV.CACHE_PASSWORD}@{TalkoENV.CACHE_HOST}:{TalkoENV.CACHE_PORT}/{TalkoENV.CACHE_DB}"
         _redis_pool = aioredis.from_url(
             url,
             max_connections=20,

@@ -1,4 +1,3 @@
-import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass
 
@@ -6,7 +5,9 @@ from fastapi import Request
 from starlette_context import plugins
 from starlette_context.middleware import RawContextMiddleware as BaseContextMiddleware
 
-context_request_id_var = ContextVar("request_id", default=str(uuid.uuid4().hex).lower())
+# Default None: the previous import-time uuid default gave every unset context
+# the SAME id. Middleware sets a fresh id per request (see set_context).
+context_request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 
 @dataclass
@@ -15,15 +16,11 @@ class TalkoRequestAuthContext:
     header_value: str
 
 
-_request_auth: ContextVar[TalkoRequestAuthContext | None] = ContextVar(
-    "request_auth", default=None
-)
+_request_auth: ContextVar[TalkoRequestAuthContext | None] = ContextVar("request_auth", default=None)
 
 
 def set_request_auth(header_name: str, header_value: str) -> None:
-    _request_auth.set(
-        TalkoRequestAuthContext(header_name=header_name, header_value=header_value)
-    )
+    _request_auth.set(TalkoRequestAuthContext(header_name=header_name, header_value=header_value))
 
 
 def get_request_auth() -> TalkoRequestAuthContext | None:

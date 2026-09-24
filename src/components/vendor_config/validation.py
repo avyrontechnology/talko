@@ -51,12 +51,8 @@ class TalkoVendorConfigValidator:
         """
         vendor = await self.__repository.find_vendor_by_id(vendor_id)
         if not vendor or not vendor.get("is_active", False):
-            self.__logger.error(
-                "Vendor with ID {} not found or inactive.".format(vendor_id)
-            )
-            raise ValueError(
-                "Vendor with ID {} not found or inactive.".format(vendor_id)
-            )
+            self.__logger.error(f"Vendor with ID {vendor_id} not found or inactive.")
+            raise ValueError(f"Vendor with ID {vendor_id} not found or inactive.")
 
     async def validate_vendor_config_exist_using_vendor_id(self, vendor_id: ObjectId):
         """
@@ -69,16 +65,10 @@ class TalkoVendorConfigValidator:
             vendor_id
         )
         if vendor_config_exists:
-            self.__logger.error(
-                "Vendor config for vendor ID {} does exist.".format(vendor_id)
-            )
-            raise ValueError(
-                "Vendor config for vendor ID {} does exist.".format(vendor_id)
-            )
+            self.__logger.error(f"Vendor config for vendor ID {vendor_id} does exist.")
+            raise ValueError(f"Vendor config for vendor ID {vendor_id} does exist.")
 
-    async def validate_vendor_config_not_exist_using_vendor_id(
-        self, vendor_id: ObjectId
-    ):
+    async def validate_vendor_config_not_exist_using_vendor_id(self, vendor_id: ObjectId):
         """
         Validate that a vendor config not exists based on its Vendor ID.
 
@@ -89,12 +79,8 @@ class TalkoVendorConfigValidator:
             vendor_id
         )
         if not vendor_config_exists:
-            self.__logger.error(
-                "Vendor config for vendor ID {} does not exist.".format(vendor_id)
-            )
-            raise ValueError(
-                "Vendor config for vendor ID {} does not exist.".format(vendor_id)
-            )
+            self.__logger.error(f"Vendor config for vendor ID {vendor_id} does not exist.")
+            raise ValueError(f"Vendor config for vendor ID {vendor_id} does not exist.")
 
     async def validate_vendor_config_exists(self, vendor_config_id: ObjectId):
         """
@@ -103,17 +89,11 @@ class TalkoVendorConfigValidator:
         :param vendor_config_id: The ObjectId of the vendor config.
         :raises ValueError: If no vendor config exists for the given ID.
         """
-        vendor_config_exists = await self.__vendor_config_repository.check_vendor_config_exists_for_existing_vendor_using_pk_id(
-            vendor_config_id
+        vendor_config_exists = (
+            await self.__vendor_config_repository.check_vendor_config_exists_for_existing_vendor_using_pk_id(
+                vendor_config_id
+            )
         )
         if not vendor_config_exists:
-            self.__logger.error(
-                "Vendor config for vendor config ID {} does not exist.".format(
-                    vendor_config_id
-                )
-            )
-            raise ValueError(
-                "Vendor config for vendor config ID {} does not exist.".format(
-                    vendor_config_id
-                )
-            )
+            self.__logger.error(f"Vendor config for vendor config ID {vendor_config_id} does not exist.")
+            raise ValueError(f"Vendor config for vendor config ID {vendor_config_id} does not exist.")

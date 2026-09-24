@@ -1,5 +1,3 @@
-import pytest
-
 from src.utils import timestamped_model
 from src.utils.timestamped_model import TalkoTimestampedModel
 
@@ -28,9 +26,7 @@ def test_timestamps_preserved_if_provided(monkeypatch):
     """
     Test that created_at and updated_at are not overwritten if provided.
     """
-    monkeypatch.setattr(
-        "src.utils.timestamped_model.TalkoDateTimeUtil", lambda: TalkoFakeDateTimeUtil()
-    )
+    monkeypatch.setattr("src.utils.timestamped_model.TalkoDateTimeUtil", lambda: TalkoFakeDateTimeUtil())
 
     model = TalkoTimestampedModel(created_at=1111111111, updated_at=2222222222)
 

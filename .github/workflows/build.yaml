@@ -2,9 +2,9 @@ name: Build
 
 on:
   push:
-    branches: [non-exist-branch]
+    branches: [main]
   pull_request:
-    types: []
+    branches: [main]
 
 jobs:
   test:
@@ -58,7 +58,13 @@ jobs:
 
       - name: Run Tests with Coverage
         run: |
-          poetry run coverage run --source src -m pytest -v || echo "Tests failed, but proceeding to generate coverage report..."
+          poetry run coverage run --source src -m pytest -q -p no:cacheprovider
+          poetry run coverage report --fail-under=60
+
+      - name: Lint (ruff)
+        run: |
+          poetry run ruff check src/
+          poetry run ruff format --check src/
 
       - name: Generate Coverage Report
         run: |
@@ -96,8 +102,8 @@ jobs:
   #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   #       with:
   #         args: |
-  #           -Dsonar.projectKey=MakunaiGlobal_talko-service
-  #           -Dsonar.organization=makunaiglobal
+  #           -Dsonar.projectKey=avyrontechnology_talko-service
+  #           -Dsonar.organization=avyrontechnology
   #           -Dsonar.python.coverage.reportPaths=coverage.xml
   #           -Dsonar.inclusions=src/**/*.py
   #           -Dsonar.exclusions=**/tests/**,**/migrations/**,**/setup.py,**/scripts/**,**/alembic/**,**/protos/**,**/pub/**,**/controllers.py,**dto.py,**/constants.py,**/enums.py,**/messages.py,**/exceptions/**,src/config/**,src/loggers/**,src/main.py,src/routes/**

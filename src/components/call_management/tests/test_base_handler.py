@@ -34,9 +34,7 @@ class TestVendorCallHandler:
         Test that TalkoVendorCallHandler initializes config, logger, and vendor_type correctly.
         """
         mock_logger = MagicMock()
-        config = {
-            "generic_url_handler": {"call_api": {"endpoint": "https://test.com/call"}}
-        }
+        config = {"generic_url_handler": {"call_api": {"endpoint": "https://test.com/call"}}}
 
         handler = TalkoDummyVendorCallHandler(config, mock_logger, "DUMMY_VENDOR")
 
@@ -50,9 +48,7 @@ class TestVendorCallHandler:
         Test that TalkoDummyVendorCallHandler.make_call returns expected dict.
         """
         mock_logger = MagicMock()
-        handler = TalkoDummyVendorCallHandler(
-            {"generic_url_handler": {"call_api": {}}}, mock_logger, "DUMMY_VENDOR"
-        )
+        handler = TalkoDummyVendorCallHandler({"generic_url_handler": {"call_api": {}}}, mock_logger, "DUMMY_VENDOR")
 
         result = await handler.make_call(
             to_number="+911234567890",

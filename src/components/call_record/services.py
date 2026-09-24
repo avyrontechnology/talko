@@ -1,16 +1,13 @@
-from datetime import datetime, timezone
-from typing import Optional
-from src.components.call_record.models import TalkoCallRecordModel
+from datetime import UTC, datetime
+
 from src.components.call_record.dto import TalkoContract
+from src.components.call_record.models import TalkoCallRecordModel
 from src.components.call_record.repositories import TalkoCallRecordRepository
 from src.loggers.talko_service_logger import TalkoServiceLogger
 
 
 class TalkoCallRecordService:
-
-    def __init__(
-        self, call_record_repo: TalkoCallRecordRepository, logger: TalkoServiceLogger
-    ):
+    def __init__(self, call_record_repo: TalkoCallRecordRepository, logger: TalkoServiceLogger):
         self.__call_record_repo = call_record_repo
         self.__logger = logger
 
@@ -18,7 +15,7 @@ class TalkoCallRecordService:
         self, data: TalkoContract.CreateCallRecordReq, partner_id: int, user_id: int
     ) -> TalkoContract.CreateCallRecordResp:
         try:
-            self.__logger.info("Started adding call recod: {}".format(data))
+            self.__logger.info(f"Started adding call recod: {data}")
             call_record = TalkoCallRecordModel(
                 caller=data.caller,
                 receiver=data.receiver,
@@ -26,28 +23,20 @@ class TalkoCallRecordService:
                 timestamp=data.timestamp,
                 partner_id=partner_id,
                 created_by=user_id,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             ).model_dump(mode="json")
             record_id = await self.__call_record_repo.add_call_record(call_record)
-            self.__logger.info("Call record added by : {}".format(user_id))
-            return TalkoContract.CreateCallRecordResp(
-                record_id=record_id, message="Call record created successfully"
-            )
+            self.__logger.info(f"Call record added by : {user_id}")
+            return TalkoContract.CreateCallRecordResp(record_id=record_id, message="Call record created successfully")
         except Exception as e:
             self.__logger.error(f"Error creating call record: {e}")
             raise e
 
-    async def get_call_record(
-        self, record_id: str, partner_id: int
-    ) -> Optional[TalkoCallRecordModel]:
+    async def get_call_record(self, record_id: str, partner_id: int) -> TalkoCallRecordModel | None:
         try:
-            self.__logger.info(
-                "Fetching call record for record_id: {}".format(record_id)
-            )
+            self.__logger.info(f"Fetching call record for record_id: {record_id}")
             data = await self.__call_record_repo.get_call_record(record_id, partner_id)
-            self.__logger.info(
-                "Fetched call record for record_id: {}".format(record_id)
-            )
+            self.__logger.info(f"Fetched call record for record_id: {record_id}")
             return data
         except Exception as e:
             self.__logger.error(f"Error fetching call record: {e}")
@@ -55,13 +44,9 @@ class TalkoCallRecordService:
 
     async def get_all_call_records(self, partner_id: int) -> list[TalkoCallRecordModel]:
         try:
-            self.__logger.info(
-                "Getting all call record of partner_id: {}".format(partner_id)
-            )
+            self.__logger.info(f"Getting all call record of partner_id: {partner_id}")
             records = await self.__call_record_repo.get_all_call_records(partner_id)
-            self.__logger.info(
-                "Fetched all call record of partner: {}".format(partner_id)
-            )
+            self.__logger.info(f"Fetched all call record of partner: {partner_id}")
             return records
         except Exception as e:
             self.__logger.error(f"Error retrieving all call records: {e}")
@@ -71,42 +56,26 @@ class TalkoCallRecordService:
         self, record_id: str, partner_id: int, data: TalkoContract.UpdateCallRecordReq
     ) -> TalkoContract.UpdateCallRecordResp:
         try:
-            self.__logger.info(
-                "Updatind call record of record_id: {}".format(record_id)
-            )
-            if not await self.__call_record_repo.is_call_record_exist(
-                record_id, partner_id
-            ):
-                self.__logger.error(
-                    "Call record does not exist with id: {}".format(record_id)
-                )
+            self.__logger.info(f"Updatind call record of record_id: {record_id}")
+            if not await self.__call_record_repo.is_call_record_exist(record_id, partner_id):
+                self.__logger.error(f"Call record does not exist with id: {record_id}")
                 raise ValueError("Call record does not exist")
             update_data = data.model_dump(exclude_unset=True)
-            await self.__call_record_repo.update_call_record(
-                record_id, partner_id, update_data
-            )
-            self.__logger.info("Call record updated of record_id: {}".format(record_id))
-            return TalkoContract.UpdateCallRecordResp(
-                record_id=record_id, message="Call record updated successfully"
-            )
+            await self.__call_record_repo.update_call_record(record_id, partner_id, update_data)
+            self.__logger.info(f"Call record updated of record_id: {record_id}")
+            return TalkoContract.UpdateCallRecordResp(record_id=record_id, message="Call record updated successfully")
         except Exception as e:
             self.__logger.error(f"Error updating call record: {e}")
             raise e
 
     async def delete_call_record(self, record_id: str, partner_id: int):
         try:
-            self.__logger.info(
-                "Deleting call record of record_id: {}".format(record_id)
-            )
-            if not await self.__call_record_repo.is_call_record_exist(
-                record_id, partner_id
-            ):
-                self.__logger.error(
-                    "Call record does not exist with id: {}".format(record_id)
-                )
+            self.__logger.info(f"Deleting call record of record_id: {record_id}")
+            if not await self.__call_record_repo.is_call_record_exist(record_id, partner_id):
+                self.__logger.error(f"Call record does not exist with id: {record_id}")
                 raise ValueError("Call record does not exist")
             await self.__call_record_repo.delete_call_record(record_id, partner_id)
-            self.__logger.info("Call record deleted of record_id: {}".format(record_id))
+            self.__logger.info(f"Call record deleted of record_id: {record_id}")
         except Exception as e:
             self.__logger.error(f"Error deleting call record: {e}")
             raise e

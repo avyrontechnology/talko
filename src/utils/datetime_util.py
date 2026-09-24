@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional, Union
 
 
 class TalkoDateTimeUtil:
@@ -10,7 +9,7 @@ class TalkoDateTimeUtil:
         return int(dt.timestamp() * 1000)
 
     @staticmethod
-    def convert_date_time(data: Optional[Union[str, int]] = None) -> Optional[int]:
+    def convert_date_time(data: str | int | None = None) -> int | None:
         """Convert datetime string or int to timestamp in milliseconds."""
         if data is None:
             return None
@@ -26,23 +25,19 @@ class TalkoDateTimeUtil:
                 dt = datetime.strptime(data, "%Y-%m-%d %H:%M:%S")
                 return int(dt.timestamp() * 1000)
             except ValueError:
-                raise ValueError("Invalid datetime string format: {}".format(data))
+                raise ValueError(f"Invalid datetime string format: {data}")
 
-        raise TypeError("Unsupported data type: {}".format(type(data)))
+        raise TypeError(f"Unsupported data type: {type(data)}")
 
     @staticmethod
-    def parse_time_str(time_range: Optional[str]) -> tuple[Optional[int], Optional[int]]:
+    def parse_time_str(time_range: str | None) -> tuple[int | None, int | None]:
         """Parse time_range string into start_date and end_date in seconds."""
         if not time_range:
             return None, None
         try:
             start_ms, end_ms = map(int, time_range.split("-"))
             if end_ms < start_ms:
-                raise ValueError(
-                    "end timestamp must be greater than or equal to start timestamp"
-                )
+                raise ValueError("end timestamp must be greater than or equal to start timestamp")
             return start_ms, end_ms
         except ValueError as e:
-            raise ValueError(
-                "Issue with time_range. {}".format(e)
-            )
+            raise ValueError(f"Issue with time_range. {e}")

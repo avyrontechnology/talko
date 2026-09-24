@@ -1,6 +1,6 @@
 import enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from src.exceptions import TalkoLoggerException
 

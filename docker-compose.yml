@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   talko:
     container_name: talko-service
@@ -15,7 +13,7 @@ services:
       - talko-mongodb
       - redis
     networks:
-      - makunai_console
+      - talko_network
     environment:
       - PYTHONPATH=/talko-service
 
@@ -32,7 +30,7 @@ services:
     volumes:
       - mongodbdata:/var/lib/mongodb/data
     networks:
-      - makunai_console
+      - talko_network
   redis:
     container_name: talko-redis
     image: redis
@@ -41,7 +39,7 @@ services:
     volumes:
       - redisdata:/data
     networks:
-        - makunai_console
+      - talko_network
 
   celery-worker:
     build: .
@@ -50,7 +48,7 @@ services:
     volumes:
       - .:/talko-service
     networks:
-      - makunai_console
+      - talko_network
 
   celery-beat:
     build: .
@@ -59,12 +57,12 @@ services:
     volumes:
       - .:/talko-service
     networks:
-      - makunai_console
+      - talko_network
 
 volumes:
   mongodbdata:
   redisdata:
 
 networks:
-  makunai_console:
-    external: true
+  talko_network:
+    driver: bridge

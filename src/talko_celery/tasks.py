@@ -1,6 +1,3 @@
-from celery import shared_task
-from celery.schedules import crontab
-
 from .celery_app import celery
 
 

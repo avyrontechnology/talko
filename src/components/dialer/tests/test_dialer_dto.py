@@ -5,7 +5,6 @@ from src.components.dialer.dto import TalkoContract
 
 
 class TestContractModels:
-
     def test_lead_list_item_success(self):
         data = {
             "id": 1,
@@ -82,9 +81,7 @@ class TestContractModels:
         payload = {"data": [{"field_0": "111"}, {"field_1": "Missing field_0 here"}]}
         with pytest.raises(ValidationError) as exc:
             TalkoContract.BulkLeadsCreateRequest(**payload)
-        assert "Each lead must contain field_0 (phone number). Error at index 1" in str(
-            exc.value
-        )
+        assert "Each lead must contain field_0 (phone number). Error at index 1" in str(exc.value)
 
     # BulkLeadsCreateResponse Tests
     def test_bulk_leads_create_response_success(self):

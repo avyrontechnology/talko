@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import psutil
 from dependency_injector.wiring import Provide, inject
@@ -47,9 +47,7 @@ class TalkoHealthController:
             else:
                 overall, http_status = "healthy", status.HTTP_200_OK
 
-            talko_service_logger.info(
-                "Health check completed with status: {}".format(overall)
-            )
+            talko_service_logger.info(f"Health check completed with status: {overall}")
 
             return JSONResponse(
                 status_code=http_status,
@@ -57,22 +55,20 @@ class TalkoHealthController:
                     "status": overall,
                     "service": TalkoENV.SERVICE_NAME,
                     "environment": TalkoENV.ENVIRONMENT,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "checks": checks,
                 },
             )
 
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error occurred during health check: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Unexpected error occurred during health check: {str(e)}")
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 content={
                     "status": "unhealthy",
                     "service": TalkoENV.SERVICE_NAME,
                     "environment": TalkoENV.ENVIRONMENT,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "error": health_messages.EXCEPTION_ERROR,
                 },
             )

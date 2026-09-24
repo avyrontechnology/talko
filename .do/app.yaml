@@ -1,0 +1,192 @@
+# DigitalOcean App Platform spec for talko-service.
+# Deploy: doctl apps create --spec .do/app.yaml
+#    or: Dashboard -> Apps -> Create -> From Source -> point at this repo,
+#        then "Use Existing App Spec" and paste this file.
+# Region blr (Bangalore) is closest to ap-south-1 users.
+# Fill SECRET values in the dashboard after creation (never commit real secrets).
+
+name: talko
+region: blr
+
+# Managed data stores (DO provisions + injects connection vars).
+# Service envs below reference them as ${talko-mongo.HOSTNAME} etc.
+databases:
+  - name: talko-mongo
+    engine: MONGODB
+    version: "7"
+    size: db-s-1vcpu-1gb
+    num_nodes: 1
+  - name: talko-valkey
+    engine: VALKEY
+    version: "8"
+    size: db-s-1vcpu-1gb
+    num_nodes: 1
+
+services:
+  - name: talko-api
+    github:
+      repo: avyrontechnology/talko
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: Dockerfile
+    http_port: 8080
+    instance_size_slug: basic-xs
+    instance_count: 1
+    health_check:
+      http_path: /talko-service/v1/health
+      initial_delay_seconds: 60
+      period_seconds: 30
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      - key: PORT
+        value: "8080"
+      - key: SERVICE_NAME
+        value: talko-service
+      - key: ENV
+        value: prod
+      - key: LOGGING_CONFIG_PATH
+        value: src/config/log.py
+      - key: MONGO_HOST
+        value: ${talko-mongo.HOSTNAME}
+      - key: MONGO_PORT
+        value: ${talko-mongo.PORT}
+      - key: MONGO_USER
+        value: ${talko-mongo.USERNAME}
+        type: SECRET
+      - key: MONGO_PASSWORD
+        value: ${talko-mongo.PASSWORD}
+        type: SECRET
+      - key: MONGO_DB
+        value: talko-service
+      - key: CACHE_PROTOCOL
+        value: redis
+      - key: CACHE_HOST
+        value: ${talko-valkey.HOSTNAME}
+      - key: CACHE_PORT
+        value: ${talko-valkey.PORT}
+      - key: CACHE_USERNAME
+        value: default
+      - key: CACHE_PASSWORD
+        value: ${talko-valkey.PASSWORD}
+        type: SECRET
+      - key: CACHE_DB
+        value: "0"
+      - key: STORAGE_SERVICE_PROVIDER
+        value: CLOUDINARY
+      - key: CLOUDINARY_CLOUD_NAME
+        type: SECRET
+      - key: CLOUDINARY_API_KEY
+        type: SECRET
+      - key: CLOUDINARY_API_SECRET
+        type: SECRET
+      - key: CLOUDINARY_FOLDER
+        value: talko
+      - key: VOICEAI_API_BASE_URL
+        type: SECRET
+      - key: VOICEAI_WS_BASE_URL
+        type: SECRET
+      - key: VOICEAI_API_KEY
+        type: SECRET
+      - key: TALKO_JWT_SECRET
+        type: SECRET
+      - key: VOICE_STREAM_SECRET
+        type: SECRET
+      - key: WEBHOOK_SECRET_MASTER_KEY
+        type: SECRET
+      # RSA keys as base64 (see src/utils/crypto_utils.py) — used by CDR/call
+      # helpers to encrypt phone numbers. Generate once, reuse everywhere.
+      - key: RSA_PRIVATE_KEY
+        type: SECRET
+      - key: RSA_PUBLIC_KEY
+        type: SECRET
+      - key: CORS_EXTRA_ORIGINS
+        type: SECRET
+      - key: ALLOWED_HOSTS_EXTRA
+        value: ${APP_DOMAIN}
+
+workers:
+  - name: talko-worker
+    github:
+      repo: avyrontechnology/talko
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: Dockerfile
+    run_command: poetry run celery -A src.talko_celery.celery_app.celery worker --loglevel=info --concurrency=4 -Q default_queue,call_operation_queue,call_assets_queue,did_management_queue,call_management_queue,missed_callback_queue,webhook_delivery_queue
+    instance_size_slug: basic-xs
+    instance_count: 1
+    envs:
+      - key: SERVICE_NAME
+        value: talko-service
+      - key: ENV
+        value: prod
+      - key: LOGGING_CONFIG_PATH
+        value: src/config/log.py
+      - key: MONGO_HOST
+        value: ${talko-mongo.HOSTNAME}
+      - key: MONGO_PORT
+        value: ${talko-mongo.PORT}
+      - key: MONGO_USER
+        value: ${talko-mongo.USERNAME}
+        type: SECRET
+      - key: MONGO_PASSWORD
+        value: ${talko-mongo.PASSWORD}
+        type: SECRET
+      - key: MONGO_DB
+        value: talko-service
+      - key: CACHE_PROTOCOL
+        value: redis
+      - key: CACHE_HOST
+        value: ${talko-valkey.HOSTNAME}
+      - key: CACHE_PORT
+        value: ${talko-valkey.PORT}
+      - key: CACHE_USERNAME
+        value: default
+      - key: CACHE_PASSWORD
+        value: ${talko-valkey.PASSWORD}
+        type: SECRET
+      - key: CACHE_DB
+        value: "0"
+
+  - name: talko-beat
+    github:
+      repo: avyrontechnology/talko
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: Dockerfile
+    run_command: poetry run celery -A src.talko_celery.celery_app.celery beat --loglevel=info
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    envs:
+      - key: SERVICE_NAME
+        value: talko-service
+      - key: ENV
+        value: prod
+      - key: LOGGING_CONFIG_PATH
+        value: src/config/log.py
+      - key: MONGO_HOST
+        value: ${talko-mongo.HOSTNAME}
+      - key: MONGO_PORT
+        value: ${talko-mongo.PORT}
+      - key: MONGO_USER
+        value: ${talko-mongo.USERNAME}
+        type: SECRET
+      - key: MONGO_PASSWORD
+        value: ${talko-mongo.PASSWORD}
+        type: SECRET
+      - key: MONGO_DB
+        value: talko-service
+      - key: CACHE_PROTOCOL
+        value: redis
+      - key: CACHE_HOST
+        value: ${talko-valkey.HOSTNAME}
+      - key: CACHE_PORT
+        value: ${talko-valkey.PORT}
+      - key: CACHE_USERNAME
+        value: default
+      - key: CACHE_PASSWORD
+        value: ${talko-valkey.PASSWORD}
+        type: SECRET
+      - key: CACHE_DB
+        value: "0"

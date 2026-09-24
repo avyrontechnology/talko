@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Union
 
 from src.loggers.talko_service_logger import TalkoServiceLogger
 
@@ -22,8 +21,8 @@ class TalkoVendorCallHandler(ABC):
         self,
         to_number: str,
         from_number: str,
-        call_url: Union[str, None],
-        agent_number: Union[str, None],
+        call_url: str | None,
+        agent_number: str | None,
     ) -> dict:
         """
         Make a call using the vendor's API.

@@ -1,4 +1,3 @@
-from src.components.call_agent_map.dto import TalkoContract
 from src.components.call_agent_map.repository import TalkoAgentMappingRepository
 from src.loggers.talko_service_logger import TalkoServiceLogger
 
@@ -33,8 +32,6 @@ class TalkoAgentMapperValidator:
         existing_agent_mapping = await self.repository.get_agent_did_mapping(agent_id)
         if existing_agent_mapping:
             self.logger.error(
-                "Agent ID {} is already mapped to another partner. Existing data: {}".format(
-                    agent_id, existing_agent_mapping
-                )
+                f"Agent ID {agent_id} is already mapped to another partner. Existing data: {existing_agent_mapping}"
             )
             raise ValueError("Agent ID is already mapped to another partner.")

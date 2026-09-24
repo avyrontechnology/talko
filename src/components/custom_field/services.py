@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 from bson import ObjectId
 
@@ -37,17 +37,13 @@ class TalkoCustomFieldService:
     async def create_custom_field(
         self, partner_id: int, field: TalkoContract.CustomFieldCreate
     ) -> TalkoContract.CustomFieldCreationUpdationResponse:
-        self.__logger.info(
-            "Creating custom field for partner {}: {}".format(partner_id, field)
-        )
+        self.__logger.info(f"Creating custom field for partner {partner_id}: {field}")
 
         field_slug: str = self.__validator.validate_custom_field_create(field)
-        await self.__validator.validate_slug_unique(
-            partner_id, field.entity_type.value, field_slug
-        )
+        await self.__validator.validate_slug_unique(partner_id, field.entity_type.value, field_slug)
 
         current_timestamp: Any = self.__datetime_util.get_current_time()
-        field_dict: Dict[str, Any] = {
+        field_dict: dict[str, Any] = {
             "partner_id": partner_id,
             "entity_type": field.entity_type.value,
             "field_name": field.field_name,
@@ -62,25 +58,15 @@ class TalkoCustomFieldService:
         }
 
         field_id: str = await self.__repository.insert_custom_field(field_dict)
-        self.__logger.info("Custom field created with ID: {}".format(field_id))
+        self.__logger.info(f"Custom field created with ID: {field_id}")
 
-        return TalkoContract.CustomFieldCreationUpdationResponse(
-            id=field_id, message=CUSTOM_FIELD_CREATED_SUCCESSFULLY
-        )
+        return TalkoContract.CustomFieldCreationUpdationResponse(id=field_id, message=CUSTOM_FIELD_CREATED_SUCCESSFULLY)
 
-    async def get_custom_fields(
-        self, partner_id: int, entity_type: str
-    ) -> List[TalkoContract.CustomFieldResponse]:
-        self.__logger.info(
-            "Listing custom fields for partner {}, entity_type {}".format(
-                partner_id, entity_type
-            )
-        )
-        fields: List[Dict[str, Any]] = await self.__repository.find_all(
-            partner_id, entity_type
-        )
+    async def get_custom_fields(self, partner_id: int, entity_type: str) -> list[TalkoContract.CustomFieldResponse]:
+        self.__logger.info(f"Listing custom fields for partner {partner_id}, entity_type {entity_type}")
+        fields: list[dict[str, Any]] = await self.__repository.find_all(partner_id, entity_type)
 
-        responses: List[TalkoContract.CustomFieldResponse] = []
+        responses: list[TalkoContract.CustomFieldResponse] = []
         for field in fields:
             field["id"] = str(field["_id"])
             del field["_id"]
@@ -93,9 +79,7 @@ class TalkoCustomFieldService:
         field_id: str,
         update: TalkoContract.CustomFieldUpdate,
     ) -> TalkoContract.CustomFieldCreationUpdationResponse:
-        self.__logger.info(
-            "Updating custom field {} for partner {}".format(field_id, partner_id)
-        )
+        self.__logger.info(f"Updating custom field {field_id} for partner {partner_id}")
         try:
             object_id: ObjectId = ObjectId(field_id)
         except Exception:
@@ -103,18 +87,14 @@ class TalkoCustomFieldService:
 
         await self.__validator.validate_custom_field_exists(object_id, partner_id)
 
-        update_dict: Dict[str, Any] = {
-            k: v for k, v in update.model_dump().items() if v is not None
-        }
+        update_dict: dict[str, Any] = {k: v for k, v in update.model_dump().items() if v is not None}
         if not update_dict:
             self.__logger.error(NO_FIELDS_PROVIDED_FOR_UPDATE)
             raise TalkoBadRequestError(NO_FIELDS_PROVIDED_FOR_UPDATE)
 
         update_dict["updated_at"] = self.__datetime_util.get_current_time()
 
-        updated: Dict[str, Any] = await self.__repository.update_by_id(
-            object_id, update_dict
-        )
+        updated: dict[str, Any] = await self.__repository.update_by_id(object_id, update_dict)
         return TalkoContract.CustomFieldCreationUpdationResponse(
             id=str(updated["_id"]), message=CUSTOM_FIELD_UPDATED_SUCCESSFULLY
         )
@@ -122,9 +102,7 @@ class TalkoCustomFieldService:
     async def delete_custom_field(
         self, partner_id: int, field_id: str
     ) -> TalkoContract.CustomFieldCreationUpdationResponse:
-        self.__logger.info(
-            "Soft-deleting custom field {} for partner {}".format(field_id, partner_id)
-        )
+        self.__logger.info(f"Soft-deleting custom field {field_id} for partner {partner_id}")
         try:
             object_id: ObjectId = ObjectId(field_id)
         except Exception:
@@ -132,13 +110,11 @@ class TalkoCustomFieldService:
 
         await self.__validator.validate_custom_field_exists(object_id, partner_id)
 
-        update_dict: Dict[str, Any] = {
+        update_dict: dict[str, Any] = {
             "is_active": False,
             "updated_at": self.__datetime_util.get_current_time(),
         }
-        updated: Dict[str, Any] = await self.__repository.update_by_id(
-            object_id, update_dict
-        )
+        updated: dict[str, Any] = await self.__repository.update_by_id(object_id, update_dict)
         return TalkoContract.CustomFieldCreationUpdationResponse(
             id=str(updated["_id"]), message=CUSTOM_FIELD_DELETED_SUCCESSFULLY
         )

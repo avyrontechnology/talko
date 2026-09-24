@@ -11,8 +11,6 @@ A superadmin acts cross-partner by sending the target partner id in the
 scope. Denials fail closed (403); role lookups fail closed (False).
 """
 
-from typing import Optional
-
 from fastapi import Request
 
 from src.components.common.constants import TalkoCurrentUserMap
@@ -45,9 +43,7 @@ ADMIN_ONLY_ROUTES = frozenset(
 )
 
 
-def resolve_talko_permission(
-    *, role: str, route_name: str, http_method: str, is_superadmin: bool
-) -> bool:
+def resolve_talko_permission(*, role: str, route_name: str, http_method: str, is_superadmin: bool) -> bool:
     """Local permission verdict for Talko-native users (no console roles).
 
     - superadmin: everything.
@@ -83,9 +79,7 @@ async def is_superadmin(request: Request, grpc_client, logger) -> bool:
     try:
         roles = await grpc_client.get_user_roles(user_id)
     except Exception as exc:
-        logger.warning(
-            "Superadmin check failed closed for user_id={}: {}".format(user_id, exc)
-        )
+        logger.warning(f"Superadmin check failed closed for user_id={user_id}: {exc}")
         return False
     return (roles or {}).get("hierarchy") == TalkoUserRoleHierarchy.ADMIN.value
 
@@ -94,8 +88,8 @@ async def resolve_effective_partner_id(
     request: Request,
     grpc_client,
     logger,
-    scope_override: Optional[int] = None,
-) -> Optional[int]:
+    scope_override: int | None = None,
+) -> int | None:
     """Partner id the request acts on: own scope, or the override for admins.
 
     A missing own scope with no override returns None (legacy behavior —
@@ -103,19 +97,13 @@ async def resolve_effective_partner_id(
     """
     user = getattr(request.state, "user", None) or {}
     own_partner_id = user.get(TalkoCurrentUserMap.PARTNER_ID)
-    if scope_override is not None and (
-        own_partner_id is None or int(scope_override) != int(own_partner_id)
-    ):
+    if scope_override is not None and (own_partner_id is None or int(scope_override) != int(own_partner_id)):
         if await is_superadmin(request, grpc_client, logger):
             logger.info(
-                "Superadmin user_id={} acting on partner_id={} (own={})".format(
-                    user.get(TalkoCurrentUserMap.USER_ID), scope_override, own_partner_id
-                )
+                f"Superadmin user_id={user.get(TalkoCurrentUserMap.USER_ID)} acting on partner_id={scope_override} (own={own_partner_id})"
             )
             return int(scope_override)
-        raise TalkoSuperadminDenied(
-            "Cross-partner scope requires superadmin (ADMIN) role"
-        )
+        raise TalkoSuperadminDenied("Cross-partner scope requires superadmin (ADMIN) role")
     if own_partner_id is None:
         return None
     return int(own_partner_id)

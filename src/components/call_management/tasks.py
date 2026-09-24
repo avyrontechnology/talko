@@ -23,7 +23,7 @@ MISSED_CALLBACK_TASK_ID_PREFIX = "missed-cb-"
 
 
 def missed_callback_task_id(call_uuid: str) -> str:
-    return "{}{}".format(MISSED_CALLBACK_TASK_ID_PREFIX, call_uuid)
+    return f"{MISSED_CALLBACK_TASK_ID_PREFIX}{call_uuid}"
 
 
 @shared_task(bind=True, max_retries=0, soft_time_limit=60, time_limit=90)
@@ -37,11 +37,7 @@ def missed_call_callback_task(self, call_uuid: str) -> str:
     """
     logger = TalkoCeleryLogger.get_logger()
     task_id = getattr(getattr(self, "request", None), "id", None)
-    logger.info(
-        "Missed-call callback task starting for call_uuid={} task_id={}".format(
-            call_uuid, task_id
-        )
-    )
+    logger.info(f"Missed-call callback task starting for call_uuid={call_uuid} task_id={task_id}")
 
     try:
 
@@ -86,22 +82,14 @@ def missed_call_callback_task(self, call_uuid: str) -> str:
                 call_redis_helper = container.call_redis_helper()
                 call_service = await container.call_service()
 
-                return await _do_callback(
-                    call_repository, call_redis_helper, call_service
-                )
+                return await _do_callback(call_repository, call_redis_helper, call_service)
             finally:
                 await container.shutdown_resources()
 
-        async def _do_callback(
-            call_repository, call_redis_helper, call_service
-        ) -> str:
+        async def _do_callback(call_repository, call_redis_helper, call_service) -> str:
             cdr = await call_repository.get_cdr_by_call_id_or_uuid(None, call_uuid)
             if not cdr:
-                logger.warning(
-                    "Missed-call callback: no TalkoCDR found for call_uuid={}".format(
-                        call_uuid
-                    )
-                )
+                logger.warning(f"Missed-call callback: no TalkoCDR found for call_uuid={call_uuid}")
                 return "cdr_not_found"
 
             # Re-check current state — a manual callback, or a later webhook
@@ -120,38 +108,22 @@ def missed_call_callback_task(self, call_uuid: str) -> str:
             # A finished winner leaves a callback TalkoCDR (locks expire, rows
             # don't); a concurrently-running winner holds the exec lock.
             if await call_repository.find_callback_by_parent_uuid(call_uuid):
-                logger.info(
-                    "Missed-call callback: call_uuid={} already has a callback "
-                    "— skipping".format(call_uuid)
-                )
+                logger.info(f"Missed-call callback: call_uuid={call_uuid} already has a callback — skipping")
                 return "already_handled"
 
-            if not await call_redis_helper.try_acquire_missed_callback_exec_lock(
-                call_uuid
-            ):
-                logger.info(
-                    "Missed-call callback: call_uuid={} execution already in "
-                    "flight — skipping".format(call_uuid)
-                )
+            if not await call_redis_helper.try_acquire_missed_callback_exec_lock(call_uuid):
+                logger.info(f"Missed-call callback: call_uuid={call_uuid} execution already in flight — skipping")
                 return "duplicate_suppressed"
 
             await call_service.initiate_missed_call_callback(cdr)
             return "processed"
 
         result = asyncio.run(_run())
-        logger.info(
-            "Missed-call callback task finished for call_uuid={} task_id={}: {}".format(
-                call_uuid, task_id, result
-            )
-        )
+        logger.info(f"Missed-call callback task finished for call_uuid={call_uuid} task_id={task_id}: {result}")
         return result
 
     except Exception as e:
-        logger.error(
-            "Missed-call callback task failed for call_uuid={} task_id={}: {}".format(
-                call_uuid, task_id, str(e)
-            )
-        )
+        logger.error(f"Missed-call callback task failed for call_uuid={call_uuid} task_id={task_id}: {str(e)}")
         return "error"
 
 
@@ -187,14 +159,10 @@ def missed_callback_sweeper_task(self) -> str:
             try:
                 call_repository = container.call_repository()
                 now_ms = TalkoDateTimeUtil.get_current_time()
-                candidates = (
-                    await call_repository.find_missed_inbounds_needing_callback(
-                        older_than_ms=now_ms
-                        - MISSED_CALLBACK_SWEEP_AGE_SECONDS * 1000,
-                        newer_than_ms=now_ms
-                        - MISSED_CALLBACK_SWEEP_WINDOW_SECONDS * 1000,
-                        limit=MISSED_CALLBACK_SWEEP_LIMIT,
-                    )
+                candidates = await call_repository.find_missed_inbounds_needing_callback(
+                    older_than_ms=now_ms - MISSED_CALLBACK_SWEEP_AGE_SECONDS * 1000,
+                    newer_than_ms=now_ms - MISSED_CALLBACK_SWEEP_WINDOW_SECONDS * 1000,
+                    limit=MISSED_CALLBACK_SWEEP_LIMIT,
                 )
                 redis_helper = container.call_redis_helper()
                 dispatched = 0
@@ -206,35 +174,26 @@ def missed_callback_sweeper_task(self) -> str:
                         continue
                     # Skip anything already healed (callback placed) or
                     # currently being handled (ETA task in flight / running).
-                    if await call_repository.find_callback_by_parent_uuid(
-                        candidate_uuid
-                    ):
+                    if await call_repository.find_callback_by_parent_uuid(candidate_uuid):
                         skipped += 1
                         continue
-                    if await redis_helper.is_missed_callback_exec_locked(
-                        candidate_uuid
-                    ):
+                    if await redis_helper.is_missed_callback_exec_locked(candidate_uuid):
                         skipped += 1
                         continue
                     missed_call_callback_task.apply_async(
                         args=[candidate_uuid],
                         task_id=missed_callback_task_id(candidate_uuid),
                     )
-                    logger.info(
-                        "Missed-call callback sweeper re-dispatched "
-                        "call_uuid={}".format(candidate_uuid)
-                    )
+                    logger.info(f"Missed-call callback sweeper re-dispatched call_uuid={candidate_uuid}")
                     dispatched += 1
-                return "swept:dispatched={}:skipped={}:candidates={}".format(
-                    dispatched, skipped, len(candidates)
-                )
+                return f"swept:dispatched={dispatched}:skipped={skipped}:candidates={len(candidates)}"
             finally:
                 await container.shutdown_resources()
 
         result = asyncio.run(_run())
-        logger.info("Missed-call callback sweeper finished: {}".format(result))
+        logger.info(f"Missed-call callback sweeper finished: {result}")
         return result
 
     except Exception as e:
-        logger.error("Missed-call callback sweeper failed: {}".format(str(e)))
+        logger.error(f"Missed-call callback sweeper failed: {str(e)}")
         return "error"

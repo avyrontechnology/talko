@@ -2,13 +2,12 @@ import asyncio
 import time
 import traceback
 import uuid
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import httpx
 from bson import ObjectId
 from bson.errors import InvalidId
 
-from src.components.cache.helper import TalkoCacheHelper
 from src.components.call_agent_map.repository import TalkoAgentMappingRepository
 from src.components.call_agent_map.services import TalkoAgentMappingService
 from src.components.call_management.agent_dialplan_resolver import (
@@ -17,7 +16,6 @@ from src.components.call_management.agent_dialplan_resolver import (
 )
 from src.components.call_management.constant import AI_BRIDGE_VENDOR_CONFIG_ID
 from src.components.call_management.dto import TalkoContract as call_contract
-from src.components.call_management.enums import TalkoInboundType
 from src.components.call_management.handlers.webhook_base_handler import TalkoWebhookHandler
 from src.components.call_management.helper import TalkoCallProcessorHelper
 from src.components.call_management.messages import (
@@ -39,12 +37,10 @@ from src.components.did_management.constants import TalkoDIDType
 from src.components.did_management.repositories import TalkoDidRepository
 from src.components.did_management.services import TalkoDidManagementService
 from src.components.inbound_call_events.publisher import TalkoInboundCallEventPublisher
-from src.components.integrations.console.maglo_client import TalkoMagloClient
 from src.components.partner_config.repository import TalkoPartnerConfigRepository
 from src.components.pstn.voiceai_relay import VOICEAI_AGENT_ID_KEY
 from src.components.vendor_config.repository import TalkoVendorConfigRepository
 from src.core.environment import TalkoENV
-from src.core.redis import TalkoRedisCache
 from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 from src.grpc_client.constants import TalkoGrpcServices
 from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
@@ -78,6 +74,10 @@ class TalkoCallService:
         call_redis_helper: TalkoCallRedisHelper,
         did_repository: TalkoDidRepository,  # same as TalkoPSTNBridgeService — for agent_id resolution
         inbound_call_event_publisher: TalkoInboundCallEventPublisher,
+        channel_pool_service: Any = None,
+        telephony_client: Any = None,
+        telephony_bridge: Any = None,
+        billing_service: Any = None,
     ):
         """
         Initializes the TalkoCallService with necessary repositories and utilities.
@@ -95,13 +95,9 @@ class TalkoCallService:
         self.__datetime_util: TalkoDateTimeUtil = datetime_util
         self.__round_robin: TalkoRoundRobinAssignment = TalkoRoundRobinAssignment()
         self.__partner_config_repo: TalkoPartnerConfigRepository = partner_config_repository
-        self.__vendor_config_repository: TalkoVendorConfigRepository = (
-            vendor_config_repository
-        )
+        self.__vendor_config_repository: TalkoVendorConfigRepository = vendor_config_repository
         self.__agent_mapping_service: TalkoAgentMappingService = agent_mapping_service
-        self.__agent_mapping_repository: TalkoAgentMappingRepository = (
-            agent_mapping_repository
-        )
+        self.__agent_mapping_repository: TalkoAgentMappingRepository = agent_mapping_repository
         self.__did_management_service: TalkoDidManagementService = did_management_service
         self.__helper: TalkoCallProcessorHelper = TalkoCallProcessorHelper(
             repository=self.__repository,
@@ -113,30 +109,30 @@ class TalkoCallService:
             agent_mapping_repository=self.__agent_mapping_repository,
             did_management_service=self.__did_management_service,
         )
-        self.__maglo_client = TalkoMagloClient(
-            logger=self.__logger,
-        )
+        # gRPC disabled for now — resolver tolerates None (skips availability).
+        # user_service_client=TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.USER),
+        try:
+            _user_service_client: Any = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.USER)
+        except Exception:
+            _user_service_client = None
         self.__dialplan_resolver = TalkoAgentDialPlanResolver(
-            maglo_client=self.__maglo_client,
             agent_mapping_repo=self.__agent_mapping_repository,
             logger=self.__logger,
-            user_service_client=TalkoRPCServiceFactory.get_service(TalkoGrpcServices.USER),
+            user_service_client=_user_service_client,
         )
         self.__response_builder = TalkoDialplanResponseBuilder()
         self.__vendor_cdr_gateway: TalkoVendorCDRGateway = vendor_cdr_gateway
         self.__cdr_update_task: TalkoCDRUpdateTask = cdr_update_task
         self.__cdr_repository = cdr_repository
         self.__redis_helper = call_redis_helper
-        self.__did_repository: TalkoDidRepository = (
-            did_repository  # for agent_id resolution in _pre_create_session
-        )
-        self.__inbound_call_event_publisher: TalkoInboundCallEventPublisher = (
-            inbound_call_event_publisher
-        )
+        self.__did_repository: TalkoDidRepository = did_repository  # for agent_id resolution in _pre_create_session
+        self.__inbound_call_event_publisher: TalkoInboundCallEventPublisher = inbound_call_event_publisher
+        self.__channel_pool_service: Any = channel_pool_service
+        self.__telephony_client: Any = telephony_client
+        self.__telephony_bridge: Any = telephony_bridge
+        self.__billing_service: Any = billing_service
 
-    def _normalize_entity_fields_for_outbound(
-        self, call_data: call_contract.CallCreate
-    ) -> call_contract.CallCreate:
+    def _normalize_entity_fields_for_outbound(self, call_data: call_contract.CallCreate) -> call_contract.CallCreate:
         """
         Backward compatibility:
         if old callers send lead_id but not entity_type/entity_id,
@@ -161,12 +157,12 @@ class TalkoCallService:
 
     def _derive_inbound_entity_fields(
         self,
-        entity_type: Optional[str] = None,
-        entity_id: Optional[int] = None,
-        entity_name: Optional[str] = None,
-        lead_id: Optional[int] = None,
-        lead_name: Optional[str] = None,
-    ) -> tuple[Optional[str], Optional[int], Optional[str]]:
+        entity_type: str | None = None,
+        entity_id: int | None = None,
+        entity_name: str | None = None,
+        lead_id: int | None = None,
+        lead_name: str | None = None,
+    ) -> tuple[str | None, int | None, str | None]:
         """
         Normalize inbound entity fields for compatibility.
         """
@@ -174,11 +170,7 @@ class TalkoCallService:
             try:
                 entity_type = TalkoEntityType(entity_type)
             except ValueError:
-                self.__logger.warning(
-                    "Invalid entity_type '{}' received in inbound flow. Ignoring.".format(
-                        entity_type
-                    )
-                )
+                self.__logger.warning(f"Invalid entity_type '{entity_type}' received in inbound flow. Ignoring.")
                 entity_type = None
 
         entity_fields = derive_entity_fields(
@@ -233,86 +225,77 @@ class TalkoCallService:
         try:
             self.__logger.info("Initial call service for partner started.")
             call_data = self._normalize_entity_fields_for_outbound(call_data)
-            self.__logger.debug("Call data received: {}".format(call_data))
+            self.__logger.debug(f"Call data received: {call_data}")
 
             if call_data.encryption_enabled or call_data.lead_secret:
                 decrypted_lead_data: dict = self.__helper.decrypt_lead_data(call_data)
 
-                self.__logger.debug(
-                    "Decrypted lead data: {}".format(decrypted_lead_data)
-                )
+                self.__logger.debug(f"Decrypted lead data: {decrypted_lead_data}")
 
                 # Select number from decrypted data based on number_type
-                to_number: str = self.__helper.extract_to_number(
-                    call_data, decrypted_lead_data
-                )
+                to_number: str = self.__helper.extract_to_number(call_data, decrypted_lead_data)
             else:
                 if not call_data.to_number:
-                    raise ValueError(
-                        "to_number must be provided if encryption is disabled"
-                    )
+                    raise ValueError("to_number must be provided if encryption is disabled")
                 to_number = call_data.to_number
 
             # partner changes
-            partner_config: dict[str, Any] = await self.__helper.get_partner_config(
-                partner_id
-            )
+            partner_config: dict[str, Any] = await self.__helper.get_partner_config(partner_id)
 
-            vendor_id: Optional[str] = partner_config.get("vendor_id")
+            vendor_id: str | None = partner_config.get("vendor_id")
             if not vendor_id:
                 raise TalkoResourceNotFound(NO_VENDOR_ID_ASSIGNED_TO_PARTNER)
 
-            vendor_config_id: Optional[str] = (
-                partner_config.get("ai_vendor_config_id")
-                if call_data.enable_ai_bridge
-                else None
+            vendor_config_id: str | None = (
+                partner_config.get("ai_vendor_config_id") if call_data.enable_ai_bridge else None
             ) or partner_config.get("vendor_config_id")
             if not vendor_config_id:
                 raise TalkoResourceNotFound("No vendor_config_id assigned to partner.")
-            if call_data.dedicated_did and not call_data.enable_ai_bridge:
-                await self.__helper.validate_given_did(
-                    call_data.dedicated_did, partner_id, call_data.workspace_id
-                )
-                from_number = call_data.dedicated_did
-                self.__logger.info(
-                    "Using provided dedicated DID: {} for call initiation".format(
-                        from_number
+            if self.__billing_service is not None:
+                try:
+                    ledger = await self.__billing_service.get_ledger(partner_id)
+                    self.__billing_service.check_balance(
+                        ledger.model_dump() if hasattr(ledger, "model_dump") else ledger
                     )
-                )
+                except TalkoResourceNotFound:
+                    pass  # no ledger = unlimited (fail-open for legacy partners)
+                except TalkoBadRequestError:
+                    raise
+                except Exception as bill_e:
+                    self.__logger.error(f"Billing guard failed open: {str(bill_e)}")
+            pool_acquired = False
+            if self.__channel_pool_service is not None:
+                try:
+                    await self.__channel_pool_service.acquire(vendor_config_id)
+                    pool_acquired = True
+                except Exception as pool_e:
+                    from src.components.call_management.channel_pool import (
+                        TalkoChannelPoolExhausted,
+                    )
+
+                    if isinstance(pool_e, TalkoChannelPoolExhausted):
+                        raise TalkoBadRequestError(str(pool_e))
+                    self.__logger.error(f"Channel pool acquire failed (fail-open): {str(pool_e)}")
+            if call_data.dedicated_did and not call_data.enable_ai_bridge:
+                await self.__helper.validate_given_did(call_data.dedicated_did, partner_id, call_data.workspace_id)
+                from_number = call_data.dedicated_did
+                self.__logger.info(f"Using provided dedicated DID: {from_number} for call initiation")
             elif not call_data.enable_ai_bridge:
                 from_number: str = await self.__helper.select_did(
                     partner_config, partner_id, user_id, call_data.workspace_id
                 )
-                self.__logger.info(
-                    "Selected DID: {} for call initiation using round-robin".format(
-                        from_number
-                    )
-                )
+                self.__logger.info(f"Selected DID: {from_number} for call initiation using round-robin")
             else:
-                await self.__helper.validate_given_did(
-                    call_data.dedicated_did, partner_id, call_data.workspace_id
-                )
+                await self.__helper.validate_given_did(call_data.dedicated_did, partner_id, call_data.workspace_id)
                 from_number = call_data.dedicated_did
-                self.__logger.info(
-                    "AI Bridge enabled, using dedicated DID: {} for call initiation".format(
-                        from_number
-                    )
-                )
+                self.__logger.info(f"AI Bridge enabled, using dedicated DID: {from_number} for call initiation")
 
-            vendor_handler: Any = await self.__helper.get_vendor_handler(
-                vendor_id, vendor_config_id
-            )
+            vendor_handler: Any = await self.__helper.get_vendor_handler(vendor_id, vendor_config_id)
 
-            self.__logger.debug(
-                "Vendor handler obtained: {} for vendor_id: {}".format(
-                    vendor_handler, vendor_id
-                )
-            )
+            self.__logger.debug(f"Vendor handler obtained: {vendor_handler} for vendor_id: {vendor_id}")
 
-            agent_number: Optional[str] = (
-                call_data.cloud_agent_number
-                if call_data.cloud_agent_number
-                else call_data.agent_number
+            agent_number: str | None = (
+                call_data.cloud_agent_number if call_data.cloud_agent_number else call_data.agent_number
             )
 
             call_id: str = ""
@@ -327,14 +310,15 @@ class TalkoCallService:
                 call_status: str = vendor_response.get("status", "initiated")
                 call_id: str = str(vendor_response.get("call_id", ""))
             except ValueError as e:
-                self.__logger.error("Vendor call failed: {}".format(str(e)))
+                if pool_acquired and self.__channel_pool_service is not None:
+                    try:
+                        await self.__channel_pool_service.release(vendor_config_id)
+                    except Exception:
+                        pass
+                self.__logger.error(f"Vendor call failed: {str(e)}")
                 raise
 
-            self.__logger.debug(
-                "Vendor response received: {} for call_id: {}".format(
-                    vendor_response, call_id
-                )
-            )
+            self.__logger.debug(f"Vendor response received: {vendor_response} for call_id: {call_id}")
 
             call_uuid: str = str(uuid.uuid4())
             timestamp: int = self.__datetime_util.get_current_time()
@@ -353,10 +337,10 @@ class TalkoCallService:
                 vendor_config_id,
             )
 
-            self.__logger.debug("Prepared TalkoCDR for call initiation: {}".format(cdr_dict))
+            self.__logger.debug(f"Prepared TalkoCDR for call initiation: {cdr_dict}")
             cdr_id: str = await self.__repository.insert_cdr(cdr_dict)
 
-            self.__logger.debug("TalkoCDR inserted with ID: {}".format(cdr_id))
+            self.__logger.debug(f"TalkoCDR inserted with ID: {cdr_id}")
 
             response: dict[str, Any] = {
                 "id": cdr_id,
@@ -385,9 +369,7 @@ class TalkoCallService:
                 # outbound_room:<to_number> — plain .lstrip("+") let a leading
                 # zero / missing country code / spaces desync the two keys.
                 normalized_to = normalize_phone_number(to_number, with_plus=False)
-                store_key = (
-                    call_id if (call_id and call_id != "None") else normalized_to
-                )
+                store_key = call_id if (call_id and call_id != "None") else normalized_to
 
                 # cdr_id (this TalkoCDR row's own _id, NOT Tata's call_id — that's
                 # routinely empty here for AI-bridge calls, see above) rides
@@ -415,11 +397,7 @@ class TalkoCallService:
                     "dedicated_did": from_number,
                     "vendor_id": str(vendor_id),
                     "vendor_config_id": str(vendor_config_id),
-                    "entity_type": (
-                        call_data.entity_type.value
-                        if getattr(call_data, "entity_type", None)
-                        else None
-                    ),
+                    "entity_type": (call_data.entity_type.value if getattr(call_data, "entity_type", None) else None),
                     "entity_id": getattr(call_data, "entity_id", None),
                     "entity_name": getattr(call_data, "entity_name", None),
                     "context_data": context_data_with_cdr_id,
@@ -447,11 +425,7 @@ class TalkoCallService:
                 # ─────────────────────────────────────────────────────────────
                 if call_data.enable_ai_bridge:
                     self.__logger.info(
-                        "[PreSession] Firing background pre-session "
-                        "to_number={} caller_did={}".format(
-                            normalized_to,
-                            from_number,
-                        )
+                        f"[PreSession] Firing background pre-session to_number={normalized_to} caller_did={from_number}"
                     )
                     asyncio.create_task(
                         self._pre_create_session(
@@ -464,17 +438,13 @@ class TalkoCallService:
                             fallback_store_key=store_key,
                             call_id=call_id,
                         ),
-                        name="pre_session_{}".format(normalized_to),
+                        name=f"pre_session_{normalized_to}",
                     )
                     # NOTE: pending_context is stored inside _pre_create_session
                     # as a fallback — do NOT store it here to avoid double writes.
                 else:
                     # ── Original flow for non-AI-bridge calls (unchanged) ─────
-                    self.__logger.info(
-                        "Storing pending call context store_key={} to_number={}".format(
-                            store_key, normalized_to
-                        )
-                    )
+                    self.__logger.info(f"Storing pending call context store_key={store_key} to_number={normalized_to}")
                     await self.__redis_helper.store_pending_call_context(
                         call_id=store_key,
                         payload=pending_context_payload,
@@ -487,9 +457,7 @@ class TalkoCallService:
                 # ─────────────────────────────────────────────────────────────
 
             else:
-                self.__logger.warning(
-                    "Skipping pending call context redis write because to_number is empty"
-                )
+                self.__logger.warning("Skipping pending call context redis write because to_number is empty")
 
             # Outbound websocket popup — scheduler (missed-call callback)
             # only. Manual outbound API calls pass notify_outbound_event=False
@@ -504,11 +472,7 @@ class TalkoCallService:
             # fire-and-forget task before it ever publishes.
             if notify_outbound_event:
                 try:
-                    did_record = (
-                        await self.__did_management_service.get_dids_by_number(
-                            from_number
-                        )
-                    )
+                    did_record = await self.__did_management_service.get_dids_by_number(from_number)
                     await self.__inbound_call_event_publisher.publish_outbound_call(
                         partner_id=partner_id,
                         workspace_id=call_data.workspace_id,
@@ -520,22 +484,16 @@ class TalkoCallService:
                 except Exception as notify_error:
                     # Notification must never fail call placement — TalkoCDR is
                     # already inserted and vendor call already placed.
-                    self.__logger.error(
-                        "Outbound call event notify failed (non-fatal): {}".format(
-                            str(notify_error)
-                        )
-                    )
+                    self.__logger.error(f"Outbound call event notify failed (non-fatal): {str(notify_error)}")
 
-            self.__logger.info("Call initiated: {}".format(response))
-            return call_contract.CallResponse(
-                id=response["id"], message=CALL_PLACED_SUCCESSFULLY
-            )
+            self.__logger.info(f"Call initiated: {response}")
+            return call_contract.CallResponse(id=response["id"], message=CALL_PLACED_SUCCESSFULLY)
 
         except Exception as e:
-            self.__logger.error("Unexpected error in initiate_call: {}".format(str(e)))
+            self.__logger.error(f"Unexpected error in initiate_call: {str(e)}")
             raise
 
-    async def initiate_missed_call_callback(self, cdr: Dict[str, Any]) -> None:
+    async def initiate_missed_call_callback(self, cdr: dict[str, Any]) -> None:
         """
         Best-effort auto-callback for a missed inbound call. Invoked from
         missed_call_callback_task, which the every-minute beat sweeper
@@ -558,29 +516,21 @@ class TalkoCallService:
         try:
             if not (partner_id and workspace_id and customer_number and did_number):
                 self.__logger.warning(
-                    "Missed-call callback skipped for call_uuid={}: missing "
-                    "partner_id/workspace_id/customer/did_number on TalkoCDR".format(
-                        call_uuid
-                    )
+                    f"Missed-call callback skipped for call_uuid={call_uuid}: missing "
+                    "partner_id/workspace_id/customer/did_number on TalkoCDR"
                 )
                 return
 
             if not agent_id:
                 self.__logger.info(
-                    "Missed-call callback skipped for call_uuid={}: no single "
-                    "assigned agent on the missed TalkoCDR".format(call_uuid)
+                    f"Missed-call callback skipped for call_uuid={call_uuid}: no single "
+                    "assigned agent on the missed TalkoCDR"
                 )
                 return
 
-            partner_config = (
-                await self.__partner_config_repo.find_partner_config_by_partner_id(
-                    partner_id
-                )
-            )
+            partner_config = await self.__partner_config_repo.find_partner_config_by_partner_id(partner_id)
             if not (partner_config or {}).get("enable_missed_call_callback"):
-                self.__logger.debug(
-                    "Missed-call callback disabled for partner_id={}".format(partner_id)
-                )
+                self.__logger.debug(f"Missed-call callback disabled for partner_id={partner_id}")
                 return
 
             customer_number = str(customer_number)
@@ -591,25 +541,18 @@ class TalkoCallService:
             # the bot's agent_bot_id rather than a real user_id (see
             # _handle_existing_cdr_flow), which resolve_for_single_agent
             # below would otherwise try to treat as a human agent.
-            did_record = await self.__did_management_service.get_dids_by_number(
-                did_number
-            )
+            did_record = await self.__did_management_service.get_dids_by_number(did_number)
             if did_record and did_record.get("did_type") == TalkoDIDType.AI_AGENT.value:
                 self.__logger.info(
-                    "Missed-call callback skipped for call_uuid={}: DID {} is "
-                    "an AI-agent DID".format(call_uuid, did_number)
+                    f"Missed-call callback skipped for call_uuid={call_uuid}: DID {did_number} is an AI-agent DID"
                 )
                 return
 
-            latest_cdr = await self.__repository.find_cdr_by_numbers(
-                customer_number, did_number
-            )
+            latest_cdr = await self.__repository.find_cdr_by_numbers(customer_number, did_number)
             if latest_cdr and latest_cdr.get("call_status") == "answered":
                 self.__logger.info(
-                    "Missed-call callback skipped for call_uuid={}: customer {} "
-                    "already connected on a later call".format(
-                        call_uuid, customer_number
-                    )
+                    f"Missed-call callback skipped for call_uuid={call_uuid}: customer {customer_number} "
+                    "already connected on a later call"
                 )
                 return
 
@@ -624,22 +567,19 @@ class TalkoCallService:
 
             if not target or not target.data:
                 self.__logger.warning(
-                    "Missed-call callback skipped for call_uuid={}: no active "
-                    "agent target resolved".format(call_uuid)
+                    f"Missed-call callback skipped for call_uuid={call_uuid}: no active agent target resolved"
                 )
                 return
 
             resolved_agent_id = target.resolved_agent_id or agent_id
             cloud_agent_number = target.data[0] if target.type == "agent" else None
-            agent_number = (
-                target.data[0] if target.type == "number" else cdr.get("agent_number")
-            )
+            agent_number = target.data[0] if target.type == "number" else cdr.get("agent_number")
 
             if not agent_number:
                 self.__logger.warning(
-                    "Missed-call callback skipped for call_uuid={}: no plain "
+                    f"Missed-call callback skipped for call_uuid={call_uuid}: no plain "
                     "agent_number available to satisfy the call contract "
-                    "(cloud-only target with no fallback number)".format(call_uuid)
+                    "(cloud-only target with no fallback number)"
                 )
                 return
 
@@ -657,10 +597,8 @@ class TalkoCallService:
             )
 
             self.__logger.info(
-                "Placing missed-call callback for call_uuid={} customer={} "
-                "agent_id={} via did={}".format(
-                    call_uuid, customer_number, resolved_agent_id, did_number
-                )
+                f"Placing missed-call callback for call_uuid={call_uuid} customer={customer_number} "
+                f"agent_id={resolved_agent_id} via did={did_number}"
             )
 
             call_response = await self.initiate_call(
@@ -675,16 +613,32 @@ class TalkoCallService:
             # _pre_create_session above), never the plain TalkoCDR document, so the
             # link back to the missed call has to be stamped on afterwards.
             if call_response and call_response.id:
-                await self.__repository.update_cdr(
-                    call_response.id, {"callback_for_call_uuid": call_uuid}
-                )
+                await self.__repository.update_cdr(call_response.id, {"callback_for_call_uuid": call_uuid})
 
         except Exception as e:
-            self.__logger.error(
-                "Missed-call callback failed for call_uuid={}: {}".format(
-                    call_uuid, str(e)
-                )
+            self.__logger.error(f"Missed-call callback failed for call_uuid={call_uuid}: {str(e)}")
+
+    def _resolve_vendor_config_id(self, partner_config: dict[str, Any], enable_ai_bridge: bool, partner_id: int) -> str:
+        """Resolve vendor_config_id the same way initiate_call does.
+
+        AI-bridge calls prefer the partner's ai_vendor_config_id and fall back
+        to the legacy AI_BRIDGE_VENDOR_CONFIG_ID only when the partner has
+        none configured (logged loudly so missing config gets fixed instead
+        of silently working by accident).
+        """
+        vendor_config_id: str | None = (
+            partner_config.get("ai_vendor_config_id") if enable_ai_bridge else None
+        ) or partner_config.get("vendor_config_id")
+        if not vendor_config_id and enable_ai_bridge:
+            self.__logger.warning(
+                f"Partner {partner_id} has no ai_vendor_config_id — falling back to legacy "
+                "AI_BRIDGE_VENDOR_CONFIG_ID. Set ai_vendor_config_id on the "
+                "partner config."
             )
+            vendor_config_id = AI_BRIDGE_VENDOR_CONFIG_ID
+        if not vendor_config_id:
+            raise TalkoResourceNotFound("No vendor_config_id assigned to partner.")
+        return vendor_config_id
 
     async def transfer_call(
         self,
@@ -692,7 +646,7 @@ class TalkoCallService:
         destination_number: str,
         partner_id: int,
         enable_ai_bridge: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Transfer an in-progress call to another number via the partner's vendor.
 
@@ -700,12 +654,8 @@ class TalkoCallService:
         an internal call record). vendor_id is resolved from the authenticated
         partner, same as initiate_call. enable_ai_bridge must be supplied by the
         caller (mirroring initiate_call) since this call intentionally avoids
-        looking up any stored call state.
-
-        TEMPORARY: when enable_ai_bridge is True, vendor_config_id is hardcoded to
-        AI_BRIDGE_VENDOR_CONFIG_ID rather than read from partner_config, since
-        ai_vendor_config_id isn't reliably populated per-partner yet. Remove this
-        override once that config is set for all partners.
+        looking up any stored call state. vendor_config_id resolves from the
+        partner config (ai_vendor_config_id for AI-bridge calls).
 
         Args:
             call_id (str): Vendor's identifier for the in-progress call.
@@ -723,45 +673,25 @@ class TalkoCallService:
             ValueError: For vendor errors.
         """
         try:
-            self.__logger.info(
-                "Transfer call service started for partner_id {} call_id {}".format(
-                    partner_id, call_id
-                )
-            )
+            self.__logger.info(f"Transfer call service started for partner_id {partner_id} call_id {call_id}")
 
-            partner_config: dict[str, Any] = await self.__helper.get_partner_config(
-                partner_id
-            )
+            partner_config: dict[str, Any] = await self.__helper.get_partner_config(partner_id)
 
-            vendor_id: Optional[str] = partner_config.get("vendor_id")
+            vendor_id: str | None = partner_config.get("vendor_id")
             if not vendor_id:
                 raise TalkoResourceNotFound(NO_VENDOR_ID_ASSIGNED_TO_PARTNER)
 
-            vendor_config_id: Optional[str] = (
-                AI_BRIDGE_VENDOR_CONFIG_ID
-                # if enable_ai_bridge
-                # else partner_config.get("vendor_config_id")
-            )
-            if not vendor_config_id:
-                raise TalkoResourceNotFound("No vendor_config_id assigned to partner.")
+            vendor_config_id = self._resolve_vendor_config_id(partner_config, enable_ai_bridge, partner_id)
 
-            vendor_handler: Any = await self.__helper.get_vendor_handler(
-                vendor_id, vendor_config_id
-            )
+            vendor_handler: Any = await self.__helper.get_vendor_handler(vendor_id, vendor_config_id)
 
-            vendor_response: Dict[str, Any] = await vendor_handler.transfer_call(
-                call_id, destination_number
-            )
+            vendor_response: dict[str, Any] = await vendor_handler.transfer_call(call_id, destination_number)
 
-            self.__logger.info(
-                "Call transfer completed for call_id {}: {}".format(
-                    call_id, vendor_response
-                )
-            )
+            self.__logger.info(f"Call transfer completed for call_id {call_id}: {vendor_response}")
             return vendor_response
 
         except Exception as e:
-            self.__logger.error("Unexpected error in transfer_call: {}".format(str(e)))
+            self.__logger.error(f"Unexpected error in transfer_call: {str(e)}")
             raise
 
     # ── NEW: background pre-session creation ─────────────────────────────────
@@ -770,12 +700,12 @@ class TalkoCallService:
         self,
         to_number: str,
         vendor_config_id: str,
-        context_data: Dict[str, Any],
+        context_data: dict[str, Any],
         caller_did: str,
         caller_phone: str,
-        fallback_payload: Dict[str, Any],
+        fallback_payload: dict[str, Any],
         fallback_store_key: str,
-        call_id: Optional[str] = None,
+        call_id: str | None = None,
     ) -> None:
         """
         Background task: POST to makun-ai /voice/sessions while Tata dials
@@ -818,31 +748,21 @@ class TalkoCallService:
             # normal on-demand _attach_pending_context path.
             if (context_data or {}).get(VOICEAI_AGENT_ID_KEY):
                 self.__logger.info(
-                    "[PreSession] voiceai-routed call to_number={} agent={} — "
-                    "skipping makun-ai pre-session, storing pending context".format(
-                        to_number, context_data.get(VOICEAI_AGENT_ID_KEY)
-                    )
+                    f"[PreSession] voiceai-routed call to_number={to_number} agent={context_data.get(VOICEAI_AGENT_ID_KEY)} — "
+                    "skipping makun-ai pre-session, storing pending context"
                 )
-                await self._store_fallback_context(
-                    fallback_store_key, fallback_payload, to_number
-                )
+                await self._store_fallback_context(fallback_store_key, fallback_payload, to_number)
                 return
 
             # ── Step 1: Resolve agent_id from DID ────────────────────────────
             # Exact same logic as TalkoPSTNBridgeService._resolve_did()
             try:
-                did_record = await self.__did_repository.get_did_by_number(
-                    call_to_number=caller_did, partner_id=None
-                )
+                did_record = await self.__did_repository.get_did_by_number(call_to_number=caller_did, partner_id=None)
             except Exception as e:
-                raise ValueError(
-                    "DID DB fetch failed caller_did={}: {}".format(caller_did, e)
-                )
+                raise ValueError(f"DID DB fetch failed caller_did={caller_did}: {e}")
 
             if not did_record or not did_record.get("is_active", True):
-                raise ValueError(
-                    "No active DID record for caller_did={}".format(caller_did)
-                )
+                raise ValueError(f"No active DID record for caller_did={caller_did}")
 
             did_type: str = did_record.get("did_type", TalkoDIDType.NORMAL.value)
             if did_type == TalkoDIDType.AI_AGENT.value:
@@ -851,11 +771,7 @@ class TalkoCallService:
                 agent_id = did_record.get("agent_id")
 
             if not agent_id:
-                raise ValueError(
-                    "agent_id missing on DID {} did_type={}".format(
-                        caller_did, did_type
-                    )
-                )
+                raise ValueError(f"agent_id missing on DID {caller_did} did_type={did_type}")
 
             # The DID's own assigned partner — NOT necessarily the caller's
             # partner_id. makun-ai scopes agent_id lookups to the DID's
@@ -863,15 +779,13 @@ class TalkoCallService:
             # (partner_id = did_record["partner_id"]). Using the caller's
             # partner_id here would 404 whenever a partner is (validly) using
             # a DID assigned to a different partner.
-            did_partner_id: Optional[int] = did_record.get("partner_id")
+            did_partner_id: int | None = did_record.get("partner_id")
             if not did_partner_id:
-                raise ValueError("partner_id missing on DID {}".format(caller_did))
+                raise ValueError(f"partner_id missing on DID {caller_did}")
 
             self.__logger.info(
-                "[PreSession] DID resolved caller_did={} agent_id={} did_type={} "
-                "did_partner_id={}".format(
-                    caller_did, agent_id, did_type, did_partner_id
-                )
+                f"[PreSession] DID resolved caller_did={caller_did} agent_id={agent_id} did_type={did_type} "
+                f"did_partner_id={did_partner_id}"
             )
 
             # ── Step 2: Resolve partner API key (same cache as TalkoPSTNBridgeService) ──
@@ -889,25 +803,15 @@ class TalkoCallService:
             api_key_cache_key = API_KEY_CACHE_KEY.format(partner_id=did_partner_id)
             raw_key = await redis.get(api_key_cache_key)
             if raw_key:
-                api_key = (
-                    raw_key.decode("utf-8") if isinstance(raw_key, bytes) else raw_key
-                )
-                self.__logger.debug(
-                    "[PreSession] API key cache HIT partner_id={}".format(
-                        did_partner_id
-                    )
-                )
+                api_key = raw_key.decode("utf-8") if isinstance(raw_key, bytes) else raw_key
+                self.__logger.debug(f"[PreSession] API key cache HIT partner_id={did_partner_id}")
             else:
-                self.__logger.debug(
-                    "[PreSession] API key cache MISS fetching via gRPC partner_id={}".format(
-                        did_partner_id
-                    )
-                )
-                grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+                self.__logger.debug(f"[PreSession] API key cache MISS fetching via gRPC partner_id={did_partner_id}")
+                grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
+                if grpc_client is None:
+                    raise TalkoBadRequestError("Console API key unavailable — gRPC disabled and key not cached")
                 api_key = await grpc_client.get_partner_api_key(did_partner_id)
-                await redis.set(
-                    api_key_cache_key, api_key, ex=API_KEY_CACHE_TTL_SECONDS
-                )
+                await redis.set(api_key_cache_key, api_key, ex=API_KEY_CACHE_TTL_SECONDS)
 
             # Only a genuine passed-in call_id is used here — no live_calls
             # polling in this path anymore. The real vendor call_id is now
@@ -916,9 +820,7 @@ class TalkoCallService:
             # pstn/services.py Step 6, merged into context_data by the
             # makun-ai worker), so this session POST just proceeds without it
             # when absent — no regression, that fallback always still runs.
-            resolved_call_id: Optional[str] = (
-                call_id if (call_id and call_id != "None") else None
-            )
+            resolved_call_id: str | None = call_id if (call_id and call_id != "None") else None
 
             # ── Step 3: POST to makun-ai /voice/sessions ──────────────────────
             # AI bridge calls have no Tata call_id — use to_number as session_id
@@ -928,7 +830,7 @@ class TalkoCallService:
             # absent, the real vendor call_id gets backfilled over the
             # LiveKit data channel once resolved (pstn/services.py Step 6),
             # which the makun-ai worker merges in at that point.
-            session_context_data: Dict[str, Any] = dict(context_data or {})
+            session_context_data: dict[str, Any] = dict(context_data or {})
             if resolved_call_id:
                 session_context_data["call_id"] = resolved_call_id
 
@@ -944,15 +846,11 @@ class TalkoCallService:
             }
 
             self.__logger.info(
-                "[PreSession] POST {} to_number={} agent_id={}".format(
-                    TalkoENV.MAKUNAI_SESSION_URL, to_number, agent_id
-                )
+                f"[PreSession] POST {TalkoENV.MAKUNAI_SESSION_URL} to_number={to_number} agent_id={agent_id}"
             )
 
             async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.post(
-                    TalkoENV.MAKUNAI_SESSION_URL, headers=headers, json=payload
-                )
+                resp = await client.post(TalkoENV.MAKUNAI_SESSION_URL, headers=headers, json=payload)
                 resp.raise_for_status()
 
             data = resp.json().get("data", {})
@@ -962,9 +860,7 @@ class TalkoCallService:
             greeting_audio = data.get("greeting_audio")
 
             if not room_name or not caller_token or not livekit_url:
-                raise ValueError(
-                    "makun-ai response missing room fields: {}".format(data)
-                )
+                raise ValueError(f"makun-ai response missing room fields: {data}")
 
             # ── Step 4: Store room in Redis keyed by to_number ────────────────
             # context_data (carrying cdr_id) was previously dropped here —
@@ -973,7 +869,7 @@ class TalkoCallService:
             # never had a way to populate ctx.context_data at all, only the
             # on-demand fallback path (_attach_pending_context) did. Without
             # it, _backfill_real_vendor_call_id has no cdr_id to update.
-            room_payload: Dict[str, Any] = {
+            room_payload: dict[str, Any] = {
                 "room_name": room_name,
                 "caller_token": caller_token,
                 "livekit_url": livekit_url,
@@ -987,49 +883,37 @@ class TalkoCallService:
 
             elapsed = (time.perf_counter() - t0) * 1000
             self.__logger.info(
-                "[PreSession] ✅ Room stored to_number={} room={} agent_id={} elapsed={:.0f}ms".format(
-                    to_number, room_name, agent_id, elapsed
-                )
+                f"[PreSession] ✅ Room stored to_number={to_number} room={room_name} agent_id={agent_id} elapsed={elapsed:.0f}ms"
             )
 
         except httpx.TimeoutException:
             elapsed = (time.perf_counter() - t0) * 1000
             self.__logger.warning(
-                "[PreSession] ⏱️ Timeout to_number={} elapsed={:.0f}ms "
-                "— falling back to pending_context".format(to_number, elapsed)
+                f"[PreSession] ⏱️ Timeout to_number={to_number} elapsed={elapsed:.0f}ms "
+                "— falling back to pending_context"
             )
-            await self._store_fallback_context(
-                fallback_store_key, fallback_payload, to_number
-            )
+            await self._store_fallback_context(fallback_store_key, fallback_payload, to_number)
 
         except httpx.HTTPStatusError as e:
             elapsed = (time.perf_counter() - t0) * 1000
             self.__logger.warning(
-                "[PreSession] ❌ HTTP {} to_number={} elapsed={:.0f}ms "
-                "— falling back to pending_context".format(
-                    e.response.status_code, to_number, elapsed
-                )
+                f"[PreSession] ❌ HTTP {e.response.status_code} to_number={to_number} elapsed={elapsed:.0f}ms "
+                "— falling back to pending_context"
             )
-            await self._store_fallback_context(
-                fallback_store_key, fallback_payload, to_number
-            )
+            await self._store_fallback_context(fallback_store_key, fallback_payload, to_number)
 
         except Exception as e:
             elapsed = (time.perf_counter() - t0) * 1000
             self.__logger.error(
-                "[PreSession] ❌ Unexpected error to_number={} "
-                "elapsed={:.0f}ms error={} traceback={}".format(
-                    to_number, elapsed, e, traceback.format_exc()
-                )
+                f"[PreSession] ❌ Unexpected error to_number={to_number} "
+                f"elapsed={elapsed:.0f}ms error={e} traceback={traceback.format_exc()}"
             )
-            await self._store_fallback_context(
-                fallback_store_key, fallback_payload, to_number
-            )
+            await self._store_fallback_context(fallback_store_key, fallback_payload, to_number)
 
     async def _store_fallback_context(
         self,
         store_key: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         to_number: str,
     ) -> None:
         """
@@ -1046,22 +930,15 @@ class TalkoCallService:
                 store_key=store_key,
                 created_at=payload.get("created_at"),
             )
-            self.__logger.info(
-                "[PreSession] Fallback context stored store_key={} to_number={}".format(
-                    store_key, to_number
-                )
-            )
+            self.__logger.info(f"[PreSession] Fallback context stored store_key={store_key} to_number={to_number}")
         except Exception as e:
             self.__logger.error(
-                "[PreSession] ❌ Fallback context store FAILED store_key={} "
-                "to_number={} error={}".format(store_key, to_number, e)
+                f"[PreSession] ❌ Fallback context store FAILED store_key={store_key} to_number={to_number} error={e}"
             )
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    def get_webhook_handler(
-        self, vendor: str, type: str = "standard"
-    ) -> TalkoWebhookHandler:
+    def get_webhook_handler(self, vendor: str, type: str = "standard") -> TalkoWebhookHandler:
         """
         Orchestrates a call initiation process by:
         - Validating and fetching partner and vendor configurations.
@@ -1083,10 +960,7 @@ class TalkoCallService:
             Exception: For unexpected failures.
         """
         try:
-            if (
-                vendor in [TalkoVendorType.TATA_TELE.value, TalkoVendorType.ACEFHONE.value]
-                and type == "standard"
-            ):
+            if vendor in [TalkoVendorType.TATA_TELE.value, TalkoVendorType.ACEFHONE.value] and type == "standard":
                 return TalkoTataTeleWebhookHandler(
                     self.__logger,
                     self.__repository,
@@ -1094,10 +968,7 @@ class TalkoCallService:
                     call_redis_helper=self.__redis_helper,
                 )
 
-            if (
-                vendor in [TalkoVendorType.TATA_TELE.value, TalkoVendorType.ACEFHONE.value]
-                and type == "dialer"
-            ):
+            if vendor in [TalkoVendorType.TATA_TELE.value, TalkoVendorType.ACEFHONE.value] and type == "dialer":
                 return TalkoDialerWebhookHandler(
                     self.__logger,
                     self.__repository,
@@ -1105,11 +976,9 @@ class TalkoCallService:
                     vendor,
                 )
 
-            raise ValueError("Unsupported vendor_id: {}".format(vendor))
+            raise ValueError(f"Unsupported vendor_id: {vendor}")
         except Exception as e:
-            self.__logger.error(
-                "Unexcpected error in get webhook handler: {}".format(str(e))
-            )
+            self.__logger.error(f"Unexcpected error in get webhook handler: {str(e)}")
             raise
 
     async def generate_dialplan_response(self, request) -> list:
@@ -1120,19 +989,13 @@ class TalkoCallService:
             call_to_number = request_data.get("call_to_number")
 
             self.__logger.debug(
-                "Processing dialplan for caller_id_number: {}, call_to_number: {}".format(
-                    caller_id_number, call_to_number
-                )
+                f"Processing dialplan for caller_id_number: {caller_id_number}, call_to_number: {call_to_number}"
             )
 
-            cdr = await self.__repository.find_cdr_by_numbers(
-                caller_id_number, call_to_number
-            )
+            cdr = await self.__repository.find_cdr_by_numbers(caller_id_number, call_to_number)
 
             if cdr:
-                response, event_metadata = await self._handle_existing_cdr_flow(
-                    request_data, cdr
-                )
+                response, event_metadata = await self._handle_existing_cdr_flow(request_data, cdr)
             else:
                 response, event_metadata = await self._handle_no_cdr_flow(
                     request_data, caller_id_number, call_to_number
@@ -1145,32 +1008,22 @@ class TalkoCallService:
             # websocket can never delay the dialplan response back to Tata Tele.
             if event_metadata:
                 asyncio.create_task(
-                    self.__inbound_call_event_publisher.publish_inbound_call(
-                        **event_metadata
-                    ),
+                    self.__inbound_call_event_publisher.publish_inbound_call(**event_metadata),
                     name="inbound_call_event_publish",
                 )
 
             return response
 
         except Exception as e:
-            self.__logger.error(
-                "Error in generate_dialplan_response: {}".format(str(e))
-            )
+            self.__logger.error(f"Error in generate_dialplan_response: {str(e)}")
             return self.__response_builder.build_empty_response()
 
-    async def _handle_existing_cdr_flow(
-        self, request_data, cdr
-    ) -> Tuple[list, Dict[str, Any]]:
+    async def _handle_existing_cdr_flow(self, request_data, cdr) -> tuple[list, dict[str, Any]]:
         """Handle dialplan generation when TalkoCDR exists"""
-        self.__logger.debug(
-            "TalkoCDR found dialplan: {}: request data: {}".format(cdr, request_data)
-        )
+        self.__logger.debug(f"TalkoCDR found dialplan: {cdr}: request data: {request_data}")
 
         dedicated_did = request_data.get("call_to_number")
-        did_record = await self.__did_management_service.get_dids_by_number(
-            dedicated_did
-        )
+        did_record = await self.__did_management_service.get_dids_by_number(dedicated_did)
 
         # For AI-agent DIDs, prefer the DID's current bot assignment over the
         # TalkoCDR's, since the number may have been reassigned to a different bot
@@ -1184,15 +1037,10 @@ class TalkoCallService:
             if live_agent_id:
                 current_agent_id = live_agent_id
 
-        partner_config = (
-            await self.__partner_config_repo.find_partner_config_by_partner_id(
-                cdr["partner_id"]
-            )
-        )
+        partner_config = await self.__partner_config_repo.find_partner_config_by_partner_id(cdr["partner_id"])
         reassign_inactive_agent = self._should_reassign_inactive_agent(partner_config)
         self.__logger.debug(
-            "Existing-TalkoCDR flow: inactive-agent reassignment enabled: {} "
-            "for partner_id: {}, agent_id: {}".format(
+            "Existing-TalkoCDR flow: inactive-agent reassignment enabled: {} for partner_id: {}, agent_id: {}".format(
                 reassign_inactive_agent, cdr.get("partner_id"), current_agent_id
             )
         )
@@ -1206,7 +1054,7 @@ class TalkoCallService:
             customer_number=request_data.get("caller_id_number"),
         )
 
-        self.__logger.debug("Dialplan target resolved: {}".format(target))
+        self.__logger.debug(f"Dialplan target resolved: {target}")
 
         # Reflect a possible reassignment so the TalkoCDR and event metadata
         # record the agent actually being dialed, not the stale owner.
@@ -1222,9 +1070,7 @@ class TalkoCallService:
             "customer_number": request_data.get("caller_id_number"),
         }
 
-        inbound_type_str, cloud_agent_number = (
-            self.__dialplan_resolver.map_transfer_to_inbound_fields(target)
-        )
+        inbound_type_str, cloud_agent_number = self.__dialplan_resolver.map_transfer_to_inbound_fields(target)
 
         # Priority 1: whatever lead_id/entity_id the previous TalkoCDR already had
         # on record. Priority 2: if a reassignment happened this call and
@@ -1272,44 +1118,28 @@ class TalkoCallService:
 
     async def _handle_no_cdr_flow(
         self, request_data, caller_id_number, call_to_number
-    ) -> Tuple[list, Optional[Dict[str, Any]]]:
+    ) -> tuple[list, dict[str, Any] | None]:
         """Handle dialplan generation when no TalkoCDR exists"""
         self.__logger.info("No TalkoCDR found, proceeding with lead handling flow")
 
-        did_record = await self.__did_management_service.get_dids_by_number(
-            call_to_number
-        )
+        did_record = await self.__did_management_service.get_dids_by_number(call_to_number)
 
         if not did_record or not did_record.get("workspace_id"):
-            self.__logger.warning(
-                "No DID record or workspace_id found for number: {}".format(
-                    call_to_number
-                )
-            )
+            self.__logger.warning(f"No DID record or workspace_id found for number: {call_to_number}")
             return self.__response_builder.build_empty_response(), None
 
-        self.__logger.debug("DID record found: {}".format(did_record))
+        self.__logger.debug(f"DID record found: {did_record}")
 
-        partner_config = (
-            await self.__partner_config_repo.find_partner_config_by_partner_id(
-                did_record["partner_id"]
-            )
-        )
+        partner_config = await self.__partner_config_repo.find_partner_config_by_partner_id(did_record["partner_id"])
 
         self.__logger.debug(
-            "Partner config loaded for partner_id {}: {}".format(
-                did_record["partner_id"], partner_config
-            )
+            "Partner config loaded for partner_id {}: {}".format(did_record["partner_id"], partner_config)
         )
 
         create_lead = self._should_create_lead(partner_config)
         reassign_inactive_agent = self._should_reassign_inactive_agent(partner_config)
-        enable_inbound_round_robin = self._should_use_inbound_round_robin(
-            partner_config
-        )
-        inbound_round_robin_index = (partner_config or {}).get(
-            "inbound_round_robin_index", 0
-        ) or 0
+        enable_inbound_round_robin = self._should_use_inbound_round_robin(partner_config)
+        inbound_round_robin_index = (partner_config or {}).get("inbound_round_robin_index", 0) or 0
 
         self.__logger.debug(
             "Lead creation enabled: {}, inactive-agent reassignment enabled: {}, "
@@ -1335,7 +1165,7 @@ class TalkoCallService:
             inbound_round_robin_index=inbound_round_robin_index,
         )
 
-        self.__logger.debug("Dialplan resolved for no TalkoCDR flow: {}".format(result))
+        self.__logger.debug(f"Dialplan resolved for no TalkoCDR flow: {result}")
 
         target = result["target"]
 
@@ -1353,17 +1183,13 @@ class TalkoCallService:
             "dedicated_did": call_to_number,
             "agent_id": result.get("agent_id"),
             "agent_ids": [
-                agent["agent_id"]
-                for agent in (result.get("agent_ids") or [])
-                if agent.get("agent_id") is not None
+                agent["agent_id"] for agent in (result.get("agent_ids") or []) if agent.get("agent_id") is not None
             ],
             "display_name": did_record.get("display_name"),
             "customer_number": caller_id_number,
         }
 
-        inbound_type_str, cloud_agent_number = (
-            self.__dialplan_resolver.map_transfer_to_inbound_fields(target)
-        )
+        inbound_type_str, cloud_agent_number = self.__dialplan_resolver.map_transfer_to_inbound_fields(target)
 
         entity_type, entity_id, entity_name = self._derive_inbound_entity_fields(
             entity_type=result.get("entity_type"),
@@ -1387,11 +1213,7 @@ class TalkoCallService:
             entity_id=entity_id,
             entity_name=entity_name,
             vendor_id=str(result["vendor_id"]) if result.get("vendor_id") else None,
-            vendor_config_id=(
-                str(result["vendor_config_id"])
-                if result.get("vendor_config_id")
-                else None
-            ),
+            vendor_config_id=(str(result["vendor_config_id"]) if result.get("vendor_config_id") else None),
             inbound_type_str=inbound_type_str,
             cloud_agent_number=cloud_agent_number,
         )
@@ -1436,12 +1258,10 @@ class TalkoCallService:
         cloud_agent_number,
     ):
         """Create TalkoCDR only if target is valid"""
-        self.__logger.debug("Evaluating TalkoCDR creation for target: {}".format(target))
+        self.__logger.debug(f"Evaluating TalkoCDR creation for target: {target}")
         should_create_cdr = bool(target and target.data)
 
-        self.__logger.debug(
-            "Should create TalkoCDR: {} for target: {}".format(should_create_cdr, target)
-        )
+        self.__logger.debug(f"Should create TalkoCDR: {should_create_cdr} for target: {target}")
 
         if should_create_cdr:
             await self.__helper.create_incoming_cdr(
@@ -1466,10 +1286,10 @@ class TalkoCallService:
 
     async def get_call_details(
         self,
-        call_id: Optional[str],
+        call_id: str | None,
         vendor_config_id: str,
-        call_uuid: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        call_uuid: str | None = None,
+    ) -> dict[str, Any]:
         """
         Fetch call details using call_id and vendor_config_id.
 
@@ -1480,17 +1300,11 @@ class TalkoCallService:
         """
         try:
             self.__logger.info(
-                "get_call_details called - call_id: {}, call_uuid: {}, vendor_config_id: {}".format(
-                    call_id, call_uuid, vendor_config_id
-                )
+                f"get_call_details called - call_id: {call_id}, call_uuid: {call_uuid}, vendor_config_id: {vendor_config_id}"
             )
 
             if call_id is None and call_uuid is None:
-                raise TalkoBadRequestError(
-                    "{} is required".format(
-                        "call_id" if call_uuid is None else "call_uuid"
-                    )
-                )
+                raise TalkoBadRequestError("{} is required".format("call_id" if call_uuid is None else "call_uuid"))
 
             if not vendor_config_id:
                 raise TalkoBadRequestError("vendor_config_id is required")
@@ -1498,45 +1312,29 @@ class TalkoCallService:
             try:
                 config_oid = ObjectId(vendor_config_id)
             except InvalidId:
-                raise TalkoBadRequestError(
-                    "Invalid vendor_config_id format: {}".format(vendor_config_id)
-                )
+                raise TalkoBadRequestError(f"Invalid vendor_config_id format: {vendor_config_id}")
 
             # Fetch vendor config using vendor_config_id
-            vendor_config: Optional[Dict[str, Any]] = (
-                await self.__vendor_config_repository.find_config_by_id(config_oid)
-            )
+            vendor_config: dict[str, Any] | None = await self.__vendor_config_repository.find_config_by_id(config_oid)
 
             if not vendor_config:
-                self.__logger.error(
-                    "Vendor config not found for id: {}".format(vendor_config_id)
-                )
-                raise TalkoResourceNotFound(
-                    "Vendor configuration not found for id: {}".format(vendor_config_id)
-                )
+                self.__logger.error(f"Vendor config not found for id: {vendor_config_id}")
+                raise TalkoResourceNotFound(f"Vendor configuration not found for id: {vendor_config_id}")
 
-            self.__logger.debug(
-                "In get call details - Vendor config fetched: {}".format(vendor_config)
-            )
+            self.__logger.debug(f"In get call details - Vendor config fetched: {vendor_config}")
 
-            self.__logger.debug(
-                "Vendor config fetched: {}".format(vendor_config.get("vendor_type"))
-            )
+            self.__logger.debug("Vendor config fetched: {}".format(vendor_config.get("vendor_type")))
 
             # Delegate to TalkoVendorCDRGateway (this makes it extensible)
-            result: Dict[str, Any] = await self.__vendor_cdr_gateway.fetch_call_details(
+            result: dict[str, Any] = await self.__vendor_cdr_gateway.fetch_call_details(
                 call_id=call_id,
                 call_uuid=call_uuid,
                 vendor_config=vendor_config,
             )
 
-            self.__logger.debug("Call details fetched: {}".format(result))
+            self.__logger.debug(f"Call details fetched: {result}")
 
-            self.__logger.info(
-                "Successfully fetched call details for call_id: {}, call_uuid: {}".format(
-                    call_id, call_uuid
-                )
-            )
+            self.__logger.info(f"Successfully fetched call details for call_id: {call_id}, call_uuid: {call_uuid}")
 
             response = await self.__cdr_repository.find_one_cdr_by_identifier(
                 call_id=call_id,
@@ -1561,28 +1359,22 @@ class TalkoCallService:
             # If do_recording_url is derived from path_for_recording, do:
             # await self.get_url_from_path(cdr)
 
-            return cdr_contract.CallRecordHistoryResponse(
-                **formatted_response
-            ).model_dump()
+            return cdr_contract.CallRecordHistoryResponse(**formatted_response).model_dump()
 
         except TalkoBadRequestError as e:
-            self.__logger.error("BadRequest in get_call_details: {}".format(str(e)))
+            self.__logger.error(f"BadRequest in get_call_details: {str(e)}")
             raise
         except TalkoResourceNotFound as e:
-            self.__logger.error(
-                "TalkoResourceNotFound in get_call_details: {}".format(str(e))
-            )
+            self.__logger.error(f"TalkoResourceNotFound in get_call_details: {str(e)}")
             raise
         except Exception as e:
-            self.__logger.error(
-                "Unexpected error in get_call_details: {}".format(str(e))
-            )
+            self.__logger.error(f"Unexpected error in get_call_details: {str(e)}")
             raise
 
     async def hangup_call(
         self,
         call_id: str,
-        user_id: Optional[int],
+        user_id: int | None,
         partner_id: int,
         enable_ai_bridge: bool = False,
     ) -> call_contract.HangupCallResponse:
@@ -1595,11 +1387,6 @@ class TalkoCallService:
         works even if the TalkoCDR write for the call hasn't landed yet. For the same
         reason, enable_ai_bridge must be supplied by the caller to pick the AI
         vendor_config instead of the partner's default.
-
-        TEMPORARY: when enable_ai_bridge is True, vendor_config_id is hardcoded to
-        AI_BRIDGE_VENDOR_CONFIG_ID rather than read from partner_config, since
-        ai_vendor_config_id isn't reliably populated per-partner yet. Remove this
-        override once that config is set for all partners.
 
         Args:
             call_id: Vendor's identifier for the call to hang up.
@@ -1615,57 +1402,64 @@ class TalkoCallService:
             ValueError: For vendor errors (missing config, unexpected response, etc).
         """
         try:
-            self.__logger.info(
-                "Hangup call requested by user {} (partner {}) for call_id: {}".format(
-                    user_id, partner_id, call_id
-                )
-            )
+            self.__logger.info(f"Hangup call requested by user {user_id} (partner {partner_id}) for call_id: {call_id}")
 
-            partner_config: dict[str, Any] = await self.__helper.get_partner_config(
-                partner_id
-            )
+            partner_config: dict[str, Any] = await self.__helper.get_partner_config(partner_id)
 
-            vendor_id: Optional[str] = partner_config.get("vendor_id")
+            vendor_id: str | None = partner_config.get("vendor_id")
             if not vendor_id:
                 raise TalkoResourceNotFound(NO_VENDOR_ID_ASSIGNED_TO_PARTNER)
 
-            vendor_config_id: Optional[str] = (
-                AI_BRIDGE_VENDOR_CONFIG_ID
-                # if enable_ai_bridge
-                # else partner_config.get("vendor_config_id")
-            )
-            if not vendor_config_id:
-                raise TalkoResourceNotFound("No vendor_config_id assigned to partner.")
+            vendor_config_id = self._resolve_vendor_config_id(partner_config, enable_ai_bridge, partner_id)
 
-            vendor_handler: Any = await self.__helper.get_vendor_handler(
-                vendor_id, vendor_config_id
-            )
+            vendor_handler: Any = await self.__helper.get_vendor_handler(vendor_id, vendor_config_id)
 
             vendor_response: dict[str, Any] = await vendor_handler.hangup_call(call_id)
 
-            self.__logger.info(
-                "Hangup call response for call_id {}: {}".format(
-                    call_id, vendor_response
-                )
-            )
+            self.__logger.info(f"Hangup call response for call_id {call_id}: {vendor_response}")
+            if self.__channel_pool_service is not None:
+                try:
+                    await self.__channel_pool_service.release(vendor_config_id)
+                except Exception as pool_e:
+                    self.__logger.error(f"Channel pool release failed (non-fatal): {str(pool_e)}")
 
             return call_contract.HangupCallResponse(
-                success=bool(
-                    vendor_response.get(
-                        "Success", vendor_response.get("success", False)
-                    )
-                ),
-                message=vendor_response.get(
-                    "Message", vendor_response.get("message", CALL_HANGUP_INITIATED)
-                ),
+                success=bool(vendor_response.get("Success", vendor_response.get("success", False))),
+                message=vendor_response.get("Message", vendor_response.get("message", CALL_HANGUP_INITIATED)),
             )
 
         except TalkoResourceNotFound as e:
-            self.__logger.error("TalkoResourceNotFound in hangup_call: {}".format(str(e)))
+            self.__logger.error(f"TalkoResourceNotFound in hangup_call: {str(e)}")
             raise
         except ValueError as e:
-            self.__logger.error("Vendor error in hangup_call: {}".format(str(e)))
+            self.__logger.error(f"Vendor error in hangup_call: {str(e)}")
             raise
         except Exception as e:
-            self.__logger.error("Unexpected error in hangup_call: {}".format(str(e)))
+            self.__logger.error(f"Unexpected error in hangup_call: {str(e)}")
             raise
+
+    # ── gRPC telephony control plane (Phase 4, dormant) ────────────────────
+    # Implemented in grpc_control_service.py; thin delegates below preserve
+    # the TalkoCallService API (controllers/tests unchanged).
+
+    def _grpc_control(self):  # lazy to avoid import cycles at module load
+        from src.components.call_management.grpc_control_service import TalkoGrpcControlService
+
+        return TalkoGrpcControlService(
+            logger=self.__logger,
+            telephony_client=self.__telephony_client,
+            telephony_bridge=self.__telephony_bridge,
+            channel_pool_service=self.__channel_pool_service,
+        )
+
+    def _require_telephony(self) -> Any:
+        return self._grpc_control()._require_telephony()
+
+    async def grpc_hangup_call(self, call_id: str, vendor_config_id: str) -> call_contract.HangupCallResponse:
+        return await self._grpc_control().grpc_hangup_call(call_id, vendor_config_id)
+
+    async def grpc_transfer_call(self, call_id: str, destination_number: str, vendor_config_id: str) -> dict[str, Any]:
+        return await self._grpc_control().grpc_transfer_call(call_id, destination_number, vendor_config_id)
+
+    async def grpc_call_status(self, call_id: str, vendor_config_id: str) -> dict[str, Any]:
+        return await self._grpc_control().grpc_call_status(call_id, vendor_config_id)

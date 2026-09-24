@@ -48,9 +48,7 @@ class TestPartnerConfigHelper:
         repository.find_partner_config_by_id.return_value = {"partner_id": 123}
         logger = MagicMock()
 
-        with pytest.raises(
-            TalkoConflictError, match="Partner config with partner_id already exists."
-        ):
+        with pytest.raises(TalkoConflictError, match="Partner config with partner_id already exists."):
             await TalkoPartnerConfigHelper.validate_and_prepare_config(
                 config, vendor_validator, partner_validator, repository, logger
             )
@@ -157,9 +155,7 @@ class TestPartnerConfigHelper:
         vendor_id = ObjectId()
         logger = MagicMock()
 
-        with pytest.raises(
-            TalkoBadRequestError, match="Round-robin cannot be enabled with workspace."
-        ):
+        with pytest.raises(TalkoBadRequestError, match="Round-robin cannot be enabled with workspace."):
             await TalkoPartnerConfigHelper.handle_did_assignment(
                 config,
                 vendor_id,
@@ -221,13 +217,9 @@ class TestPartnerConfigHelper:
         vendor_id = ObjectId()
 
         did_service = AsyncMock()
-        did_service.get_dids_by_partner_workspace_and_vendor.return_value = [
-            {"did_number": "111", "agent_id": 1}
-        ]
+        did_service.get_dids_by_partner_workspace_and_vendor.return_value = [{"did_number": "111", "agent_id": 1}]
 
-        result = await TalkoPartnerConfigHelper.update_default_attendance(
-            config, vendor_id, did_service, MagicMock()
-        )
+        result = await TalkoPartnerConfigHelper.update_default_attendance(config, vendor_id, did_service, MagicMock())
 
         assert "service_default_attendance" in result
         assert result["service_default_attendance"][101][0]["phone_number"] == "111"
@@ -243,9 +235,7 @@ class TestPartnerConfigHelper:
             {"did_number": "222", "agent_id": None},
         ]
 
-        result = await TalkoPartnerConfigHelper.update_default_attendance(
-            config, vendor_id, did_service, MagicMock()
-        )
+        result = await TalkoPartnerConfigHelper.update_default_attendance(config, vendor_id, did_service, MagicMock())
 
         assert "round_robin_default_attendance" in result
         assert len(result["round_robin_default_attendance"]["default"]) == 2
@@ -254,16 +244,10 @@ class TestPartnerConfigHelper:
         vendor_id = ObjectId()
         did_service = AsyncMock()
         config.enable_workspace = True
-        with pytest.raises(
-            TalkoBadRequestError, match="Round-robin cannot be enabled with workspace."
-        ):
-            await TalkoPartnerConfigHelper._assign_round_robin_dids(
-                config, ["d1"], vendor_id, did_service, MagicMock()
-            )
+        with pytest.raises(TalkoBadRequestError, match="Round-robin cannot be enabled with workspace."):
+            await TalkoPartnerConfigHelper._assign_round_robin_dids(config, ["d1"], vendor_id, did_service, MagicMock())
         config.enable_workspace = False
         config.enable_round_robin = True
         config.round_robin_did_count = None
         with pytest.raises(TalkoBadRequestError, match="round_robin_did_count is required"):
-            await TalkoPartnerConfigHelper._assign_round_robin_dids(
-                config, ["d1"], vendor_id, did_service, MagicMock()
-            )
+            await TalkoPartnerConfigHelper._assign_round_robin_dids(config, ["d1"], vendor_id, did_service, MagicMock())

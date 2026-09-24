@@ -20,7 +20,7 @@ class FakeRepo:
         return len(self.docs)
 
     async def insert_user(self, doc):
-        user_id = "user-{}".format(len(self.docs) + 1)
+        user_id = f"user-{len(self.docs) + 1}"
         self.docs[user_id] = {**doc, "_id": user_id}
         return user_id
 
@@ -139,9 +139,7 @@ class TestLogin:
         service = make_service()
         await service.signup(signup_payload(email="root@example.com"))
         await service.create_user(provision_payload())
-        out = await service.login(
-            TalkoContract.Login(credential="AARAV@EXAMPLE.COM", password="Str0ng!Pass")
-        )
+        out = await service.login(TalkoContract.Login(credential="AARAV@EXAMPLE.COM", password="Str0ng!Pass"))
         assert out["token"]
         assert out["token_type"] == "bearer"
 
@@ -151,9 +149,7 @@ class TestLogin:
         await service.signup(signup_payload(email="root@example.com"))
         await service.signup(signup_payload())
         with pytest.raises(TalkoInactiveUserError):
-            await service.login(
-                TalkoContract.Login(credential="aarav@example.com", password="Str0ng!Pass")
-            )
+            await service.login(TalkoContract.Login(credential="aarav@example.com", password="Str0ng!Pass"))
 
     @pytest.mark.asyncio
     async def test_wrong_password_rejected_without_hint(self):
@@ -161,13 +157,9 @@ class TestLogin:
         await service.signup(signup_payload(email="root@example.com"))
         await service.create_user(provision_payload())
         with pytest.raises(TalkoInvalidCredentialsError):
-            await service.login(
-                TalkoContract.Login(credential="aarav@example.com", password="Wr0ng!Pass")
-            )
+            await service.login(TalkoContract.Login(credential="aarav@example.com", password="Wr0ng!Pass"))
         with pytest.raises(TalkoInvalidCredentialsError):
-            await service.login(
-                TalkoContract.Login(credential="nobody@example.com", password="Str0ng!Pass")
-            )
+            await service.login(TalkoContract.Login(credential="nobody@example.com", password="Str0ng!Pass"))
 
     @pytest.mark.asyncio
     async def test_inactive_user_cannot_login(self):
@@ -176,9 +168,7 @@ class TestLogin:
         user = await service.create_user(provision_payload())
         await service.update_user(user["id"], TalkoContract.UpdateUser(is_active=False))
         with pytest.raises(TalkoInactiveUserError):
-            await service.login(
-                TalkoContract.Login(credential="aarav@example.com", password="Str0ng!Pass")
-            )
+            await service.login(TalkoContract.Login(credential="aarav@example.com", password="Str0ng!Pass"))
 
 
 class TestUserManagement:
@@ -217,18 +207,13 @@ class TestUserManagement:
         )
         assert updated["is_active"] is True
         assert updated["partner_id"] == 9
-        out = await service.login(
-            TalkoContract.Login(credential="aarav@example.com", password="Str0ng!Pass")
-        )
+        out = await service.login(TalkoContract.Login(credential="aarav@example.com", password="Str0ng!Pass"))
         assert out["token"]
 
     @pytest.mark.asyncio
     async def test_unknown_user_returns_none(self):
         service = make_service()
-        assert (
-            await service.update_user("missing", TalkoContract.UpdateUser(role="viewer"))
-            is None
-        )
+        assert await service.update_user("missing", TalkoContract.UpdateUser(role="viewer")) is None
 
     @pytest.mark.asyncio
     async def test_password_roundtrip_and_token_claims(self):
@@ -246,9 +231,7 @@ class TestUserManagement:
         assert stored["password_hash"] != "Str0ng!Pass"
         assert verify_password("Str0ng!Pass", stored["password_hash"]) is True
         assert verify_password("Wr0ng!Pass", stored["password_hash"]) is False
-        out = await service.login(
-            TalkoContract.Login(credential="aarav@example.com", password="Str0ng!Pass")
-        )
+        out = await service.login(TalkoContract.Login(credential="aarav@example.com", password="Str0ng!Pass"))
         claims = verify_talko_token(TalkoENV.TALKO_JWT_SECRET, out["token"])
         assert claims is not None
         assert claims["iss"] == "talko"

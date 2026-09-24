@@ -34,7 +34,8 @@ import hmac
 import json
 import secrets
 import time
-from typing import Any, Awaitable, Callable, Deque, Dict, Optional, Set, Tuple
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import aiohttp
 import httpx
@@ -59,10 +60,11 @@ def _mint_stream_token(agent_id: str, secret: str, ttl_s: int = _STREAM_TOKEN_TT
     if not agent_id:
         raise ValueError("agent_id is required to mint a stream token")
     expires_at = int(time.time()) + int(ttl_s)
-    payload = "{}|{}|{}".format(agent_id, expires_at, secrets.token_hex(8)).encode("utf-8")
+    payload = f"{agent_id}|{expires_at}|{secrets.token_hex(8)}".encode()
     encoded = base64.urlsafe_b64encode(payload).rstrip(b"=").decode("ascii")
     signature = hmac.new(key.encode("utf-8"), payload, hashlib.sha256).hexdigest()
-    return "{}.{}".format(encoded, signature)
+    return f"{encoded}.{signature}"
+
 
 VOICEAI_AGENT_ID_KEY = "voiceai_agent_id"
 SEND_TIMEOUT_SECONDS = 5.0
@@ -80,7 +82,7 @@ _MULAW_SILENCE = b"\xff"
 # Keep-alive HTTP clients keyed by running loop (one loop per worker
 # process for the service lifetime). Never closed explicitly; the process
 # owns them, same as the Redis pools elsewhere in the codebase.
-_pooled_http_clients: Dict[int, "httpx.AsyncClient"] = {}
+_pooled_http_clients: dict[int, "httpx.AsyncClient"] = {}
 
 
 async def _pooled_http_client(timeout_seconds: float) -> "httpx.AsyncClient":
@@ -100,6 +102,8 @@ async def _pooled_http_client(timeout_seconds: float) -> "httpx.AsyncClient":
         client = httpx.AsyncClient(timeout=timeout_seconds)
         _pooled_http_clients[key] = client
     return client
+
+
 # Outbound pacing toward Tata (relay-specific; the LiveKit path in
 # services.py uses MAX_PENDING_MARKS=8 because its audio already arrives at
 # realtime rate so the window never binds).
@@ -155,8 +159,8 @@ class TalkoVoiceaiRelay:
         logger,
         ticket_timeout_seconds: float = 10.0,
         connect_timeout_seconds: float = 15.0,
-        ticket_provider: Optional[Callable[[], Awaitable[str]]] = None,
-        ws_connector: Optional[Callable[[str], Awaitable[Any]]] = None,
+        ticket_provider: Callable[[], Awaitable[str]] | None = None,
+        ws_connector: Callable[[str], Awaitable[Any]] | None = None,
         max_pending_marks: int = RELAY_MAX_PENDING_MARKS,
         ack_wait_seconds: float = RELAY_ACK_WAIT_SECONDS,
         frame_interval_seconds: float = RELAY_FRAME_INTERVAL_SECONDS,
@@ -182,17 +186,15 @@ class TalkoVoiceaiRelay:
     # ── setup helpers ────────────────────────────────────────────────
 
     def ws_url(self, agent_id: str, ticket: str) -> str:
-        return "{}/chat/v1/{}?token={}".format(self.__ws_base_url, agent_id, ticket)
+        return f"{self.__ws_base_url}/chat/v1/{agent_id}?token={ticket}"
 
     async def __mint_ticket(self) -> str:
         # Pooled client: a fresh AsyncClient per call pays a full TCP+TLS
         # handshake to the engine (~1.4s measured) on every call. Keep-alive
         # connections amortize that to a plain request (~0.2s).
-        url = "{}/auth/ws-ticket".format(self.__api_base_url)
+        url = f"{self.__api_base_url}/auth/ws-ticket"
         client = await _pooled_http_client(self.__ticket_timeout)
-        resp = await client.post(
-            url, headers={"Authorization": "Bearer {}".format(self.__api_key)}
-        )
+        resp = await client.post(url, headers={"Authorization": f"Bearer {self.__api_key}"})
         resp.raise_for_status()
         return resp.json()["ticket"]
 
@@ -212,15 +214,13 @@ class TalkoVoiceaiRelay:
         tata_ws,
         provider: TalkoAbstractPSTNProvider,
         ctx: TalkoCallContext,
-        start_event: Dict[str, Any],
+        start_event: dict[str, Any],
         raw_events,
         voiceai_agent_id: str,
     ) -> None:
         """Bridge one call. Returns when either leg ends."""
         sid = ctx.call_sid
-        self.__logger.info(
-            "[VOICEAI][RELAY] Starting sid={} agent={}".format(sid, voiceai_agent_id)
-        )
+        self.__logger.info(f"[VOICEAI][RELAY] Starting sid={sid} agent={voiceai_agent_id}")
         # Auth: prefer a locally-minted stream token (microseconds, no I/O)
         # when the shared secret is provisioned; fall back to the single-use
         # ticket POST otherwise. The timings line exposes which path ran via
@@ -234,28 +234,26 @@ class TalkoVoiceaiRelay:
             ticket = await self.__ticket_provider()
             auth_mode = "ticket"
         t_ticket = time.monotonic()
-        self.__logger.info(
-            "[VOICEAI][RELAY] auth sid={} mode={}".format(sid, auth_mode)
-        )
+        self.__logger.info(f"[VOICEAI][RELAY] auth sid={sid} mode={auth_mode}")
         vws = await self.__ws_connector(self.ws_url(voiceai_agent_id, ticket))
         t_ws = time.monotonic()
-        self.__logger.info("[VOICEAI][RELAY] voiceai socket open sid={}".format(sid))
+        self.__logger.info(f"[VOICEAI][RELAY] voiceai socket open sid={sid}")
 
         # Mark names voiceai asked Tata to ack — written by the outbound
         # pump, read by the inbound loop to route acks back to voiceai.
         # Set add/contains are GIL-atomic; ack routing is best-effort.
-        voiceai_marks: Set[str] = set()
+        voiceai_marks: set[str] = set()
         # In-flight per-frame marks of our own (label -> ack event), in send
         # order. Bounds how far ahead of Tata's playout the pump may run —
         # without this the engine's bursts pile up in Tata's buffer and the
         # caller hears nothing (or everything minutes late).
-        pending_marks: Dict[str, asyncio.Event] = {}
+        pending_marks: dict[str, asyncio.Event] = {}
         # Wakes the pump's sender the moment an ack frees a pacing slot.
         pacing_wake = asyncio.Event()
         # Set when the Tata leg ended on its own (stop event) so the pump
         # doesn't redundantly close an already-dead Tata socket.
         tata_ended = False
-        pump_stats: Dict[str, Any] = {}
+        pump_stats: dict[str, Any] = {}
         try:
             await self.__send_voiceai(vws, json.dumps(start_event), sid)
             pump = asyncio.create_task(
@@ -270,7 +268,7 @@ class TalkoVoiceaiRelay:
                     lambda: tata_ended,
                     t_ws,
                 ),
-                name="voiceai_out_{}".format(sid),
+                name=f"voiceai_out_{sid}",
             )
             try:
                 async for raw in raw_events:
@@ -281,9 +279,7 @@ class TalkoVoiceaiRelay:
 
                     if provider.is_stop_event(event):
                         await self.__send_voiceai(vws, json.dumps(event), sid)
-                        self.__logger.info(
-                            "[VOICEAI][RELAY] Tata stop forwarded sid={}".format(sid)
-                        )
+                        self.__logger.info(f"[VOICEAI][RELAY] Tata stop forwarded sid={sid}")
                         tata_ended = True
                         break
 
@@ -336,14 +332,8 @@ class TalkoVoiceaiRelay:
             # voiceai_msgs/bytes + rms_* describe what the engine sent
             # (rms ~0 ⇒ engine sent silence); fwd_frames what Tata got.
             msgs = (pump_stats or {}).get("voiceai_msgs", 0)
-            avg_rms = (
-                (pump_stats or {}).get("rms_sum", 0) / msgs if msgs else 0
-            )
-            self.__logger.info(
-                "[VOICEAI][RELAY] Ended sid={} stats={} avg_rms={:.0f}".format(
-                    sid, pump_stats, avg_rms
-                )
-            )
+            avg_rms = (pump_stats or {}).get("rms_sum", 0) / msgs if msgs else 0
+            self.__logger.info(f"[VOICEAI][RELAY] Ended sid={sid} stats={pump_stats} avg_rms={avg_rms:.0f}")
             # Phase-0 latency spans: every number is ms since run() entry.
             # ticket/ws/first_media/first_send must sum to first audible
             # audio; any span dominating points at its owner (Talko ticket /
@@ -356,12 +346,8 @@ class TalkoVoiceaiRelay:
                     sid,
                     (t_ticket - t_run) * 1000,
                     (t_ws - t_ticket) * 1000,
-                    "{:.0f}".format(first_media)
-                    if first_media is not None
-                    else "none",
-                    "{:.0f}".format(first_send)
-                    if first_send is not None
-                    else "none",
+                    f"{first_media:.0f}" if first_media is not None else "none",
+                    f"{first_send:.0f}" if first_send is not None else "none",
                 )
             )
 
@@ -387,18 +373,18 @@ class TalkoVoiceaiRelay:
         tata_ws,
         provider: TalkoAbstractPSTNProvider,
         ctx: TalkoCallContext,
-        voiceai_marks: Set[str],
-        pending_marks: Dict[str, asyncio.Event],
+        voiceai_marks: set[str],
+        pending_marks: dict[str, asyncio.Event],
         wake: asyncio.Event,
         tata_ended: Callable[[], bool],
         t_origin: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Forward agent audio / marks / clears to Tata. Ends on WS close.
 
         Returns TEMP DEBUG audio-flow stats (see ``stats`` below), logged by
         the caller in the Ended summary.
         """
-        outbox: Deque[Tuple[Any, ...]] = collections.deque()
+        outbox: collections.deque[tuple[Any, ...]] = collections.deque()
         finished = False  # reader drained the voiceai socket (nonlocal below)
         send_failed = False
         # TEMP DEBUG (silent-reply investigation): audio flow counters + RMS
@@ -422,11 +408,7 @@ class TalkoVoiceaiRelay:
                     try:
                         data = await vws.receive_str()
                     except Exception as e:
-                        self.__logger.warning(
-                            "[VOICEAI][RELAY] voiceai recv failed sid={}: {}".format(
-                                ctx.call_sid, e
-                            )
-                        )
+                        self.__logger.warning(f"[VOICEAI][RELAY] voiceai recv failed sid={ctx.call_sid}: {e}")
                         break
                     if data is None:
                         break
@@ -435,9 +417,7 @@ class TalkoVoiceaiRelay:
                         rms = _mulaw_rms(payload)
                         stats["voiceai_msgs"] += 1
                         if stats["voiceai_msgs"] == 1:
-                            stats["first_media_ms"] = (
-                                time.monotonic() - t_origin
-                            ) * 1000
+                            stats["first_media_ms"] = (time.monotonic() - t_origin) * 1000
                         stats["voiceai_bytes"] += len(payload)
                         stats["rms_sum"] += rms
                         stats["rms_max"] = max(stats["rms_max"], rms)
@@ -500,11 +480,7 @@ class TalkoVoiceaiRelay:
                             ev.set()
                         pending_marks.clear()
                         outbox.append(("clear",))
-                        self.__logger.info(
-                            "[VOICEAI][RELAY] clear queued sid={} dropped_queued={}".format(
-                                ctx.call_sid, dropped
-                            )
-                        )
+                        self.__logger.info(f"[VOICEAI][RELAY] clear queued sid={ctx.call_sid} dropped_queued={dropped}")
                         wake.set()
             finally:
                 finished = True
@@ -537,9 +513,7 @@ class TalkoVoiceaiRelay:
                         # marks/s, so a mark per frame would flood it (see
                         # RELAY_* constants). Frame 1 is always marked.
                         if (chunk_no - 1) % self.__mark_every_n == 0:
-                            label: Optional[str] = "{}-{}".format(
-                                OWN_MARK_PREFIX.rstrip("-"), chunk_no
-                            )
+                            label: str | None = "{}-{}".format(OWN_MARK_PREFIX.rstrip("-"), chunk_no)
                             pending_marks[label] = asyncio.Event()
                         else:
                             label = None
@@ -553,57 +527,39 @@ class TalkoVoiceaiRelay:
                             )
                             stats["fwd_frames"] += 1
                             if stats["fwd_frames"] == 1:
-                                stats["first_send_ms"] = (
-                                    time.monotonic() - t_origin
-                                ) * 1000
+                                stats["first_send_ms"] = (time.monotonic() - t_origin) * 1000
                         except Exception:
                             if label is not None:
                                 pending_marks.pop(label, None)
                             raise
                     elif item[0] == "clear":
-                        await provider.send_clear(
-                            tata_ws, stream_sid=ctx.stream_sid
-                        )
-                        self.__logger.info(
-                            "[VOICEAI][RELAY] clear forwarded sid={}".format(
-                                ctx.call_sid
-                            )
-                        )
+                        await provider.send_clear(tata_ws, stream_sid=ctx.stream_sid)
+                        self.__logger.info(f"[VOICEAI][RELAY] clear forwarded sid={ctx.call_sid}")
                 if finished and not outbox:
                     break
                 try:
-                    await asyncio.wait_for(
-                        wake.wait(), timeout=self.__ack_wait_seconds
-                    )
+                    await asyncio.wait_for(wake.wait(), timeout=self.__ack_wait_seconds)
                     timed_out = False
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     timed_out = True
                 wake.clear()
-                if (
-                    timed_out
-                    and outbox
-                    and len(pending_marks) >= self.__max_pending_marks
-                ):
+                if timed_out and outbox and len(pending_marks) >= self.__max_pending_marks:
                     # Acks for wiped/lost frames never arrive — drop the
                     # oldest slot so one lost ack can't stall the call
                     # (same tradeoff as the LiveKit path in services.py).
                     oldest_label = next(iter(pending_marks))
                     if pending_marks.pop(oldest_label, None) is not None:
                         self.__logger.warning(
-                            "[VOICEAI][RELAY] Ack timeout label={} pending={} sid={}".format(
-                                oldest_label, len(pending_marks), ctx.call_sid
-                            )
+                            f"[VOICEAI][RELAY] Ack timeout label={oldest_label} pending={len(pending_marks)} sid={ctx.call_sid}"
                         )
 
-        reader_task = asyncio.create_task(reader(), name="voiceai_in_{}".format(ctx.call_sid))
+        reader_task = asyncio.create_task(reader(), name=f"voiceai_in_{ctx.call_sid}")
         try:
             await sender()
         except Exception as e:
             send_failed = True
             self.__logger.warning(
-                "[VOICEAI][RELAY] Tata send failed sid={} type={} error={!r}".format(
-                    ctx.call_sid, type(e).__name__, e
-                )
+                f"[VOICEAI][RELAY] Tata send failed sid={ctx.call_sid} type={type(e).__name__} error={e!r}"
             )
         finally:
             if not reader_task.done():
@@ -616,10 +572,7 @@ class TalkoVoiceaiRelay:
                     pass
         if not tata_ended() and not send_failed:
             # voiceai closed first (agent hangup) — end the Tata leg.
-            self.__logger.info(
-                "[VOICEAI][RELAY] voiceai socket closed sid={} — "
-                "closing Tata leg".format(ctx.call_sid)
-            )
+            self.__logger.info(f"[VOICEAI][RELAY] voiceai socket closed sid={ctx.call_sid} — closing Tata leg")
             try:
                 await tata_ws.close()
             except Exception:
@@ -641,7 +594,7 @@ class TalkoVoiceaiRelay:
             now = time.monotonic()
         self.__next_send_ts = now + self.__frame_interval
 
-    async def __wait_for_mark(self, voiceai_marks: Set[str], label: str) -> None:
+    async def __wait_for_mark(self, voiceai_marks: set[str], label: str) -> None:
         """Brief grace period for the pump to register voiceai's mark."""
         for _ in range(20):  # ~200ms total
             if label in voiceai_marks:
@@ -665,7 +618,7 @@ class _AiohttpVoiceaiSocket:
     async def send_str(self, data: str) -> None:
         await self.__ws.send_str(data)
 
-    async def receive_str(self) -> Optional[str]:
+    async def receive_str(self) -> str | None:
         """Next TEXT frame, or None when the socket closed."""
         msg = await self.__ws.receive()
         if msg.type == aiohttp.WSMsgType.TEXT:

@@ -49,7 +49,12 @@ class TestCloudinaryUpload:
         file_obj = MagicMock()
         file_obj.filename = "logo.png"
         with patch.object(
-            mod.cloudinary.uploader, "upload", return_value={"secure_url": "https://res.cloudinary.com/demo/image/upload/talko/logo.png", "public_id": "talko/logo.png"}
+            mod.cloudinary.uploader,
+            "upload",
+            return_value={
+                "secure_url": "https://res.cloudinary.com/demo/image/upload/talko/logo.png",
+                "public_id": "talko/logo.png",
+            },
         ) as mock_upload:
             url = await mgr.upload_digital_asset(file_obj, "logo.png")
         assert url.startswith("https://res.cloudinary.com/")
@@ -114,9 +119,7 @@ class TestCloudinaryUrls:
         import src.components.digital_assets.storage.managers.cloudinary_manager as mod
 
         mgr = make_manager(monkeypatch)
-        with patch.object(
-            mod.cloudinary.uploader, "destroy", return_value={"result": "not found"}
-        ):
+        with patch.object(mod.cloudinary.uploader, "destroy", return_value={"result": "not found"}):
             mgr.delete_digital_asset("media/gone")  # S3-like idempotent delete
 
 

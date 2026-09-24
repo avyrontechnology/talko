@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 
 from bson import ObjectId
 from pymongo.results import InsertOneResult, UpdateResult
@@ -17,9 +17,7 @@ class TalkoCallRepository:
     Repository for managing call-related data operations in the database.
     """
 
-    def __init__(
-        self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger
-    ):
+    def __init__(self, db_manager: TalkoDocDatabaseSessionManager, logger: TalkoServiceLogger):
         """
         Initialize the repository.
 
@@ -30,9 +28,7 @@ class TalkoCallRepository:
         self.__db_manager: TalkoDocDatabaseSessionManager = db_manager
         self.__logger: TalkoServiceLogger = logger
 
-    async def get_vendor_config(
-        self, vendor_id: str, vendor_config_id: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
+    async def get_vendor_config(self, vendor_id: str, vendor_config_id: str | None = None) -> dict[str, Any] | None:
         """
         Retrieve vendor config by vendor_id and vendor config id, including vendor_type.
 
@@ -43,48 +39,28 @@ class TalkoCallRepository:
             dict or None: Vendor config with vendor_type.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG
-            ) as collection:
-                self.__logger.debug("Get vendor config: {}".format(vendor_config_id))
-                vendor_config: Optional[Dict[str, Any]] = await collection.find_one(
-                    {"_id": ObjectId(vendor_config_id)}
-                )
+            async with self.__db_manager.collection(TalkoVendorConfigModel.CollectionName.VENDOR_CONFIG) as collection:
+                self.__logger.debug(f"Get vendor config: {vendor_config_id}")
+                vendor_config: dict[str, Any] | None = await collection.find_one({"_id": ObjectId(vendor_config_id)})
                 if not vendor_config:
-                    self.__logger.error(
-                        "Vendor config for vendor_config_id {} not found".format(
-                            vendor_config_id
-                        )
-                    )
+                    self.__logger.error(f"Vendor config for vendor_config_id {vendor_config_id} not found")
                     return None
 
                 # Fetch vendor_type from vendors collection
-                async with self.__db_manager.collection(
-                    TalkoVendorModel.CollectionName.VENDOR
-                ) as vendor_collection:
-                    vendor: Optional[Dict[str, Any]] = await vendor_collection.find_one(
-                        {"_id": ObjectId(vendor_id)}
-                    )
+                async with self.__db_manager.collection(TalkoVendorModel.CollectionName.VENDOR) as vendor_collection:
+                    vendor: dict[str, Any] | None = await vendor_collection.find_one({"_id": ObjectId(vendor_id)})
                     if vendor and isinstance(vendor, dict) and "vendor_type" in vendor:
                         vendor_config["vendor_type"] = vendor["vendor_type"]
                     else:
-                        self.__logger.warning(
-                            f"Vendor type not found for vendor_id {vendor_id}, defaulting to None"
-                        )
+                        self.__logger.warning(f"Vendor type not found for vendor_id {vendor_id}, defaulting to None")
                         vendor_config["vendor_type"] = None
 
                 return vendor_config
         except Exception as e:
-            self.__logger.error(
-                "Failed to retrieve vendor config for vendor_id {}: {}".format(
-                    vendor_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to retrieve vendor config for vendor_id {vendor_id}: {str(e)}")
             raise
 
-    async def get_partner_config_by_partner_id(
-        self, partner_id: int
-    ) -> Optional[Dict[str, Any]]:
+    async def get_partner_config_by_partner_id(self, partner_id: int) -> dict[str, Any] | None:
         """
         Retrieve partner config by partner_id.
 
@@ -100,16 +76,12 @@ class TalkoCallRepository:
             ) as collection:
                 return await collection.find_one({"partner_id": partner_id})
         except Exception as e:
-            self.__logger.error(
-                "Failed to retrieve partner config for partner_id {}: {}".format(
-                    partner_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to retrieve partner config for partner_id {partner_id}: {str(e)}")
             raise
 
     async def update_partner_config_did_indices(
-        self, partner_id: int, did_indices: Dict[str | int, int], updated_at: int
-    ) -> Optional[Dict[str, Any]]:
+        self, partner_id: int, did_indices: dict[str | int, int], updated_at: int
+    ) -> dict[str, Any] | None:
         """
         Update DID indices in partner config.
 
@@ -130,7 +102,7 @@ class TalkoCallRepository:
             ) as collection:
                 # Convert integer keys to strings
                 did_indices_converted = {str(k): v for k, v in did_indices.items()}
-                result: Optional[Dict[str, Any]] = await collection.find_one_and_update(
+                result: dict[str, Any] | None = await collection.find_one_and_update(
                     {"partner_id": partner_id},
                     {
                         "$set": {
@@ -141,29 +113,17 @@ class TalkoCallRepository:
                     return_document=True,
                 )
                 if result:
-                    self.__logger.info(
-                        "Updated partner config did_indices for partner_id {}".format(
-                            partner_id
-                        )
-                    )
+                    self.__logger.info(f"Updated partner config did_indices for partner_id {partner_id}")
                 else:
-                    self.__logger.error(
-                        "No partner config found to update did_indices for partner_id {}".format(
-                            partner_id
-                        )
-                    )
+                    self.__logger.error(f"No partner config found to update did_indices for partner_id {partner_id}")
                 return result
         except Exception as e:
-            self.__logger.error(
-                "Failed to update partner config did_indices for partner_id {}: {}".format(
-                    partner_id, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to update partner config did_indices for partner_id {partner_id}: {str(e)}")
             raise
 
     async def update_partner_config_inbound_round_robin_index(
         self, partner_id: int, inbound_round_robin_index: int, updated_at: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Update the inbound round-robin agent ringing cursor in partner config.
 
@@ -182,7 +142,7 @@ class TalkoCallRepository:
             async with self.__db_manager.collection(
                 TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG
             ) as collection:
-                result: Optional[Dict[str, Any]] = await collection.find_one_and_update(
+                result: dict[str, Any] | None = await collection.find_one_and_update(
                     {"partner_id": partner_id},
                     {
                         "$set": {
@@ -193,23 +153,15 @@ class TalkoCallRepository:
                     return_document=True,
                 )
                 if result:
-                    self.__logger.info(
-                        "Updated partner config inbound_round_robin_index for partner_id {}".format(
-                            partner_id
-                        )
-                    )
+                    self.__logger.info(f"Updated partner config inbound_round_robin_index for partner_id {partner_id}")
                 else:
                     self.__logger.error(
-                        "No partner config found to update inbound_round_robin_index for partner_id {}".format(
-                            partner_id
-                        )
+                        f"No partner config found to update inbound_round_robin_index for partner_id {partner_id}"
                     )
                 return result
         except Exception as e:
             self.__logger.error(
-                "Failed to update partner config inbound_round_robin_index for partner_id {}: {}".format(
-                    partner_id, str(e)
-                )
+                f"Failed to update partner config inbound_round_robin_index for partner_id {partner_id}: {str(e)}"
             )
             raise
 
@@ -224,21 +176,15 @@ class TalkoCallRepository:
             str: Inserted TalkoCDR ID.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
                 result: InsertOneResult = await collection.insert_one(cdr_dict)
-                self.__logger.info(
-                    "Inserted TalkoCDR with ID: {}".format(result.inserted_id)
-                )
+                self.__logger.info(f"Inserted TalkoCDR with ID: {result.inserted_id}")
                 return str(result.inserted_id)
         except Exception as e:
-            self.__logger.error("Failed to insert TalkoCDR: {}".format(str(e)))
+            self.__logger.error(f"Failed to insert TalkoCDR: {str(e)}")
             raise
 
-    async def get_cdr_by_call_id_or_uuid(
-        self, call_id: Optional[str], uuid_value: Optional[str]
-    ) -> Optional[Dict[str, Any]]:
+    async def get_cdr_by_call_id_or_uuid(self, call_id: str | None, uuid_value: str | None) -> dict[str, Any] | None:
         """
         Get a TalkoCDR by call_id (or uuid if supported later).
 
@@ -249,10 +195,8 @@ class TalkoCallRepository:
             dict or None: TalkoCDR record.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                query: Dict[str, Any] = {}
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                query: dict[str, Any] = {}
                 if uuid_value and uuid_value != "None":
                     query = {"call_uuid": uuid_value}
                 if call_id and call_id != "None":
@@ -262,7 +206,7 @@ class TalkoCallRepository:
 
                 return await collection.find_one(query)
         except Exception as e:
-            self.__logger.error("Failed to get TalkoCDR by call id: {}".format(str(e)))
+            self.__logger.error(f"Failed to get TalkoCDR by call id: {str(e)}")
             raise
 
     async def update_cdr(self, cdr_id: str, updates: dict) -> bool:
@@ -277,20 +221,14 @@ class TalkoCallRepository:
             bool: True if modified, False otherwise.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                result: UpdateResult = await collection.update_one(
-                    {"_id": ObjectId(cdr_id)}, {"$set": updates}
-                )
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                result: UpdateResult = await collection.update_one({"_id": ObjectId(cdr_id)}, {"$set": updates})
                 return result.modified_count > 0
         except Exception as e:
-            self.__logger.error("Failed to update TalkoCDR: {}".format(str(e)))
+            self.__logger.error(f"Failed to update TalkoCDR: {str(e)}")
             raise
 
-    async def find_callback_by_parent_uuid(
-        self, call_uuid: str
-    ) -> Optional[Dict[str, Any]]:
+    async def find_callback_by_parent_uuid(self, call_uuid: str) -> dict[str, Any] | None:
         """
         Find an outbound auto-callback TalkoCDR placed for a missed inbound call.
 
@@ -301,18 +239,10 @@ class TalkoCallRepository:
         the customer.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
-                return await collection.find_one(
-                    {"callback_for_call_uuid": call_uuid}
-                )
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
+                return await collection.find_one({"callback_for_call_uuid": call_uuid})
         except Exception as e:
-            self.__logger.error(
-                "Failed to find callback for parent uuid {}: {}".format(
-                    call_uuid, str(e)
-                )
-            )
+            self.__logger.error(f"Failed to find callback for parent uuid {call_uuid}: {str(e)}")
             raise
 
     async def find_missed_inbounds_needing_callback(
@@ -337,9 +267,7 @@ class TalkoCallRepository:
         Oldest first so the most overdue callbacks are healed first.
         """
         try:
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
                 cursor = (
                     collection.find(
                         {
@@ -358,9 +286,7 @@ class TalkoCallRepository:
                 )
                 return await cursor.to_list(length=limit)
         except Exception as e:
-            self.__logger.error(
-                "Failed to find missed inbounds needing callback: {}".format(str(e))
-            )
+            self.__logger.error(f"Failed to find missed inbounds needing callback: {str(e)}")
             raise
 
     def normalize_phone_number(self, number: str) -> str:
@@ -385,15 +311,9 @@ class TalkoCallRepository:
         else:
             return digits  # fallback
 
-    async def find_cdr_by_numbers(
-        self, caller_id_number: str, call_to_number: str
-    ) -> Optional[Dict]:
+    async def find_cdr_by_numbers(self, caller_id_number: str, call_to_number: str) -> dict | None:
         try:
-            self.__logger.debug(
-                "Searching TalkoCDR for numbers: {}, {}".format(
-                    caller_id_number, call_to_number
-                )
-            )
+            self.__logger.debug(f"Searching TalkoCDR for numbers: {caller_id_number}, {call_to_number}")
 
             # Normalize both numbers
             normalized_caller = self.normalize_phone_number(caller_id_number)
@@ -416,9 +336,7 @@ class TalkoCallRepository:
                 "did_number": normalized_did,  # or also make this flexible if needed
             }
 
-            async with self.__db_manager.collection(
-                TalkoCDR.CollectionName.TalkoCDR
-            ) as collection:
+            async with self.__db_manager.collection(TalkoCDR.CollectionName.TalkoCDR) as collection:
                 cursor = collection.find(query).sort("created_at", -1).limit(1)
                 cdr_list = await cursor.to_list(length=1)
 

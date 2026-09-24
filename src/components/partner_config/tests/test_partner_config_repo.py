@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.components.partner_config.repository import TalkoPartnerConfigRepository
-from src.components.vendor_config.services import TalkoVendorConfigService
 
 
 @pytest.fixture

@@ -1,5 +1,3 @@
-from typing import List
-
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Request, status
 
@@ -39,17 +37,11 @@ class TalkoCallAgentMappingController:
     async def create_agent_did_mapping(
         request: Request,
         call_agent_data: TalkoContract.AgentDidMappingCreate,
-        call_agent_service: TalkoAgentMappingService = Depends(
-            Provide[TalkoContainer.call_agent_mapping_service]
-        ),
+        call_agent_service: TalkoAgentMappingService = Depends(Provide[TalkoContainer.call_agent_mapping_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> TalkoContract.AgentDidMappingCreationResponse:
         try:
-            talko_service_logger.info(
-                "Received call agent mapping creation request: {}".format(
-                    call_agent_data
-                )
-            )
+            talko_service_logger.info(f"Received call agent mapping creation request: {call_agent_data}")
             mapping_response: TalkoContract.AgentDidMappingCreationResponse = (
                 await call_agent_service.create_agent_did_mapping(
                     call_agent_data.agent_id,
@@ -58,73 +50,49 @@ class TalkoCallAgentMappingController:
             )
             return TalkoResourceCreatedResponse(data=mapping_response)
         except ValueError as e:
-            talko_service_logger.error(
-                "Error in creation of agent mapping: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in creation of agent mapping: {str(e)}")
             return TalkoBadRequestResponse(detail=SOMETHING_WENT_WRONG)
         except TalkoResourceNotFound as e:
-            talko_service_logger.error(
-                "Resource not found while creating agent mapping: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Resource not found while creating agent mapping: {str(e)}")
             return TalkoResourceNotFoundResponse(detail=SOMETHING_WENT_WRONG)
         except TalkoBadRequestError as e:
-            talko_service_logger.error(
-                "Bad request while creating agent mapping: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Bad request while creating agent mapping: {str(e)}")
             return TalkoBadRequestResponse(detail=BAD_REQUEST)
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error occurred while creating agent mapping: {}".format(
-                    str(e)
-                )
-            )
-            raise TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+            talko_service_logger.error(f"Unexpected error occurred while creating agent mapping: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @router.get(
         "",
-        response_model=List[TalkoContract.AgentDidMappingResponse],
+        response_model=list[TalkoContract.AgentDidMappingResponse],
     )
     @permission_check(TalkoPermissionDependency)
     @inject
     async def get_all_agent_did_mapping(
         request: Request,
         call_agent_data: TalkoContract.AgentDidMappingCreate,
-        call_agent_service: TalkoAgentMappingService = Depends(
-            Provide[TalkoContainer.call_agent_mapping_service]
-        ),
+        call_agent_service: TalkoAgentMappingService = Depends(Provide[TalkoContainer.call_agent_mapping_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-    ) -> List[TalkoContract.AgentDidMappingResponse]:
+    ) -> list[TalkoContract.AgentDidMappingResponse]:
         try:
-            talko_service_logger.info(
-                "Call agent mapping get all data request: {}".format(call_agent_data)
-            )
+            talko_service_logger.info(f"Call agent mapping get all data request: {call_agent_data}")
             mapping_response: TalkoContract.AgentDidMappingCreationResponse = (
                 await call_agent_service.get_all_agent_did_mapping()
             )
             return TalkoSuccessResponse(data=mapping_response)
         except ValueError as e:
-            talko_service_logger.error(
-                "Error in getting all agent mapping: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in getting all agent mapping: {str(e)}")
             return TalkoBadRequestResponse(detail=BAD_REQUEST)
         except TalkoResourceNotFound as e:
-            talko_service_logger.error(
-                "Resource not found while getting all agent mapping: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Resource not found while getting all agent mapping: {str(e)}")
             return TalkoResourceNotFoundResponse(detail=SOMETHING_WENT_WRONG)
         except TalkoBadRequestError as e:
-            talko_service_logger.error(
-                "Bad request while getting all agent mapping: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Bad request while getting all agent mapping: {str(e)}")
             return TalkoBadRequestResponse(detail=BAD_REQUEST)
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error occurred while getting all agent mapping: {}".format(
-                    str(e)
-                )
-            )
-            raise TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
-        
+            talko_service_logger.error(f"Unexpected error occurred while getting all agent mapping: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+
     # routes for agent to workspace mapping
     @router.post(
         "/workspace-mapping",
@@ -136,53 +104,36 @@ class TalkoCallAgentMappingController:
     async def create_agent_workspace_mapping(
         request: Request,
         call_agent_data: TalkoContract.AgentWorkspaceMappingCreate,
-        call_agent_service: TalkoAgentMappingService = Depends(
-            Provide[TalkoContainer.call_agent_mapping_service]
-        ),
+        call_agent_service: TalkoAgentMappingService = Depends(Provide[TalkoContainer.call_agent_mapping_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ) -> TalkoContract.AgentWorkspaceMappingCreationResponse:
         try:
-            talko_service_logger.info(
-                "Received call agent mapping creation request: {}".format(
-                    call_agent_data
-                )
-            )
+            talko_service_logger.info(f"Received call agent mapping creation request: {call_agent_data}")
             mapping_response: TalkoContract.AgentWorkspaceMappingCreationResponse = (
                 await call_agent_service.create_agent_workspace_mapping(
                     call_agent_data.partner_id,
                     call_agent_data.workspace_id,
                     call_agent_data.agent_id,
-                    call_agent_data.agent_number
+                    call_agent_data.agent_number,
                 )
             )
             return TalkoResourceCreatedResponse(data=mapping_response)
         except ValueError as e:
-            talko_service_logger.error(
-                "Error in creation of agent mapping: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error in creation of agent mapping: {str(e)}")
             return TalkoBadRequestResponse(detail=BAD_REQUEST)
         except TalkoResourceNotFound as e:
-            talko_service_logger.error(
-                "Resource not found while creating agent mapping: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Resource not found while creating agent mapping: {str(e)}")
             return TalkoResourceNotFoundResponse(detail=SOMETHING_WENT_WRONG)
         except TalkoBadRequestError as e:
-            talko_service_logger.error(
-                "Bad request while creating agent mapping: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Bad request while creating agent mapping: {str(e)}")
             return TalkoBadRequestResponse(detail=BAD_REQUEST)
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error occurred while creating agent mapping: {}".format(
-                    str(e)
-                )
-            )
-            raise TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)    
-
+            talko_service_logger.error(f"Unexpected error occurred while creating agent mapping: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
     @router.get(
         "/workspace-mapping",
-        response_model=List[TalkoContract.AgentWorkspaceMappingResponse],
+        response_model=list[TalkoContract.AgentWorkspaceMappingResponse],
     )
     @permission_check(TalkoPermissionDependency)
     @inject
@@ -190,46 +141,36 @@ class TalkoCallAgentMappingController:
         request: Request,
         workspace_id: int,
         partner_id: int,
-        call_agent_service: TalkoAgentMappingService = Depends(
-            Provide[TalkoContainer.call_agent_mapping_service]
-        ),
+        call_agent_service: TalkoAgentMappingService = Depends(Provide[TalkoContainer.call_agent_mapping_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
-    ) -> List[TalkoContract.AgentWorkspaceMappingResponse]:
+    ) -> list[TalkoContract.AgentWorkspaceMappingResponse]:
         try:
             talko_service_logger.info(
-                "Request received to fetch agents for workspace_id={}, partner_id={}".format(workspace_id, partner_id)
+                f"Request received to fetch agents for workspace_id={workspace_id}, partner_id={partner_id}"
             )
-            
-            mapping_response: List[TalkoContract.AgentWorkspaceMappingResponse] = (
-                await call_agent_service.get_agents_by_workspace(workspace_id, partner_id)
-            )
-            
+
+            mapping_response: list[
+                TalkoContract.AgentWorkspaceMappingResponse
+            ] = await call_agent_service.get_agents_by_workspace(workspace_id, partner_id)
+
             return TalkoSuccessResponse(data=mapping_response)
-        
+
         except ValueError as e:
-            talko_service_logger.error(
-                "Error fetching agents for workspace: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Error fetching agents for workspace: {str(e)}")
             return TalkoBadRequestResponse(detail=BAD_REQUEST)
-        
+
         except TalkoResourceNotFound as e:
-            talko_service_logger.error(
-                "Resource not found while fetching agents: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Resource not found while fetching agents: {str(e)}")
             return TalkoResourceNotFoundResponse(detail=SOMETHING_WENT_WRONG)
-        
+
         except TalkoBadRequestError as e:
-            talko_service_logger.error(
-                "Bad request while fetching agents: {}".format(str(e))
-            )
+            talko_service_logger.error(f"Bad request while fetching agents: {str(e)}")
             return TalkoBadRequestResponse(detail=BAD_REQUEST)
-        
+
         except Exception as e:
-            talko_service_logger.error(
-                "Unexpected error occurred while fetching agents: {}".format(str(e))
-            )
-            raise TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)  
-        
+            talko_service_logger.error(f"Unexpected error occurred while fetching agents: {str(e)}")
+            return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
+
     @router.patch(
         "/workspace-mapping/{partner_id}/{workspace_id}/status",
         status_code=status.HTTP_200_OK,
@@ -243,7 +184,7 @@ class TalkoCallAgentMappingController:
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ):
         """
-        Update the 'is_active' field for all agent-workspace mappings 
+        Update the 'is_active' field for all agent-workspace mappings
         for a given partner_id and workspace_id.
         """
         try:
@@ -261,6 +202,6 @@ class TalkoCallAgentMappingController:
             return TalkoResourceNotFoundResponse(detail=SOMETHING_WENT_WRONG)
         except Exception as e:
             talko_service_logger.error(
-                "Unexpected error updating 'is_active' for workspace_id={}, partner_id={}: {}".format(workspace_id, partner_id, str(e))
+                f"Unexpected error updating 'is_active' for workspace_id={workspace_id}, partner_id={partner_id}: {str(e)}"
             )
             raise

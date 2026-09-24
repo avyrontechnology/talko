@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Tuple
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -9,7 +8,7 @@ KEYS_DIR: Path = BASE_DIR / "keys"
 KEYS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def generate_keys() -> Tuple[str, str]:
+def generate_keys() -> tuple[str, str]:
     """Generate and save RSA private/public key pair.
 
     Returns:

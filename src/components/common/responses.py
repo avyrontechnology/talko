@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from fastapi import Response
 from fastapi.encoders import jsonable_encoder
@@ -16,7 +16,7 @@ class TalkoAPIResponse(Response):
         content: Any,
         status_code: int = 200,
         media_type: str = "application/json",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         # Use `Response` to directly define content and media type
         super().__init__(
@@ -27,7 +27,7 @@ class TalkoAPIResponse(Response):
         )
 
     @staticmethod
-    def to_json(content: Dict[str, Any]) -> str:
+    def to_json(content: dict[str, Any]) -> str:
         """
         Convert content to a JSON string.
         """
@@ -41,10 +41,10 @@ class TalkoSuccessResponse(JSONResponse):
 
     def __init__(
         self,
-        data: Optional[Union[List[Any], Dict[str, Any]]] = None,
+        data: list[Any] | dict[str, Any] | None = None,
         message: str = "Request successful",
         status: str = "success",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         self.data = jsonable_encoder(data)
         self.message = message
@@ -70,7 +70,7 @@ class TalkoValidationErrorResponse(TalkoAPIResponse):
         self,
         detail: str,
         error_code: str = "VALIDATION_ERROR",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         content = {
             "status": "error",
@@ -93,7 +93,7 @@ class TalkoUnauthorizedResponse(TalkoAPIResponse):
     def __init__(
         self,
         detail: str = "Unauthorized access",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         content = {
             "status": "error",
@@ -116,7 +116,7 @@ class TalkoNotFoundResponse(TalkoAPIResponse):
     def __init__(
         self,
         detail: str = "Resource not found",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         content = {
             "status": "error",
@@ -139,7 +139,7 @@ class TalkoInternalServerErrorResponse(TalkoAPIResponse):
     def __init__(
         self,
         detail: str = "Internal server error",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         content = {
             "status": "error",
@@ -159,9 +159,7 @@ class TalkoBadRequestResponse(TalkoAPIResponse):
     A response class for handling 400 Bad Request errors.
     """
 
-    def __init__(
-        self, detail: str = "Bad request", headers: Optional[Dict[str, Any]] = None
-    ):
+    def __init__(self, detail: str = "Bad request", headers: dict[str, Any] | None = None):
         content = {
             "status": "error",
             "error_code": "BAD_REQUEST",
@@ -183,7 +181,7 @@ class TalkoForbiddenPermissionResponse(TalkoAPIResponse):
     def __init__(
         self,
         detail: str = "Forbidden: You do not have permission to perform this action.",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         content = {
             "status": "error",
@@ -206,7 +204,7 @@ class TalkoForbiddenResponse(TalkoAPIResponse):
     def __init__(
         self,
         detail: str = "Forbidden request",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         content = {
             "status": "error",
@@ -229,7 +227,7 @@ class TalkoTooManyRequestsResponse(TalkoAPIResponse):
     def __init__(
         self,
         detail: str = "Too many requests",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         content = {
             "status": "error",
@@ -251,9 +249,9 @@ class TalkoResourceCreatedResponse(JSONResponse):
 
     def __init__(
         self,
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
         message: str = "Request successful",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         self.data = jsonable_encoder(data)
         self.message = message
@@ -263,9 +261,7 @@ class TalkoResourceCreatedResponse(JSONResponse):
         """
         Render the response content as JSON, allowing FastAPI's automatic serialization.
         """
-        return super().render(
-            {"status": "success", "message": self.message, "data": self.data}
-        )
+        return super().render({"status": "success", "message": self.message, "data": self.data})
 
 
 class TalkoSuccessNoContentResponse(TalkoAPIResponse):
@@ -275,7 +271,7 @@ class TalkoSuccessNoContentResponse(TalkoAPIResponse):
 
     def __init__(
         self,
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         # Convert content to JSON string manually
         super().__init__(
@@ -294,7 +290,7 @@ class TalkoResourceConflictResponse(TalkoAPIResponse):
     def __init__(
         self,
         detail: str = "Conflict request",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         content = {
             "status": "error",
@@ -316,9 +312,9 @@ class TalkoAcceptedResponse(JSONResponse):
 
     def __init__(
         self,
-        data: Optional[Union[List[Any], Dict[str, Any]]] = None,
+        data: list[Any] | dict[str, Any] | None = None,
         message: str = "Request accepted for processing",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         self.data = jsonable_encoder(data)
         self.message = message
@@ -328,9 +324,7 @@ class TalkoAcceptedResponse(JSONResponse):
         """
         Render the response content as JSON.
         """
-        return super().render(
-            {"status": "success", "message": self.message, "data": self.data}
-        )
+        return super().render({"status": "success", "message": self.message, "data": self.data})
 
 
 class TalkoInvalidFileFormat(TalkoAPIResponse):
@@ -341,7 +335,7 @@ class TalkoInvalidFileFormat(TalkoAPIResponse):
     def __init__(
         self,
         detail: str = "Invalid File Format",
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         content = {
             "status": "error",
@@ -364,7 +358,7 @@ class TalkoResourceNotFoundResponse(TalkoAPIResponse):
     def __init__(
         self,
         detail: str,
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ):
         content = {
             "status": "error",

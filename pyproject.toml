@@ -38,6 +38,37 @@ pytest = "^8.4.1"
 pytest-asyncio = "^1.0.0"
 asgi-lifespan = "^2.1.0"
 websockets = "^16.0"
+ruff = "^0.16.0"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [
+    "venv",
+    ".venv",
+    "src/pub",
+    "src/protos",
+]
+
+[tool.ruff.lint]
+select = [
+    "F",   # pyflakes
+    "E4",  # pycodestyle errors (syntax/logic, not style)
+    "E7",
+    "E9",
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade (except UP042: str+Enum mixin is required for Mongo storage)
+]
+# NOTE: E501 (line-too-long) intentionally not gated — 148 legacy long
+# log-lines predate the standard; formatter already caps code layout.
+# Clean up opportunistically; do not add new >120 lines.
+ignore = [
+    "B008",  # function-call-in-default-argument (Depends(...) pattern is idiomatic FastAPI)
+    "B017",  # assert-raises-exception (pytest.raises(Exception) used deliberately in tests)
+    "B904",  # raise-without-from (implicit __context__ preserved; deliberate re-raise style)
+    "UP042",  # replace-str-enum (str+Enum mixin required for Mongo/pydantic compat)
+]
 
 [build-system]
 requires = ["poetry-core"]

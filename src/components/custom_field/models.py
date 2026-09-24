@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from src.components.custom_field.constants import (
     TalkoCustomFieldDataType,
     TalkoCustomFieldEntityType,
@@ -13,9 +11,9 @@ class TalkoCustomFieldDefinition(TalkoTimestampedModel):
     field_name: str
     field_slug: str
     data_type: TalkoCustomFieldDataType
-    choice_options: Optional[List[str]] = None
+    choice_options: list[str] | None = None
     is_required: bool = False
-    sequence: Optional[int] = None
+    sequence: int | None = None
     is_active: bool = True
 
     class CollectionName:

@@ -30,20 +30,16 @@ class TalkoAuthContextController:
     ) -> dict:
         try:
             user: dict = getattr(request.state, "user", None) or {}
-            grpc_client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.AUTH)
+            grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
             superadmin = await is_superadmin(request, grpc_client, talko_service_logger)
             return TalkoSuccessResponse(
                 data={
                     "user_id": user.get(TalkoCurrentUserMap.USER_ID),
                     "partner_id": user.get(TalkoCurrentUserMap.PARTNER_ID),
-                    "auth_type": "api_key"
-                    if user.get("is_api_key_auth")
-                    else "jwt",
+                    "auth_type": "api_key" if user.get("is_api_key_auth") else "jwt",
                     "is_superadmin": superadmin,
                 }
             )
         except Exception as exc:
-            talko_service_logger.error(
-                "Unexpected error building auth context: {}".format(exc)
-            )
+            talko_service_logger.error(f"Unexpected error building auth context: {exc}")
             return TalkoInternalServerErrorResponse()

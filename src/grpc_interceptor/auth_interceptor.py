@@ -1,7 +1,4 @@
-import grpc
-from grpc import StatusCode
-from grpc.aio import UnaryUnaryClientInterceptor, AioRpcError
-from src.components.common.responses import TalkoUnauthorizedResponse
+from grpc.aio import UnaryUnaryClientInterceptor
 
 
 class TalkoApiKeyClientInterceptor(UnaryUnaryClientInterceptor):

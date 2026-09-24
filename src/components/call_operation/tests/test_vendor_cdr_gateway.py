@@ -8,7 +8,6 @@ from src.exceptions import TalkoBadRequestError
 
 @pytest.mark.asyncio
 class TestVendorCDRGateway:
-
     def setup_method(self):
         """Setup mocks before each test"""
         self.mock_cdr_update_task = MagicMock()
@@ -17,9 +16,7 @@ class TestVendorCDRGateway:
         # Make fetch_single_cdr async
         self.mock_cdr_update_task.fetch_single_cdr = AsyncMock()
 
-        self.gateway = TalkoVendorCDRGateway(
-            cdr_update_task=self.mock_cdr_update_task, logger=self.mock_logger
-        )
+        self.gateway = TalkoVendorCDRGateway(cdr_update_task=self.mock_cdr_update_task, logger=self.mock_logger)
 
     async def test_fetch_call_details_tata_tele_success(self):
         """Test successful routing to Tata Tele handler"""
@@ -40,18 +37,17 @@ class TestVendorCDRGateway:
 
         self.mock_cdr_update_task.fetch_single_cdr.return_value = mock_result
 
-        result = await self.gateway.fetch_call_details(
-            call_id="TT123456789", vendor_config=vendor_config
-        )
+        result = await self.gateway.fetch_call_details(call_id="TT123456789", vendor_config=vendor_config)
 
         assert result == mock_result
         self.mock_cdr_update_task.fetch_single_cdr.assert_called_once_with(
             call_id="TT123456789",
+            call_uuid=None,
             cdr_config=vendor_config["cdr_url_handler"],
             vendor_type="tata_tele",
         )
         self.mock_logger.info.assert_called_with(
-            "Routing call details request for call_id=TT123456789 to vendor_type=tata_tele"
+            "Routing call details request for call_id=TT123456789, call_uuid=None to vendor_type=tata_tele"
         )
 
     async def test_fetch_call_details_missing_vendor_type(self):
@@ -62,9 +58,7 @@ class TestVendorCDRGateway:
         }
 
         with pytest.raises(TalkoBadRequestError) as exc_info:
-            await self.gateway.fetch_call_details(
-                call_id="12345", vendor_config=vendor_config
-            )
+            await self.gateway.fetch_call_details(call_id="12345", vendor_config=vendor_config)
 
         assert "vendor_type missing in vendor configuration" in str(exc_info.value)
 
@@ -76,9 +70,7 @@ class TestVendorCDRGateway:
         }
 
         with pytest.raises(TalkoBadRequestError) as exc_info:
-            await self.gateway.fetch_call_details(
-                call_id="12345", vendor_config=vendor_config
-            )
+            await self.gateway.fetch_call_details(call_id="12345", vendor_config=vendor_config)
 
         assert "TalkoCDR configuration missing" in str(exc_info.value)
         self.mock_logger.error.assert_called()
@@ -91,9 +83,7 @@ class TestVendorCDRGateway:
         }
 
         with pytest.raises(TalkoBadRequestError) as exc_info:
-            await self.gateway.fetch_call_details(
-                call_id="12345", vendor_config=vendor_config
-            )
+            await self.gateway.fetch_call_details(call_id="12345", vendor_config=vendor_config)
 
         assert "Unsupported vendor: unknown_vendor" in str(exc_info.value)
 
@@ -104,19 +94,13 @@ class TestVendorCDRGateway:
             "cdr_url_handler": {"endpoint": "http://test.com"},
         }
 
-        self.mock_cdr_update_task.fetch_single_cdr.side_effect = Exception(
-            "API timeout"
-        )
+        self.mock_cdr_update_task.fetch_single_cdr.side_effect = Exception("API timeout")
 
         with pytest.raises(Exception) as exc_info:
-            await self.gateway.fetch_call_details(
-                call_id="12345", vendor_config=vendor_config
-            )
+            await self.gateway.fetch_call_details(call_id="12345", vendor_config=vendor_config)
 
         assert "API timeout" in str(exc_info.value)
-        self.mock_logger.error.assert_called_with(
-            "Error in TalkoVendorCDRGateway: API timeout"
-        )
+        self.mock_logger.error.assert_called_with("Error in TalkoVendorCDRGateway: API timeout")
 
     async def test__handle_tata_tele_is_called_correctly(self):
         """Test internal _handle_tata_tele method"""
@@ -128,9 +112,7 @@ class TestVendorCDRGateway:
         mock_result = {"status": "success"}
         self.mock_cdr_update_task.fetch_single_cdr.return_value = mock_result
 
-        result = await self.gateway.fetch_call_details(
-            call_id="ABC123", vendor_config=vendor_config
-        )
+        result = await self.gateway.fetch_call_details(call_id="ABC123", vendor_config=vendor_config)
 
         assert result == mock_result
         self.mock_cdr_update_task.fetch_single_cdr.assert_called_once()
@@ -146,14 +128,11 @@ class TestVendorCDRGateway:
         vendor_config = {"vendor_type": "newfuturevendor", "cdr_url_handler": {}}
 
         with pytest.raises(TalkoBadRequestError):
-            await self.gateway.fetch_call_details(
-                call_id="123", vendor_config=vendor_config
-            )
+            await self.gateway.fetch_call_details(call_id="123", vendor_config=vendor_config)
 
 
 @pytest.mark.asyncio
 class TestVendorCDRGatewayEdgeCases:
-
     async def test_empty_vendor_config(self):
         """Test behavior with completely empty vendor_config"""
         gateway = TalkoVendorCDRGateway(cdr_update_task=MagicMock(), logger=MagicMock())
