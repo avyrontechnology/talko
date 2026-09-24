@@ -98,6 +98,9 @@ class TalkoContainer(containers.DeclarativeContainer):
                 "src.components.partner_auth.controllers",
                 "src.components.partner_webhook.controllers",
                 "src.components.user_auth.controllers",
+                "src.components.client.controllers",
+                "src.components.billing.controllers",
+                "src.components.rbac.controllers",
             ]
         )
 
