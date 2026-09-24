@@ -21,6 +21,14 @@ from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.middlewares.context import set_request_auth
 from src.utils.token_utils import TalkoApiKeyGenerator
 
+# Module-level fallback: BaseHTTPMiddleware dispatch is invoked by Starlette,
+# not FastAPI DI, so the @inject + Depends(Provide[...]) defaults above are
+# not guaranteed to resolve. The except handlers must never depend on them —
+# otherwise the real traceback gets masked by a secondary AttributeError
+# ('Provide' object has no attribute 'error') and every failure looks like a
+# generic 500. This logger is always safe to use.
+_mw_logger = TalkoServiceLogger.get_logger()
+
 
 async def resolve_user_payload(token: str, redis_pool: Redis, logger: TalkoServiceLogger) -> dict | None:
     """
@@ -155,7 +163,7 @@ class TalkoAuthMiddleware(BaseHTTPMiddleware):
             logger.debug(f"Added state to request for user {payload}")
 
         except Exception as exc:
-            logger.error(f"Internal Server Error {exc}")
+            _mw_logger.error(f"Internal Server Error {exc}", exc_info=True)
             return TalkoInternalServerErrorResponse()
 
         return await call_next(request)
@@ -229,7 +237,7 @@ class TalkoAuthMiddleware(BaseHTTPMiddleware):
             set_request_auth("API-KEY", api_key)
 
         except Exception as exc:
-            logger.error(f"Internal Server Error in _handle_api_key: {exc}")
+            _mw_logger.error(f"Internal Server Error in _handle_api_key: {exc}", exc_info=True)
             return TalkoInternalServerErrorResponse()
 
         return await call_next(request)
