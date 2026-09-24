@@ -35,8 +35,7 @@ class TalkoClientRepository:
             if active_only:
                 query["is_active"] = True
             async with self.__db_manager.collection(TalkoClientModel.CollectionName.CLIENT) as collection:
-                cursor = collection.find(query).sort("created_at", -1)
-                return [doc async for doc in cursor]
+                return await collection.find(query).sort("created_at", -1).to_list(length=None)
         except Exception as e:
             self.__logger.error(f"Failed to list clients for partner {partner_id}: {str(e)}")
             raise
