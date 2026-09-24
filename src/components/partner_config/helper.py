@@ -19,6 +19,7 @@ class TalkoPartnerConfigHelper:
         partner_config_validator: Any,
         repository: TalkoPartnerConfigRepository,
         logger: TalkoServiceLogger,
+        client_repository: Any | None = None,
     ) -> ObjectId:
         """
         Validates the initial configuration and prepares the vendor ID.
@@ -29,14 +30,32 @@ class TalkoPartnerConfigHelper:
             logger.error(f"Invalid vendor_id: {config.vendor_id}")
             raise ValueError("Invalid vendor_id format.")
 
-        logger.debug(f"Partner config for partner_id {config.partner_id} with vendor_id: {vendor_id}")
+        client_id = getattr(config, "client_id", None)
+        if client_id is not None:
+            try:
+                client_oid = ObjectId(client_id)
+            except Exception:
+                logger.error(f"Invalid client_id: {client_id}")
+                raise ValueError("Invalid client_id format.")
+            if client_repository is not None:
+                client_doc = await client_repository.find_by_id(client_oid)
+                if not client_doc:
+                    raise ValueError("Client not found.")
+                if client_doc.get("partner_id") != config.partner_id:
+                    raise ValueError("Client does not belong to this partner.")
+
+        logger.debug(f"Partner config for partner_id {config.partner_id} client_id {client_id} with vendor_id: {vendor_id}")
         await vendor_config_validator.validate_vendor_exists(vendor_id)
         await vendor_config_validator.validate_vendor_config_not_exist_using_vendor_id(vendor_id)
-        await partner_config_validator.check_if_already_partner_exist_in_partner_config(config.partner_id)
+        await partner_config_validator.check_if_already_partner_exist_in_partner_config(
+            config.partner_id, client_id
+        )
 
-        existing_config: dict[str, Any] | None = await repository.find_partner_config_by_id(config.partner_id)
+        existing_config: dict[str, Any] | None = await repository.find_partner_config_by_partner_and_client(
+            config.partner_id, client_id
+        )
         if existing_config:
-            logger.error(f"Partner config with partner_id {config.partner_id} already exists")
+            logger.error(f"Partner config with partner_id {config.partner_id} client_id {client_id} already exists")
             raise TalkoConflictError("Partner config with partner_id already exists.")
 
         return vendor_id

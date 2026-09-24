@@ -36,6 +36,7 @@ class TalkoPartnerConfigService:
         vendor_config_repository: TalkoVendorConfigRepository,
         partner_config_validator: TalkoPartnerConfigValidator,
         did_management_service: TalkoDidManagementService,
+        client_repository=None,
     ):
         """
         Initialize the service with necessary dependencies.
@@ -49,6 +50,7 @@ class TalkoPartnerConfigService:
         self.vendor_config_repository: TalkoVendorConfigRepository = vendor_config_repository
         self.partner_config_validator: TalkoPartnerConfigValidator = partner_config_validator
         self.did_management_service: TalkoDidManagementService = did_management_service
+        self.client_repository = client_repository
 
     async def create_partner_config(
         self, config: TalkoContract.PartnerConfigCreate
@@ -67,6 +69,7 @@ class TalkoPartnerConfigService:
                 self.partner_config_validator,
                 self.repository,
                 self.logger,
+                getattr(self, "client_repository", None),
             )
             vendor_config_id: ObjectId = ObjectId(config.vendor_config_id)
 

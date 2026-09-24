@@ -184,6 +184,7 @@ class TalkoContainer(containers.DeclarativeContainer):
         logger=logger,
         partner_config_repository=partner_config_repo,
     )
+    client_repo = providers.Factory(TalkoClientRepository, db_manager=db, logger=logger)
     partner_api_key_validator = providers.Factory(
         TalkoPartnerApiKeyValidator, logger=logger, repository=partner_api_key_repo
     )
@@ -256,8 +257,8 @@ class TalkoContainer(containers.DeclarativeContainer):
         vendor_config_repository=vendor_config_repo,
         partner_config_validator=partner_config_validator,
         did_management_service=did_service,
+        client_repository=client_repo,
     )
-    client_repo = providers.Factory(TalkoClientRepository, db_manager=db, logger=logger)
     client_service = providers.Factory(
         TalkoClientService,
         repository=client_repo,

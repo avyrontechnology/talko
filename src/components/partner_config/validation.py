@@ -27,14 +27,19 @@ class TalkoPartnerConfigValidator:
         self.logger = logger
         self.partner_config_repository = partner_config_repository
 
-    async def check_if_already_partner_exist_in_partner_config(self, partner_id: int) -> None:
+    async def check_if_already_partner_exist_in_partner_config(
+        self, partner_id: int, client_id: str | None = None
+    ) -> None:
         """
-        Validate that a partner exists and no config already exists for it.
+        Validate that no config already exists for this (partner_id, client_id).
 
-        :param partner_id: The ObjectId of the partner.
-        :raises ValueError: If the partner config already exists for partner id.
+        :param partner_id: The partner ID.
+        :param client_id: Optional client ID (None = partner-level default).
+        :raises ValueError: If the partner config already exists for the scope.
         """
-        partner_config = await self.partner_config_repository.find_partner_config_by_partner_id(partner_id)
+        partner_config = await self.partner_config_repository.find_partner_config_by_partner_and_client(
+            partner_id, client_id
+        )
         if partner_config:
-            self.logger.error(f"Partner id: {partner_id} already exists in partner config.")
+            self.logger.error(f"Partner id: {partner_id} client_id: {client_id} already exists in partner config.")
             raise ValueError(PARTNER_CONFIG_WITH_PARTNER_ID_ALREADY_EXIST)

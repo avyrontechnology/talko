@@ -86,6 +86,18 @@ class TalkoPartnerConfigRepository:
             self.logger.error(f"Failed to find partner config by partner_id {id}: {str(e)}")
             raise
 
+    async def find_partner_config_by_partner_and_client(
+        self, partner_id: int, client_id: str | None
+    ) -> dict | None:
+        try:
+            async with self.db_manager.collection(TalkoPartnerConfigModel.CollectionName.PARTNER_CONFIG) as collection:
+                return await collection.find_one({"partner_id": partner_id, "client_id": client_id})
+        except Exception as e:
+            self.logger.error(
+                f"Failed to find partner config by partner_id {partner_id} client_id {client_id}: {str(e)}"
+            )
+            raise
+
     async def update_partner_config(self, id: str, update_dict: dict) -> dict:
         """
         Update a partner configuration document by its ID.

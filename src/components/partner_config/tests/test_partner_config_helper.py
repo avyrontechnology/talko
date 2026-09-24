@@ -45,7 +45,7 @@ class TestPartnerConfigHelper:
         vendor_validator = AsyncMock()
         partner_validator = AsyncMock()
         repository = AsyncMock()
-        repository.find_partner_config_by_id.return_value = {"partner_id": 123}
+        repository.find_partner_config_by_partner_and_client.return_value = {"partner_id": 123}
         logger = MagicMock()
 
         with pytest.raises(TalkoConflictError, match="Partner config with partner_id already exists."):
@@ -57,7 +57,7 @@ class TestPartnerConfigHelper:
         vendor_validator = AsyncMock()
         partner_validator = AsyncMock()
         repository = AsyncMock()
-        repository.find_partner_config_by_id.return_value = None
+        repository.find_partner_config_by_partner_and_client.return_value = None
         logger = MagicMock()
 
         vendor_id = await TalkoPartnerConfigHelper.validate_and_prepare_config(

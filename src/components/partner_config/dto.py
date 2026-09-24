@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class TalkoContract:
     class PartnerConfigCreate(BaseModel):
         partner_id: int
+        client_id: str | None = None
         vendor_id: str
         vendor_config_id: str
         ai_vendor_config_id: str | None = None
@@ -20,6 +21,7 @@ class TalkoContract:
 
     class PartnerConfigUpdate(BaseModel):
         is_active: bool | None = None
+        client_id: str | None = None
         ai_vendor_config_id: str | None = None
         enable_round_robin: bool | None = None
         enable_agent_mapping: bool | None = None
@@ -47,6 +49,7 @@ class TalkoContract:
         # and a single legacy doc 500s the entire list endpoint.
         id: str
         partner_id: int
+        client_id: str | None = None
         vendor_id: str
         ai_vendor_config_id: str | None = None
         is_active: bool

@@ -9,6 +9,7 @@ from src.utils.timestamped_model import TalkoTimestampedModel
 
 class TalkoPartnerConfigModel(TalkoTimestampedModel):
     partner_id: int | None = None  # ID of the partner
+    client_id: str | None = None  # Optional client (sub-account) ID; None = partner-level default
     is_active: bool  # Active status
     vendor_id: ObjectId  # Associated vendor ID
     vendor_config_id: str | None = None  # Associated vendor config ID
