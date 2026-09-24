@@ -29,6 +29,17 @@ class TalkoClientRepository:
             self.__logger.error(f"Failed to find client {client_id}: {str(e)}")
             raise
 
+    async def find_all(self, active_only: bool = False) -> list[dict[str, Any]]:
+        try:
+            query: dict[str, Any] = {}
+            if active_only:
+                query["is_active"] = True
+            async with self.__db_manager.collection(TalkoClientModel.CollectionName.CLIENT) as collection:
+                return await collection.find(query).sort("created_at", -1).to_list(length=None)
+        except Exception as e:
+            self.__logger.error(f"Failed to list all clients: {str(e)}")
+            raise
+
     async def find_by_partner(self, partner_id: int, active_only: bool = False) -> list[dict[str, Any]]:
         try:
             query: dict[str, Any] = {"partner_id": partner_id}

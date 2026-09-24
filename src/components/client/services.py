@@ -56,6 +56,10 @@ class TalkoClientService:
         docs = await self.__repository.find_by_partner(partner_id, active_only)
         return [self._to_response(d) for d in docs]
 
+    async def list_all_clients(self, active_only: bool = False) -> list[TalkoContract.ClientResponse]:
+        docs = await self.__repository.find_all(active_only)
+        return [self._to_response(d) for d in docs]
+
     async def get_client(self, client_id: str) -> TalkoContract.ClientResponse:
         doc = await self.__repository.find_by_id(ObjectId(client_id))
         if not doc:
