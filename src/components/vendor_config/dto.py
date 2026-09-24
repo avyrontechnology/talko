@@ -24,7 +24,16 @@ class TalkoContract:
         name: str | None = None
         vendor_name: str
         generic_url_handler: dict[str, Any] | None = None
+        cdr_url_handler: dict[str, Any] | None = None
+        dialer_url_handler: dict[str, Any] | None = None
+        c2c_support_url_handler: dict[str, Any] | None = None
+        hangup_url_handler: dict[str, Any] | None = None
+        transfer_url_handler: dict[str, Any] | None = None
+        live_calls_url_handler: dict[str, Any] | None = None
+        channel_pool: Optional["TalkoContract.ChannelPoolConfig"] = None
         available_did: list[str] | None = None
+        created_at: int | None = None
+        updated_at: int | None = None
 
     class VendorConfigUpdate(BaseModel):
         generic_url_handler: dict[str, Any] | None = None
