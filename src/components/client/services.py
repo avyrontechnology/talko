@@ -45,7 +45,12 @@ class TalkoClientService:
         record = TalkoClientModel(
             partner_id=payload.partner_id,
             name=name,
-            workspace_ids=payload.workspace_ids or [],
+            contact_name=(payload.contact_name or None),
+            email=(payload.email or None),
+            phone=(payload.phone or None),
+            external_ref=(payload.external_ref or None),
+            notes=(payload.notes or None),
+            tags=payload.tags or [],
             is_active=True,
         ).model_dump()
         client_id = await self.__repository.insert_client(record)
@@ -76,6 +81,9 @@ class TalkoClientService:
                 from src.exceptions import TalkoBadRequestError
 
                 raise TalkoBadRequestError("Client name must not be empty")
+        for key in ("contact_name", "email", "phone", "external_ref", "notes"):
+            if key in update and isinstance(update[key], str):
+                update[key] = update[key].strip() or None
         update["updated_at"] = self.__datetime_util.get_current_time()
         doc = await self.__repository.update_client(ObjectId(client_id), update)
         if not doc:

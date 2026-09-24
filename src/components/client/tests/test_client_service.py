@@ -22,9 +22,23 @@ class TestCreate:
         svc, repo = _svc()
         repo.find_by_name = AsyncMock(return_value=None)
         repo.insert_client = AsyncMock(return_value=str(ObjectId()))
-        out = await svc.create_client(TalkoContract.ClientCreate(partner_id=7, name="Acme", workspace_ids=[1]))
+        out = await svc.create_client(
+            TalkoContract.ClientCreate(
+                partner_id=7,
+                name="Acme",
+                contact_name="Aarav",
+                email="aarav@acme.com",
+                phone="9876543210",
+                external_ref="MAG-1",
+                notes="VIP",
+                tags=["vip"],
+            )
+        )
         assert out.message == "Client created successfully"
         assert out.id
+        inserted = repo.insert_client.call_args[0][0]
+        assert inserted["contact_name"] == "Aarav"
+        assert inserted["tags"] == ["vip"]
 
     @pytest.mark.asyncio
     async def test_duplicate_name(self):
@@ -52,7 +66,12 @@ class TestReadUpdate:
                     "_id": ObjectId(),
                     "partner_id": 7,
                     "name": "A",
-                    "workspace_ids": [],
+                    "contact_name": None,
+                    "email": None,
+                    "phone": None,
+                    "external_ref": None,
+                    "notes": None,
+                    "tags": [],
                     "is_active": True,
                 }
             ]

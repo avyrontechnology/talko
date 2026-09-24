@@ -11,7 +11,12 @@ class TalkoClientModel(TalkoTimestampedModel):
 
     partner_id: int = Field(description="Owning partner ID")
     name: str = Field(min_length=1, max_length=120, description="Client display name")
-    workspace_ids: list[int] = Field(default_factory=list, description="Workspace IDs scoped to this client")
+    contact_name: str | None = Field(default=None, max_length=120, description="Contact person for this sub-account")
+    email: str | None = Field(default=None, max_length=254, description="Contact email")
+    phone: str | None = Field(default=None, max_length=20, description="Contact phone")
+    external_ref: str | None = Field(default=None, max_length=120, description="Maglo/CRM account ID for reconciliation")
+    notes: str | None = Field(default=None, max_length=2000, description="Ops notes")
+    tags: list[str] = Field(default_factory=list, description="Ops tags")
     is_active: bool = Field(default=True)
     billing_account_id: str | None = Field(default=None, description="Billing ledger account (Phase 7)")
 
