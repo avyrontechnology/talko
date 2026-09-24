@@ -42,6 +42,16 @@ class TalkoPartnerApiKeyRepository:
             self.logger.error(f"Failed to find partner api keys for partner_id {partner_id}: {str(e)}")
             raise
 
+    async def find_all(self) -> list[dict]:
+        try:
+            async with self.db_manager.collection(
+                TalkoPartnerApiKeyModel.CollectionName.PARTNER_API_KEYS
+            ) as collection:
+                return await collection.find({}).to_list(length=None)
+        except Exception as e:
+            self.logger.error(f"Failed to find all partner api keys: {str(e)}")
+            raise
+
     async def find_by_id(self, id: str) -> dict | None:
         try:
             async with self.db_manager.collection(

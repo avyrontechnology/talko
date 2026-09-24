@@ -55,19 +55,25 @@ class TalkoPartnerApiKeyService:
     async def list_api_keys(self, partner_id: int) -> list[TalkoContract.ApiKeyListItem]:
         self.logger.info(f"Listing partner api keys for partner_id: {partner_id}")
         keys = await self.repository.find_all_by_partner_id(partner_id)
-        return [
-            TalkoContract.ApiKeyListItem(
-                id=str(key["_id"]),
-                key_prefix=key["key_prefix"],
-                partner_id=key["partner_id"],
-                label=key.get("label"),
-                is_active=key["is_active"],
-                created_at=key["created_at"],
-                last_used_at=key.get("last_used_at"),
-                revoked_at=key.get("revoked_at"),
-            )
-            for key in keys
-        ]
+        return [self._to_list_item(key) for key in keys]
+
+    async def list_all_api_keys(self) -> list[TalkoContract.ApiKeyListItem]:
+        self.logger.info("Listing all partner api keys (superadmin)")
+        keys = await self.repository.find_all()
+        return [self._to_list_item(key) for key in keys]
+
+    @staticmethod
+    def _to_list_item(key: dict) -> TalkoContract.ApiKeyListItem:
+        return TalkoContract.ApiKeyListItem(
+            id=str(key["_id"]),
+            key_prefix=key["key_prefix"],
+            partner_id=key["partner_id"],
+            label=key.get("label"),
+            is_active=key["is_active"],
+            created_at=key["created_at"],
+            last_used_at=key.get("last_used_at"),
+            revoked_at=key.get("revoked_at"),
+        )
 
     async def revoke_api_key(self, id: str) -> TalkoContract.ApiKeyRevokeResponse:
         self.logger.info(f"Revoking partner api key {id}")

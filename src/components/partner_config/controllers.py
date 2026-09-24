@@ -89,7 +89,7 @@ class TalkoPartnerConfigController:
             talko_service_logger.error(f"Unexpected error creating partner config: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
-    @router.get("", response_model=list[TalkoContract.PartnerConfigResponse])
+    @router.get("", response_model=list[TalkoContract.PartnerDataConfigResponse])
     @permission_check(TalkoPermissionDependency)
     @inject
     async def get_all_partner_configs(
@@ -113,7 +113,7 @@ class TalkoPartnerConfigController:
             talko_service_logger.error(f"Unexpected error retrieving partner configs: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
-    @router.get("/{id}", response_model=TalkoContract.PartnerConfigResponse)
+    @router.get("/{id}", response_model=TalkoContract.PartnerDataConfigResponse)
     @permission_check(TalkoPermissionDependency)
     @inject
     async def get_partner_config_by_id(
@@ -146,7 +146,7 @@ class TalkoPartnerConfigController:
             talko_service_logger.error(f"Unexpected error retrieving partner config: {str(e)}")
             return TalkoInternalServerErrorResponse(detail=SOMETHING_WENT_WRONG)
 
-    @router.patch("/{id}", response_model=TalkoContract.PartnerConfigResponse)
+    @router.patch("/{id}", response_model=TalkoContract.PartnerDataConfigResponse)
     @permission_check(TalkoPermissionDependency)
     @inject
     async def update_partner_config(

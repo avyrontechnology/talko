@@ -72,16 +72,27 @@ class TalkoPartnerApiKeyController:
     @inject
     async def list_api_keys(
         request: Request,
-        partner_id: int = Query(...),
+        partner_id: int | None = Query(None),
         partner_api_key_service: TalkoPartnerApiKeyService = Depends(Provide[TalkoContainer.partner_api_key_service]),
         talko_service_logger: TalkoServiceLogger = Depends(Provide[TalkoContainer.logger]),
     ):
         try:
-            talko_service_logger.info(f"Listing partner api keys for partner_id: {partner_id}")
-            # Segregation: non-superadmins may only list their own partner's keys.
             current_user_data: dict = request.state.user
             grpc_client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
-            if not await is_superadmin(request, grpc_client, talko_service_logger):
+            is_admin = await is_superadmin(request, grpc_client, talko_service_logger)
+            # Empty partner_id = all keys for superadmin, own keys otherwise.
+            if partner_id is None:
+                if is_admin:
+                    talko_service_logger.info("Listing all partner api keys (superadmin default)")
+                    keys = await partner_api_key_service.list_all_api_keys()
+                    return TalkoSuccessResponse(data=keys)
+                own = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
+                if own is None:
+                    return TalkoSuccessResponse(data=[])
+                partner_id = own
+            talko_service_logger.info(f"Listing partner api keys for partner_id: {partner_id}")
+            # Segregation: non-superadmins may only list their own partner's keys.
+            if not is_admin:
                 own = current_user_data.get(TalkoCurrentUserMap.PARTNER_ID)
                 if own is not None:
                     partner_id = own

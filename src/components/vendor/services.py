@@ -56,7 +56,8 @@ class TalkoVendorService:
     async def get_vendors(self) -> list[TalkoContract.GetAllVendorData]:
         self.logger.info("Get vendor all list started.")
         try:
-            vendors = await self.repository.find_all_vendors()
+            # Admin list must include inactive so superadmin can activate them.
+            vendors = await self.repository.find_all_vendors(include_inactive=True)
             vendor_responses = []
             for vendor in vendors:
                 vendor["id"] = str(vendor["_id"])
