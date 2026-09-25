@@ -451,12 +451,10 @@ class TestCallProcessorHelperCompleteCoverage:
             await self.helper.select_did(partner_config=partner_config, partner_id=123, user_id=456)
 
     def test_prepare_cdr_with_all_fields(self):
-        """Test prepare_cdr with all optional fields"""
+        """Test prepare_cdr with all optional fields (entity/lead no longer accepted on create)"""
         call_data = TalkoContract.CallCreate(
             workspace_id=1,
             agent_number="9123456789",
-            lead_id=100,
-            lead_name="Test Lead",
             encryption_enabled=False,
             to_number="919876543210",
         )
@@ -476,8 +474,8 @@ class TestCallProcessorHelperCompleteCoverage:
         )
 
         assert result["call_id"] == "call123"
-        assert result["lead_id"] == 100
-        assert result["lead_name"] == "Test Lead"
+        assert result["lead_id"] is None
+        assert result["lead_name"] == ""
         assert result["vendor_id"] == "v1"
 
     @pytest.mark.asyncio
@@ -1099,12 +1097,10 @@ class TestCallProcessorHelperCompleteCoverage:
         assert any("mapped to different workspace" in msg for msg in debug_calls)
 
     def test_prepare_cdr_with_actual_lead_name(self):
-        """Test prepare_cdr with actual non-empty lead_name"""
+        """Test prepare_cdr carries no lead name (lead fields removed from create)"""
         call_data = TalkoContract.CallCreate(
             workspace_id=1,
             agent_number="9123456789",
-            lead_id=100,
-            lead_name="John Doe",  # Actual name
             encryption_enabled=False,
             to_number="919876543210",
         )
@@ -1121,7 +1117,7 @@ class TestCallProcessorHelperCompleteCoverage:
             to_number="919876543210",
         )
 
-        assert result["lead_name"] == "John Doe"
+        assert result["lead_name"] == ""
 
     @pytest.mark.asyncio
     async def test_get_partner_config_not_found_full_verification(self):

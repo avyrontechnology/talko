@@ -132,29 +132,6 @@ class TalkoCallService:
         self.__telephony_bridge: Any = telephony_bridge
         self.__billing_service: Any = billing_service
 
-    def _normalize_entity_fields_for_outbound(self, call_data: call_contract.CallCreate) -> call_contract.CallCreate:
-        """
-        Backward compatibility:
-        if old callers send lead_id but not entity_type/entity_id,
-        normalize it to Lead + entity_id.
-        """
-        if call_data.entity_type is None and call_data.lead_id is not None:
-            self.__logger.warning(
-                "DEPRECATED: outbound request using lead_id without entity_type/entity_id. "
-                "Normalizing to TalkoEntityType.LEAD."
-            )
-            call_data.entity_type = TalkoEntityType.LEAD
-            call_data.entity_id = call_data.lead_id
-
-        if (
-            getattr(call_data, "entity_name", None) is None
-            and getattr(call_data, "lead_name", None)
-            and call_data.entity_type == TalkoEntityType.LEAD
-        ):
-            call_data.entity_name = call_data.lead_name
-
-        return call_data
-
     def _derive_inbound_entity_fields(
         self,
         entity_type: str | None = None,
@@ -224,7 +201,6 @@ class TalkoCallService:
         """
         try:
             self.__logger.info("Initial call service for partner started.")
-            call_data = self._normalize_entity_fields_for_outbound(call_data)
             self.__logger.debug(f"Call data received: {call_data}")
 
             if call_data.encryption_enabled or call_data.lead_secret:
@@ -397,9 +373,9 @@ class TalkoCallService:
                     "dedicated_did": from_number,
                     "vendor_id": str(vendor_id),
                     "vendor_config_id": str(vendor_config_id),
-                    "entity_type": (call_data.entity_type.value if getattr(call_data, "entity_type", None) else None),
-                    "entity_id": getattr(call_data, "entity_id", None),
-                    "entity_name": getattr(call_data, "entity_name", None),
+                    "entity_type": None,
+                    "entity_id": None,
+                    "entity_name": None,
                     "context_data": context_data_with_cdr_id,
                     "enable_ai_bridge": bool(call_data.enable_ai_bridge),
                     "created_at": timestamp,
@@ -584,9 +560,6 @@ class TalkoCallService:
                 return
 
             call_data = call_contract.CallCreate(
-                entity_type=cdr.get("entity_type"),
-                entity_id=cdr.get("entity_id"),
-                entity_name=cdr.get("entity_name"),
                 workspace_id=workspace_id,
                 partner_id=partner_id,
                 agent_number=agent_number,

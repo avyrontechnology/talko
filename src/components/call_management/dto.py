@@ -4,19 +4,10 @@ from pydantic import BaseModel, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 from src.components.call_management.enums import TalkoOutboundType
-from src.components.cdr.constants import TalkoEntityType
 
 
 class TalkoContract:
     class CallCreate(BaseModel):
-        entity_type: TalkoEntityType | None = None  # "Lead" or "Contact"
-        entity_id: int | None = None
-        entity_name: str | None = None
-
-        # ── DEPRECATED: kept for backward compat (old callers) ─────────
-        lead_id: int | None = None
-        lead_name: str | None = None
-
         workspace_id: int | None = None
         partner_id: int | None = None
         number_type: str | None = None
