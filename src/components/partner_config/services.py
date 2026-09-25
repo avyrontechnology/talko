@@ -169,7 +169,7 @@ class TalkoPartnerConfigService:
 
     async def update_partner_config(
         self, id: str, update_data: TalkoContract.PartnerConfigUpdate
-    ) -> TalkoContract.PartnerConfigResponse:
+    ) -> TalkoContract.PartnerDataConfigResponse:
         """
         Update a partner configuration with optional attendance data.
 
@@ -187,14 +187,15 @@ class TalkoPartnerConfigService:
         try:
             self.logger.info(f"Updating partner config {id}")
             # Fetch existing config
-            existing_config: TalkoContract.PartnerConfigResponse = await self.get_partner_config_by_id(id)
+            existing_config: TalkoContract.PartnerDataConfigResponse = await self.get_partner_config_by_id(id)
             if not existing_config:
                 raise TalkoResourceNotFound(PARTNER_CONFIG_WITH_ID_NOT_FOUND)
 
-            # Merge update data
-            updated_config_data = existing_config.copy(deep=True)
+            # Merge update data (Pydantic v2 has no BaseModel.update();
+            # model_copy(update=...) is the equivalent).
             update_dict = update_data.model_dump(exclude_unset=True)
-            updated_config_data.update(update_dict)
+            updated_config_data = existing_config.model_copy(update=update_dict, deep=True)
+            vendor_id = ObjectId(existing_config.vendor_id)
 
             # Handle attendance update if provided
             if "service_default_attendance" in update_dict or "round_robin_default_attendance" in update_dict:
@@ -206,7 +207,6 @@ class TalkoPartnerConfigService:
                     ]
                     if k in update_dict
                 }
-                vendor_id = ObjectId(existing_config.vendor_id)
                 attendance_data = await TalkoPartnerConfigHelper.update_default_attendance(
                     updated_config_data,
                     vendor_id,
@@ -221,23 +221,28 @@ class TalkoPartnerConfigService:
                     updated_config_data.round_robin_default_attendance["default"].extend(
                         attendance_update["round_robin_default_attendance"].get("default", [])
                     )
-                updated_config_data.update(attendance_data)
+                updated_config_data = updated_config_data.model_copy(update=attendance_data, deep=True)
 
             # Update the config in the repository
-            model_config = TalkoPartnerConfigModel(**updated_config_data.model_dump()).model_dump(
+            merged = updated_config_data.model_dump()
+            # Model requires ObjectId instances; the response DTO carries str.
+            if isinstance(merged.get("vendor_id"), str):
+                merged["vendor_id"] = ObjectId(merged["vendor_id"])
+            model_config = TalkoPartnerConfigModel(**merged).model_dump(
                 by_alias=True, exclude_unset=True
             )
             model_config["updated_at"] = self.datetime_util.get_current_time()
             # Repository raises ValueError when the document is missing, so a
             # bare await is enough — the return value carries no extra state
             # beyond what updated_config_data already holds.
-            await self.repository.update_partner_config(id, model_config)
+            # NOTE: _id is an ObjectId in Mongo — a raw str never matches.
+            await self.repository.update_partner_config(ObjectId(id), model_config)
             updated_config_data.id = id
             updated_config_data.updated_at = model_config["updated_at"]
             updated_config_data.vendor_id = str(vendor_id)
 
             self.logger.info(f"Partner config {id} updated successfully")
-            return TalkoContract.PartnerConfigResponse(**updated_config_data.model_dump())
+            return TalkoContract.PartnerDataConfigResponse(**updated_config_data.model_dump())
         except TalkoResourceNotFound as e:
             self.logger.error(f"Partner config {id} not found: {e}")
             raise
