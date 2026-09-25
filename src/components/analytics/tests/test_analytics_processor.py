@@ -10,6 +10,7 @@ from src.components.analytics.dto import (
     TalkoTotalAgentTalkTimeRequest,
 )
 from src.components.analytics.processor import TalkoAnalyticsProcessor
+from src.utils.enums import TalkoUserRoleHierarchy
 
 
 @pytest.mark.asyncio
@@ -30,6 +31,18 @@ class TestAnalyticsProcessor:
         mock_user_hierarchy.get_user_hierarchy_data.return_value = [1, 2, 3]
         mock_grpc_client.get_user_roles.return_value = {"hierarchy": 3}
         return processor, mock_repo, mock_logger, mock_grpc_client, mock_user_hierarchy
+
+    async def test_user_hierarchy_data_none_user_uses_partner_scope(self, setup_processor):
+        # API-key auth carries no user_id and gRPC is disabled — must not
+        # touch grpc_client, must return partner-wide scope.
+        processor, _, _, mock_grpc_client, mock_user_hierarchy = setup_processor
+
+        agents, role = await processor.user_hierarchy_data(MagicMock(), None)
+
+        assert agents == []
+        assert role == TalkoUserRoleHierarchy.MAINTAINER.value
+        mock_user_hierarchy.get_user_hierarchy_data.assert_not_awaited()
+        mock_grpc_client.get_user_roles.assert_not_awaited()
 
     async def test_get_agent_call_analytics_success(self, setup_processor):
         processor, mock_repo, mock_logger, _, _ = setup_processor

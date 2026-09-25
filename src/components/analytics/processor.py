@@ -11,6 +11,7 @@ from src.components.analytics.repositories import TalkoAnalyticsRepository
 from src.components.common.user_hierarchy import TalkoUserHierarchy
 from src.grpc_client.client_services.auth_service_client import TalkoAuthServiceClient
 from src.loggers.talko_service_logger import TalkoServiceLogger
+from src.utils.enums import TalkoUserRoleHierarchy
 
 
 class TalkoAnalyticsProcessor:
@@ -28,6 +29,12 @@ class TalkoAnalyticsProcessor:
 
     async def user_hierarchy_data(self, request_data, current_user_id: int) -> tuple[list, int]:
         """Fetch and validate agent hierarchy under the given user."""
+        if current_user_id is None:
+            # Partner API-key auth carries no user_id and gRPC is disabled —
+            # fall back to partner-wide scope (empty agent filter + maintainer
+            # role bypasses the repository's empty-result guard).
+            self.logger.info("No user_id (API-key auth); using partner-wide analytics scope")
+            return [], TalkoUserRoleHierarchy.MAINTAINER.value
         agent_ids = await self.user_hierarchy.get_user_hierarchy_data(request_data, current_user_id)
         agent_data: dict[int, dict[str, Any]] = await self.grpc_client.get_user_roles(current_user_id)
         user_role = agent_data.get("hierarchy", 0)
