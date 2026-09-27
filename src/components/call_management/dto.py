@@ -79,16 +79,9 @@ class TalkoContract:
                 )
             return v
 
-        # Workspace mandatory for non-AI calls
-        @model_validator(mode="after")
-        def validate_workspace_id(self):
-            # When not using AI bridge, workspace_id is required
-            if not self.enable_ai_bridge and self.workspace_id is None:
-                raise PydanticCustomError(
-                    "workspace_id_required",
-                    "workspace_id is required when enable_ai_bridge is false",
-                )
-            return self
+        # Workspace is optional at the API boundary: select_did enforces it
+        # per routing strategy (required for workspace-mode configs,
+        # unnecessary for round-robin / agent-mapping configs).
 
     class CallResponse(BaseModel):
         id: str
