@@ -363,7 +363,9 @@ class TalkoResourceNotFoundResponse(TalkoAPIResponse):
         content = {
             "status": "error",
             "error_code": "RESOURCE_NOT_FOUND",
-            "detail": f"{detail} not found",
+            # Full-sentence details (ending with ".") stand alone;
+            # fragments get the conventional suffix.
+            "detail": detail if detail.rstrip().endswith(".") else f"{detail} not found",
         }
         super().__init__(
             content=self.to_json(content),
