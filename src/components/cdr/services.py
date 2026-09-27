@@ -198,7 +198,11 @@ class TalkoCDRService:
             workspace_agent_ids, user_role = await self.__analytics_processor.user_hierarchy_data(
                 request_data=payload, current_user_id=user_id
             )
-            if not workspace_agent_ids:
+            # API-key auth has no user_id: user_hierarchy_data returns
+            # partner-wide scope ([], MAINTAINER) — must not be mistaken
+            # for "no agents in scope". Only JWT users with an empty
+            # hierarchy get the empty result.
+            if not workspace_agent_ids and user_id is not None:
                 return TalkoContract.AgentCallRecordHistoryResponse(
                     call_record=[],
                     total_count=0,
