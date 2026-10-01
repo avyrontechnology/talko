@@ -30,6 +30,7 @@ email-validator = "^2.3.0"
 psutil = "^7.2.2"
 livekit = "^1.1.7"
 livekit-api = "^1.1.0"
+websockets = "^16.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -37,7 +38,6 @@ coverage = "^7.9.2"
 pytest = "^8.4.1"
 pytest-asyncio = "^1.0.0"
 asgi-lifespan = "^2.1.0"
-websockets = "^16.0"
 ruff = "^0.16.0"
 
 [tool.ruff]

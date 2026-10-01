@@ -94,10 +94,15 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
                     "async": 1,
                     "get_call_id": 1,
                 }
+                headers = {}
 
             self.logger.debug(f"{self.vendor_type} payload={payload}")
 
-            headers: dict = {
+            # Preserve vendor-config headers (e.g. accept/content-type on the
+            # c2c_support handler) — the previous code assigned them inside
+            # the ai_bridge branch and then unconditionally overwrote them here.
+            headers = {
+                **(headers or {}),
                 "Content-Type": "application/json",
                 "Authorization": auth_credentials.get("token"),
             }
@@ -110,16 +115,41 @@ class TalkoTataTeleCallHandler(TalkoVendorCallHandler):
                     json_data = response.json()
                     self.logger.info(f"{self.vendor_type} API call successful: {json_data}")
                     return json_data
-                elif response.status_code == 400:
-                    error_data = response.json()
-                    error_message = error_data.get("message")
-                    self.logger.error(f"Invalid parameters in {self.vendor_type} API call: {error_message}")
-                    raise ValueError(INVALID_PARAMETER.format(error_message))
-                elif response.status_code != 200:
+                try:
+                    error_body = response.json()
+                except Exception:
+                    error_body = None
+                import inspect as _inspect
+
+                if _inspect.isawaitable(error_body):
+                    # Test doubles (AsyncMock) make .json() awaitable; real
+                    # httpx responses are sync. Never await here — fall back
+                    # to .text instead of leaking an un-awaited coroutine.
+                    try:
+                        error_body.close()
+                    except Exception:
+                        pass
+                    error_body = None
+                if not isinstance(error_body, (dict, str)):
+                    error_body = getattr(response, "text", "")
+                    if _inspect.isawaitable(error_body):
+                        error_body = ""
+                if isinstance(error_body, dict):
+                    error_message = error_body.get("message") or error_body
+                else:
+                    error_message = error_body
+                if response.status_code in (400, 422):
                     self.logger.error(
-                        f"Unexpected {self.vendor_type} API response: {response.status_code} - {response.json()}"
+                        f"Invalid parameters in {self.vendor_type} API call "
+                        f"status={response.status_code}: {error_message}"
                     )
-                    raise ValueError(UNEXPECTED_API_RESPONSE.format(response.status_code))
+                    raise ValueError(INVALID_PARAMETER.format(error_message))
+                self.logger.error(
+                    f"Unexpected {self.vendor_type} API response: {response.status_code} - {error_message}"
+                )
+                raise ValueError(
+                    UNEXPECTED_API_RESPONSE.format(f"{response.status_code} - {error_message}")
+                )
         except Exception as e:
             self.logger.error(f"Failed to make {self.vendor_type} API call: {str(e)}")
             raise ValueError(f"{self.vendor_type} API call failed: {str(e)}")

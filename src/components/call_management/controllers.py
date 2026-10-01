@@ -64,7 +64,7 @@ class TalkoCallController:
             )
         except ValueError as e:
             talko_service_logger.error(f"Error in initiating call api: {str(e)}")
-            return TalkoBadRequestResponse(detail=call_messages.SOMETHING_WENT_WRONG)
+            return TalkoBadRequestResponse(detail=str(e) or call_messages.SOMETHING_WENT_WRONG)
         except TalkoResourceNotFound as e:
             talko_service_logger.error(f"Error in initiate call api resource: {str(e)}")
             return TalkoResourceNotFoundResponse(detail=str(e) or call_messages.SOMETHING_WENT_WRONG)
