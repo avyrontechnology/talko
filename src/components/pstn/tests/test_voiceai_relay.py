@@ -526,3 +526,42 @@ class TestStreamTokenAuth:
         )
         assert len(opened) == 1
         assert "agent_9" in opened[0] and "ticket=" in opened[0]
+
+    @pytest.mark.asyncio
+    async def test_mint_ticket_reads_envelope(self, monkeypatch):
+        """Engine wraps the ticket: {"ok":true,"data":{"ticket":...}} (prod 23:46 KeyError)."""
+        from unittest.mock import MagicMock
+
+        import src.components.pstn.voiceai_relay as relay_mod
+        from src.components.pstn.voiceai_relay import TalkoVoiceaiRelay
+
+        class FakeResp:
+            def __init__(self, payload):
+                self._payload = payload
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return self._payload
+
+        class FakeClient:
+            def __init__(self, payload):
+                self._payload = payload
+
+            async def post(self, url, headers=None):
+                assert url.endswith("/auth/ws-ticket")
+                assert headers == {"Authorization": "Bearer key"}
+                return FakeResp(self._payload)
+
+        async def fake_pooled(timeout_seconds):
+            return FakeClient({"ok": True, "data": {"ticket": "tick123", "expires_in": 60}})
+
+        monkeypatch.setattr(relay_mod, "_pooled_http_client", fake_pooled)
+        relay = TalkoVoiceaiRelay(
+            ws_base_url="wss://voiceai.local",
+            api_base_url="https://voiceai.local",
+            api_key="key",
+            logger=MagicMock(),
+        )
+        assert await relay._TalkoVoiceaiRelay__mint_ticket() == "tick123"

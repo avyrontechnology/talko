@@ -196,7 +196,14 @@ class TalkoVoiceaiRelay:
         client = await _pooled_http_client(self.__ticket_timeout)
         resp = await client.post(url, headers={"Authorization": f"Bearer {self.__api_key}"})
         resp.raise_for_status()
-        return resp.json()["ticket"]
+        payload = resp.json() or {}
+        # Engine wraps in success envelope {"ok":true,"data":{"ticket":...}};
+        # accept a bare {"ticket":...} too for older surfaces.
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+        ticket = data.get("ticket")
+        if not ticket:
+            raise ValueError("engine ws-ticket response carried no ticket")
+        return ticket
 
     async def __connect_socket(self, url: str) -> "_AiohttpVoiceaiSocket":
         session = aiohttp.ClientSession()
