@@ -9,7 +9,7 @@ Lifeline:
 
 1. Mint a single-use voiceai WS ticket
    (``POST {VOICEAI_API_BASE_URL}/auth/ws-ticket``, Bearer ``VOICEAI_API_KEY``).
-2. Open ``{VOICEAI_WS_BASE_URL}/chat/v1/{agent_id}?token={ticket}`` and
+2. Open ``{VOICEAI_WS_BASE_URL}/chat/v1/{agent_id}?ticket={ticket}`` and
    forward Tata's ``start`` event first — voiceai requires ``start``
    (``callSid``/``streamSid``) before any ``media``.
 3. Pump Tata -> voiceai (caller audio, mark acks, stop) and
@@ -186,7 +186,7 @@ class TalkoVoiceaiRelay:
     # ── setup helpers ────────────────────────────────────────────────
 
     def ws_url(self, agent_id: str, ticket: str) -> str:
-        return f"{self.__ws_base_url}/chat/v1/{agent_id}?token={ticket}"
+        return f"{self.__ws_base_url}/chat/v1/{agent_id}?ticket={ticket}"
 
     async def __mint_ticket(self) -> str:
         # Pooled client: a fresh AsyncClient per call pays a full TCP+TLS

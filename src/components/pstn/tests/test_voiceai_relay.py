@@ -93,7 +93,7 @@ def make_relay(vws, ticket="tick", logger=None, **kwargs):
         return ticket
 
     async def ws_connector(url):
-        assert url == "wss://voiceai.local/chat/v1/agent_1?token=tick"
+        assert url == "wss://voiceai.local/chat/v1/agent_1?ticket=tick"
         return vws
 
     return TalkoVoiceaiRelay(
@@ -226,7 +226,7 @@ class TestVoiceaiRelayOutbound:
             api_key="k",
             logger=MagicMock(),
         )
-        assert relay.ws_url("a1", "t") == "wss://v.local/chat/v1/a1?token=t"
+        assert relay.ws_url("a1", "t") == "wss://v.local/chat/v1/a1?ticket=t"
 
 
 class TestFrameSplitting:
@@ -525,4 +525,4 @@ class TestStreamTokenAuth:
             timeout=10,
         )
         assert len(opened) == 1
-        assert "agent_9" in opened[0] and "token=" in opened[0]
+        assert "agent_9" in opened[0] and "ticket=" in opened[0]
