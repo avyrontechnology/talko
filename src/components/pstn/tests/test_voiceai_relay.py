@@ -565,3 +565,51 @@ class TestStreamTokenAuth:
             logger=MagicMock(),
         )
         assert await relay._TalkoVoiceaiRelay__mint_ticket() == "tick123"
+
+
+class TestTeardownRace:
+    @pytest.mark.asyncio
+    async def test_trailing_tata_frame_after_voiceai_close_does_not_raise(self):
+        """Prod 2026-10-02: engine closed its side (agent hangup) after ~90 s
+        of healthy media; a trailing Tata media frame then hit send_str on
+        the dead socket -> ConnectionResetError bubbled out of run() and was
+        logged as FAILED. run() must swallow that race and return normally."""
+
+        class ClosingVoiceaiSocket(FakeVoiceaiSocket):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.remote_gone = False
+
+            async def receive_str(self):
+                data = await super().receive_str()
+                if data is None:
+                    # Engine hung up remotely: the transport is dead even
+                    # though nobody called close() yet (prod 2026-10-02).
+                    self.remote_gone = True
+                return data
+
+            async def send_str(self, data: str):
+                if self.remote_gone or self.closed:
+                    raise ConnectionResetError("Cannot write to closing transport")
+                await super().send_str(data)
+
+        vws = ClosingVoiceaiSocket([], remote_close_when_empty=True)
+        tata = FakeTataWs()
+        relay = make_relay(vws)
+        start = {"event": "start", "start": {}}
+
+        async def trailing_media_then_stop():
+            # Give the pump a moment to observe the remote close, then
+            # deliver a trailing Tata frame (seq 1578 in prod) + stop.
+            for _ in range(100):
+                if vws.remote_gone:
+                    break
+                await asyncio.sleep(0.01)
+            yield tata_media(99)
+            yield json.dumps({"event": "stop", "streamSid": "MZ123"})
+
+        await asyncio.wait_for(
+            relay.run(tata, TalkoTataTeleProvider(), make_ctx(), start, trailing_media_then_stop(), "agent_1"),
+            timeout=10,
+        )
+        assert vws.closed

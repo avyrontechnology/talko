@@ -284,8 +284,26 @@ class TalkoVoiceaiRelay:
                     except (json.JSONDecodeError, TypeError):
                         continue
 
+                    # Teardown race guard: the pump's reader ends when the
+                    # voiceai engine closes its side (agent hangup). Any Tata
+                    # frame arriving after that (e.g. trailing media before
+                    # Tata's own stop) has nowhere to go — forwarding it
+                    # raises ClientConnectionResetError ("Cannot write to
+                    # closing transport") out of run(), which the caller then
+                    # logs as ❌ FAILED even though the call itself already
+                    # ended normally. Drop trailing frames instead.
+                    if pump.done():
+                        break
+
                     if provider.is_stop_event(event):
-                        await self.__send_voiceai(vws, json.dumps(event), sid)
+                        try:
+                            await self.__send_voiceai(vws, json.dumps(event), sid)
+                        except (ConnectionResetError, aiohttp.ClientConnectionResetError) as e:
+                            self.__logger.info(
+                                f"[VOICEAI][RELAY] voiceai leg already closed at teardown sid={sid} — "
+                                f"dropping Tata stop ({type(e).__name__})"
+                            )
+                            break
                         self.__logger.info(f"[VOICEAI][RELAY] Tata stop forwarded sid={sid}")
                         tata_ended = True
                         break
@@ -313,13 +331,27 @@ class TalkoVoiceaiRelay:
                             # ordered mark is actually forwarded) and the
                             # engine must see each mark only once.
                             voiceai_marks.discard(label)
-                            await self.__send_voiceai(vws, raw, sid)
+                            try:
+                                await self.__send_voiceai(vws, raw, sid)
+                            except (ConnectionResetError, aiohttp.ClientConnectionResetError) as e:
+                                self.__logger.info(
+                                    f"[VOICEAI][RELAY] voiceai leg already closed at teardown sid={sid} — "
+                                    f"dropping mark ack ({type(e).__name__})"
+                                )
+                                break
                         # else: unknown mark, consume locally.
                         continue
 
                     translated = forward_to_voiceai(event)
                     if translated is not None:
-                        await self.__send_voiceai(vws, translated, sid)
+                        try:
+                            await self.__send_voiceai(vws, translated, sid)
+                        except (ConnectionResetError, aiohttp.ClientConnectionResetError) as e:
+                            self.__logger.info(
+                                f"[VOICEAI][RELAY] voiceai leg already closed at teardown sid={sid} — "
+                                f"dropping trailing Tata frame ({type(e).__name__})"
+                            )
+                            break
             finally:
                 try:
                     # Unblock the pump's receive so it can drain and exit.

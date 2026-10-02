@@ -514,6 +514,16 @@ class TalkoPSTNBridgeService:
                 raw_events,
                 voiceai_agent_id,
             )
+        except (ConnectionResetError, asyncio.TimeoutError) as e:
+            # Teardown race: the voiceai engine closed its side (agent hangup)
+            # while a trailing Tata frame was still being forwarded, or the
+            # closing send hit the send timeout. The call itself already ran
+            # to completion (see the relay's Ended stats line) — not a call
+            # failure, so warning instead of the alarming ❌ FAILED error.
+            self.__logger.warning(
+                f"[PSTN][CALL] voiceai leg closed at teardown sid={ctx.call_sid} "
+                f"type={type(e).__name__} error={e}"
+            )
         except Exception as e:
             self.__logger.error(
                 f"[PSTN][CALL] ❌ voiceai relay FAILED sid={ctx.call_sid} error={e} traceback={traceback.format_exc()}"
