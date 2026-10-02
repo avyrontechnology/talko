@@ -293,6 +293,11 @@ class TalkoVoiceaiRelay:
                     # logs as ❌ FAILED even though the call itself already
                     # ended normally. Drop trailing frames instead.
                     if pump.done():
+                        voiceai_close = getattr(vws, "close_info", None)
+                        self.__logger.info(
+                            f"[VOICEAI][RELAY] Tata leg ended after voiceai close sid={sid} "
+                            f"voiceai_close={voiceai_close} — dropping trailing Tata frame"
+                        )
                         break
 
                     if provider.is_stop_event(event):
@@ -450,8 +455,30 @@ class TalkoVoiceaiRelay:
                         self.__logger.warning(f"[VOICEAI][RELAY] voiceai recv failed sid={ctx.call_sid}: {e}")
                         break
                     if data is None:
+                        # Engine closed its side. The close code/reason is the
+                        # single best clue for mid-conversation drops (clean
+                        # 1000 = agent hangup path; anything else = engine
+                        # crash/timeout/network).
+                        self.__logger.info(
+                            f"[VOICEAI][RELAY] voiceai socket closed sid={ctx.call_sid} "
+                            f"close={getattr(vws, 'close_info', None)} "
+                            f"after_msgs={stats['voiceai_msgs']}"
+                        )
                         break
                     kind, payload = parse_from_voiceai(data)
+                    if kind is None:
+                        # Engine control/housekeeping frame (e.g. a hangup
+                        # notice carrying the reason). Rare — log it so the
+                        # hangup cause is never silently dropped.
+                        try:
+                            evt = json.loads(data) if isinstance(data, str) else None
+                        except (json.JSONDecodeError, TypeError):
+                            evt = None
+                        if isinstance(evt, dict) and evt.get("event") not in (None, "media", "mark", "clear"):
+                            self.__logger.info(
+                                f"[VOICEAI][RELAY] voiceai control sid={ctx.call_sid} frame={data[:300]}"
+                            )
+                        continue
                     if kind == "media":
                         rms = _mulaw_rms(payload)
                         stats["voiceai_msgs"] += 1
@@ -653,6 +680,9 @@ class _AiohttpVoiceaiSocket:
     def __init__(self, session: aiohttp.ClientSession, ws) -> None:
         self.__session = session
         self.__ws = ws
+        # Last non-TEXT frame seen (CLOSE/CLOSING/CLOSED/ERROR) — the engine's
+        # close code/reason, used to explain mid-conversation drops.
+        self.close_info: dict[str, Any] | None = None
 
     async def send_str(self, data: str) -> None:
         await self.__ws.send_str(data)
@@ -663,6 +693,15 @@ class _AiohttpVoiceaiSocket:
         if msg.type == aiohttp.WSMsgType.TEXT:
             return msg.data
         # voiceai never sends binary frames; anything else means closed/closing.
+        # Stash the close detail before reporting the end of stream.
+        try:
+            self.close_info = {
+                "type": msg.type.name if hasattr(msg.type, "name") else str(msg.type),
+                "code": msg.data if isinstance(msg.data, int) else None,
+                "reason": msg.extra if isinstance(msg.extra, str) else None,
+            }
+        except Exception:
+            self.close_info = {"type": "unknown"}
         return None
 
     async def close(self) -> None:
