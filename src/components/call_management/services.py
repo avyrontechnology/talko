@@ -1,4 +1,5 @@
 import asyncio
+import json
 import time
 import traceback
 import uuid
@@ -725,6 +726,10 @@ class TalkoCallService:
                     "skipping makun-ai pre-session, storing pending context"
                 )
                 await self._store_fallback_context(fallback_store_key, fallback_payload, to_number)
+                # Warm the PSTN hot-path DID cache while Tata rings so the
+                # post-answer Step 2 hits Redis (~10ms) instead of Atlas
+                # (~0.5s). Best-effort: never fails the call.
+                await self._warm_outbound_did_cache(caller_did)
                 return
 
             # ── Step 1: Resolve agent_id from DID ────────────────────────────
@@ -908,6 +913,46 @@ class TalkoCallService:
             self.__logger.error(
                 f"[PreSession] ❌ Fallback context store FAILED store_key={store_key} to_number={to_number} error={e}"
             )
+
+    async def _warm_outbound_did_cache(self, caller_did: str) -> None:
+        """Pre-fetch the DID record into the PSTN hot-path cache (Redis).
+
+        Runs during the ringing window so the post-answer Step 2
+        (``TalkoPSTNBridgeService._resolve_did``) hits
+        ``pstn:did:<number>`` instead of paying an Atlas round trip
+        (~0.5s observed). Best-effort: any failure is logged and swallowed.
+
+        Key-format note: the PSTN reader keys by the RAW did_number from
+        Tata's start event (observed with a leading ``+``), while placement
+        time only has the bare digits — so both variants are written. Each
+        is tiny (one DID row, existing 300s TTL); reads are exact-match so
+        no other lookup can collide with the extra key.
+        """
+        try:
+            if not caller_did:
+                return
+            did_record = await self.__did_repository.get_did_by_number(
+                call_to_number=caller_did, partner_id=None
+            )
+            if not did_record or not did_record.get("is_active", True):
+                return
+            from src.components.cache.redis_client import get_redis_client
+            from src.core.redis_constants import DID_CACHE_KEY, DID_CACHE_TTL_SECONDS
+            from src.utils.mongo_utils import stringify_object_ids
+
+            redis = await get_redis_client()
+            payload = json.dumps(stringify_object_ids(did_record))
+            keys = {caller_did}
+            keys.add(caller_did if caller_did.startswith("+") else f"+{caller_did}")
+            for key_did in keys:
+                await redis.set(
+                    DID_CACHE_KEY.format(did_number=key_did),
+                    payload,
+                    ex=DID_CACHE_TTL_SECONDS,
+                )
+            self.__logger.info(f"[PreSession] DID cache warmed caller_did={caller_did}")
+        except Exception as e:
+            self.__logger.warning(f"[PreSession] DID cache warm skipped caller_did={caller_did} error={e}")
 
     # ─────────────────────────────────────────────────────────────────────────
 

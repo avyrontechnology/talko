@@ -1426,3 +1426,101 @@ class TestPreCreateSessionCallId:
         stored_payload = mock_store.call_args[0][1]
         assert stored_payload["context_data"]["cdr_id"] == "cdr-xyz-789"
         assert stored_payload["context_data"]["campaign_id"] == "7"
+
+
+class FakeRedis:
+    def __init__(self):
+        self.store = {}
+
+    async def set(self, key, value, ex=None):
+        self.store[key] = (value, ex)
+
+    async def get(self, key):
+        return self.store.get(key, (None, None))[0]
+
+
+class TestWarmOutboundDidCache:
+    @pytest.mark.asyncio
+    async def test_writes_both_key_variants_for_active_did(self):
+        from bson import ObjectId
+
+        service, deps = make_service()
+        deps["did_repository"].get_did_by_number = AsyncMock(
+            return_value={
+                "_id": ObjectId("6aa02d20724c38d0d89c413c"),
+                "did_number": "917965263087",
+                "partner_id": 2,
+                "is_active": True,
+            }
+        )
+        redis = FakeRedis()
+        with patch(
+            "src.components.cache.redis_client.get_redis_client",
+            new_callable=AsyncMock,
+            return_value=redis,
+        ):
+            await service._warm_outbound_did_cache("917965263087")
+
+        # PSTN reads with Tata's raw (plus-prefixed) number AND the bare
+        # digits variant must both hit — writes cover both.
+        assert "pstn:did:917965263087" in redis.store
+        assert "pstn:did:+917965263087" in redis.store
+        for _, (value, ex) in redis.store.items():
+            assert ex == 300
+            assert '"partner_id": 2' in value
+            assert "ObjectId" not in value
+
+    @pytest.mark.asyncio
+    async def test_skips_inactive_or_missing_did(self):
+        service, deps = make_service()
+        redis = FakeRedis()
+        with patch(
+            "src.components.cache.redis_client.get_redis_client",
+            new_callable=AsyncMock,
+            return_value=redis,
+        ):
+            deps["did_repository"].get_did_by_number = AsyncMock(return_value=None)
+            await service._warm_outbound_did_cache("917965263087")
+            assert redis.store == {}
+
+            deps["did_repository"].get_did_by_number = AsyncMock(
+                return_value={"did_number": "917965263087", "is_active": False}
+            )
+            await service._warm_outbound_did_cache("917965263087")
+            assert redis.store == {}
+
+    @pytest.mark.asyncio
+    async def test_failures_never_raise(self):
+        service, deps = make_service()
+        deps["did_repository"].get_did_by_number = AsyncMock(side_effect=Exception("db down"))
+        with patch(
+            "src.components.cache.redis_client.get_redis_client",
+            new_callable=AsyncMock,
+            side_effect=Exception("redis down"),
+        ):
+            await service._warm_outbound_did_cache("917965263087")  # must not raise
+
+    @pytest.mark.asyncio
+    async def test_voiceai_branch_warms_did_cache_during_ringing(self):
+        service, deps = make_service()
+        deps["did_repository"].get_did_by_number = AsyncMock(
+            return_value={"did_number": "917965263087", "partner_id": 2, "is_active": True}
+        )
+        service._TalkoCallService__redis_helper = AsyncMock()
+        redis = FakeRedis()
+        with patch(
+            "src.components.cache.redis_client.get_redis_client",
+            new_callable=AsyncMock,
+            return_value=redis,
+        ):
+            await service._pre_create_session(
+                to_number="918103492952",
+                vendor_config_id="config456",
+                context_data={"voiceai_agent_id": "agent-1", "cdr_id": "cdr-1"},
+                caller_did="917965263087",
+                caller_phone="+918103492952",
+                fallback_payload={"created_at": 1},
+                fallback_store_key="918103492952",
+                call_id="None",
+            )
+        assert "pstn:did:+917965263087" in redis.store
