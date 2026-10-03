@@ -308,6 +308,10 @@ class TalkoVoiceaiRelay:
         ingress_buf: collections.deque[tuple[float, str]] = collections.deque()
         ingress_stats: dict[str, Any] = {"max_gap_ms": 0.0, "gaps_over_40ms": 0, "buffered": 0}
         last_ingress_ms = 0.0
+        # Tata per-frame counter (media.chunk): distinguishes bunching
+        # (frames late but all present) from true loss (counter skips).
+        last_ingress_chunk: int | None = None
+        ingress_stats["missing_frames"] = 0
         try:
             await self.__send_voiceai(vws, json.dumps(start_event), sid)
             pump = asyncio.create_task(
@@ -412,6 +416,14 @@ class TalkoVoiceaiRelay:
 
                     translated = forward_to_voiceai(event)
                     if translated is not None:
+                        try:
+                            chunk = int((event.get("media") or {}).get("chunk", -1))
+                        except (TypeError, ValueError):
+                            chunk = -1
+                        if chunk >= 0:
+                            if last_ingress_chunk is not None and chunk > last_ingress_chunk + 1:
+                                ingress_stats["missing_frames"] += chunk - last_ingress_chunk - 1
+                            last_ingress_chunk = chunk
                         now_ms = time.monotonic() * 1000
                         if last_ingress_ms:
                             gap_ms = now_ms - last_ingress_ms
@@ -466,11 +478,12 @@ class TalkoVoiceaiRelay:
             # apart; large max_gap_ms here means the carrier/network leg —
             # not the engine — delivered choppy audio.
             self.__logger.info(
-                "[VOICEAI][RELAY] ingress sid={} max_gap_ms={:.0f} gaps_over_40ms={} residual_buffered={}".format(
+                "[VOICEAI][RELAY] ingress sid={} max_gap_ms={:.0f} gaps_over_40ms={} residual_buffered={} missing_frames={}".format(
                     sid,
                     ingress_stats["max_gap_ms"],
                     ingress_stats["gaps_over_40ms"],
                     ingress_stats["buffered"],
+                    ingress_stats["missing_frames"],
                 )
             )
             # Phase-0 latency spans: every number is ms since run() entry.
