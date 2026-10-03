@@ -549,11 +549,22 @@ class TalkoVoiceaiRelay:
             "rms_sum": 0,
             "fwd_frames": 0,
             "dropped_on_clear": 0,
+            # Egress timing: inter-arrival gaps of engine audio (src_*) and
+            # inter-send gaps toward Tata (send_*). Reads per call:
+            # src gappy + send gappy => engine stalled (Gemini slow);
+            # src clean + send gappy => our sender stalled (ack window);
+            # both clean + caller hears choppiness => Tata->handset leg.
+            "src_max_gap_ms": 0.0,
+            "src_gaps_over_40ms": 0,
+            "send_max_gap_ms": 0.0,
+            "send_gaps_over_40ms": 0,
         }
+        last_src_ms = 0.0
+        last_send_ms = 0.0
 
         async def reader() -> int:
             """voiceai socket -> outbox. Returns next chunk number to use."""
-            nonlocal finished
+            nonlocal finished, last_src_ms
             chunk = 0
             try:
                 while True:
@@ -588,6 +599,14 @@ class TalkoVoiceaiRelay:
                             )
                         continue
                     if kind == "media":
+                        now_ms = time.monotonic() * 1000
+                        if last_src_ms:
+                            gap_ms = now_ms - last_src_ms
+                            if gap_ms > stats["src_max_gap_ms"]:
+                                stats["src_max_gap_ms"] = gap_ms
+                            if gap_ms > 40:
+                                stats["src_gaps_over_40ms"] += 1
+                        last_src_ms = now_ms
                         rms = _mulaw_rms(payload)
                         stats["voiceai_msgs"] += 1
                         if stats["voiceai_msgs"] == 1:
@@ -670,7 +689,7 @@ class TalkoVoiceaiRelay:
             gated on the ack window; control items always flow so a full
             window can never trap a clear behind unsent audio.
             """
-            nonlocal send_failed
+            nonlocal send_failed, last_send_ms
             while True:
                 wake.clear()
                 # No await between clear() and these checks, so no wake-up
@@ -702,6 +721,14 @@ class TalkoVoiceaiRelay:
                             stats["fwd_frames"] += 1
                             if stats["fwd_frames"] == 1:
                                 stats["first_send_ms"] = (time.monotonic() - t_origin) * 1000
+                            now_ms = time.monotonic() * 1000
+                            if last_send_ms:
+                                gap_ms = now_ms - last_send_ms
+                                if gap_ms > stats["send_max_gap_ms"]:
+                                    stats["send_max_gap_ms"] = gap_ms
+                                if gap_ms > 40:
+                                    stats["send_gaps_over_40ms"] += 1
+                            last_send_ms = now_ms
                         except Exception:
                             if label is not None:
                                 pending_marks.pop(label, None)
