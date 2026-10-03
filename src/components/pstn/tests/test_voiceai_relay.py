@@ -613,3 +613,40 @@ class TestTeardownRace:
             timeout=10,
         )
         assert vws.closed
+
+
+class TestIngressJitterBuffer:
+    def test_passthrough_when_disabled(self):
+        from collections import deque
+
+        from src.components.pstn.voiceai_relay import _ingress_due
+
+        buf: deque = deque()
+        assert _ingress_due(buf, 0, 120, 1000.0, "a") == ["a"]
+        assert _ingress_due(buf, 60, 0, 1000.0, "b") == ["b"]
+        assert len(buf) == 0
+
+    def test_holds_target_window_then_releases_in_order(self):
+        from collections import deque
+
+        from src.components.pstn.voiceai_relay import _ingress_due
+
+        buf: deque = deque()
+        # target 60ms = 3 frames: first three arrivals all held.
+        assert _ingress_due(buf, 60, 120, 1000.0, "a") == []
+        assert _ingress_due(buf, 60, 120, 1020.0, "b") == []
+        assert _ingress_due(buf, 60, 120, 1040.0, "c") == []
+        # Fourth arrival releases the oldest — order preserved.
+        assert _ingress_due(buf, 60, 120, 1060.0, "d") == ["a"]
+        assert _ingress_due(buf, 60, 120, 1080.0, "e") == ["b"]
+        assert [f for _, f in buf] == ["c", "d", "e"]
+
+    def test_age_cap_releases_stalled_stream(self):
+        from collections import deque
+
+        from src.components.pstn.voiceai_relay import _ingress_due
+
+        buf: deque = deque()
+        assert _ingress_due(buf, 60, 120, 1000.0, "a") == []
+        # Stream stalls 200ms: the held frame must not wait for company.
+        assert _ingress_due(buf, 60, 120, 1200.0, "b") == ["a"]

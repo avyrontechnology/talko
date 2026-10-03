@@ -505,6 +505,8 @@ class TalkoPSTNBridgeService:
                 logger=self.__logger,
                 ticket_timeout_seconds=TalkoENV.VOICEAI_WS_TICKET_TIMEOUT_SECONDS,
                 connect_timeout_seconds=TalkoENV.VOICEAI_WS_CONNECT_TIMEOUT_SECONDS,
+                ingress_jbuf_target_ms=TalkoENV.VOICEAI_INGRESS_JBUF_TARGET_MS,
+                ingress_jbuf_max_ms=TalkoENV.VOICEAI_INGRESS_JBUF_MAX_MS,
             )
             await relay.run(
                 ws,

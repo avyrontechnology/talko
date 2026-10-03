@@ -124,6 +124,16 @@ RELAY_FRAME_INTERVAL_SECONDS = 0.02
 RELAY_ACK_WAIT_SECONDS = 2.0
 RELAY_MARK_EVERY_N_FRAMES = 50
 
+# Ingress jitter buffer (Tata -> voiceai): carrier frames should arrive
+# every 20 ms but bunch up under jitter. Hold a small window (target) so
+# the engine/transcriber sees steady timing; never hold a frame past the
+# age cap. Control frames (stop/mark) bypass — their latency matters more.
+# Both bounded: steady-state cost is ~target ms on the agent's listen path
+# only (never the caller's ear). Zero/negative disables (old behavior).
+RELAY_INGRESS_JBUF_TARGET_MS = 60.0
+RELAY_INGRESS_JBUF_MAX_MS = 120.0
+RELAY_MEDIA_FRAME_MS = 20.0
+
 
 def _split_frames(payload: bytes):
     """Split one voiceai audio blob into Tata-sized 160B frames.
@@ -148,6 +158,32 @@ def _mulaw_rms(payload: bytes) -> int:
         return -1
 
 
+def _ingress_due(
+    buf: collections.deque[tuple[float, str]],
+    target_ms: float,
+    max_ms: float,
+    now_ms: float,
+    frame: str,
+) -> list[str]:
+    """Push one Tata media frame; return frames whose turn it is to forward.
+
+    Holds up to ``target_ms`` worth so bursts smooth out, and releases
+    anything older than ``max_ms`` so a trickling stream never stalls behind
+    the buffer. Non-positive target/max disables (pure passthrough).
+    Pure function (no I/O) so unit tests can pin the behavior exactly.
+    """
+    if target_ms <= 0 or max_ms <= 0:
+        out = [f for _, f in buf] + [frame]
+        buf.clear()
+        return out
+    buf.append((now_ms, frame))
+    target_n = max(1, int(target_ms / RELAY_MEDIA_FRAME_MS))
+    out: list[str] = []
+    while buf and (len(buf) > target_n or now_ms - buf[0][0] >= max_ms):
+        out.append(buf.popleft()[1])
+    return out
+
+
 class TalkoVoiceaiRelay:
     """Relays one live call between a Tata socket and a voiceai agent socket."""
 
@@ -165,6 +201,8 @@ class TalkoVoiceaiRelay:
         ack_wait_seconds: float = RELAY_ACK_WAIT_SECONDS,
         frame_interval_seconds: float = RELAY_FRAME_INTERVAL_SECONDS,
         mark_every_n_frames: int = RELAY_MARK_EVERY_N_FRAMES,
+        ingress_jbuf_target_ms: float = RELAY_INGRESS_JBUF_TARGET_MS,
+        ingress_jbuf_max_ms: float = RELAY_INGRESS_JBUF_MAX_MS,
     ) -> None:
         self.__ws_base_url = ws_base_url.rstrip("/")
         self.__api_base_url = api_base_url.rstrip("/")
@@ -181,6 +219,8 @@ class TalkoVoiceaiRelay:
         self.__ack_wait_seconds = ack_wait_seconds
         self.__frame_interval = frame_interval_seconds
         self.__mark_every_n = max(1, mark_every_n_frames)
+        self.__ingress_target_ms = float(ingress_jbuf_target_ms)
+        self.__ingress_max_ms = float(ingress_jbuf_max_ms)
         self.__next_send_ts = 0.0
 
     # ── setup helpers ────────────────────────────────────────────────
@@ -261,6 +301,13 @@ class TalkoVoiceaiRelay:
         # doesn't redundantly close an already-dead Tata socket.
         tata_ended = False
         pump_stats: dict[str, Any] = {}
+        # Ingress jitter telemetry: inter-arrival gaps of Tata media frames.
+        # A healthy leg sits ~20 ms; midday carrier jitter shows up here as
+        # large max_gap_ms / gaps_over_40ms — the evidence for where
+        # choppiness originates.
+        ingress_buf: collections.deque[tuple[float, str]] = collections.deque()
+        ingress_stats: dict[str, Any] = {"max_gap_ms": 0.0, "gaps_over_40ms": 0, "buffered": 0}
+        last_ingress_ms = 0.0
         try:
             await self.__send_voiceai(vws, json.dumps(start_event), sid)
             pump = asyncio.create_task(
@@ -301,6 +348,22 @@ class TalkoVoiceaiRelay:
                         break
 
                     if provider.is_stop_event(event):
+                        # Flush the jitter buffer first: the caller's final
+                        # ~60ms would otherwise be lost with the hangup.
+                        flushed = True
+                        while ingress_buf:
+                            try:
+                                await self.__send_voiceai(vws, ingress_buf.popleft()[1], sid)
+                            except (ConnectionResetError, aiohttp.ClientConnectionResetError) as e:
+                                self.__logger.info(
+                                    f"[VOICEAI][RELAY] voiceai leg already closed at teardown sid={sid} — "
+                                    f"dropping buffered frame ({type(e).__name__})"
+                                )
+                                ingress_buf.clear()
+                                flushed = False
+                                break
+                        if not flushed:
+                            break
                         try:
                             await self.__send_voiceai(vws, json.dumps(event), sid)
                         except (ConnectionResetError, aiohttp.ClientConnectionResetError) as e:
@@ -349,13 +412,34 @@ class TalkoVoiceaiRelay:
 
                     translated = forward_to_voiceai(event)
                     if translated is not None:
-                        try:
-                            await self.__send_voiceai(vws, translated, sid)
-                        except (ConnectionResetError, aiohttp.ClientConnectionResetError) as e:
-                            self.__logger.info(
-                                f"[VOICEAI][RELAY] voiceai leg already closed at teardown sid={sid} — "
-                                f"dropping trailing Tata frame ({type(e).__name__})"
-                            )
+                        now_ms = time.monotonic() * 1000
+                        if last_ingress_ms:
+                            gap_ms = now_ms - last_ingress_ms
+                            if gap_ms > ingress_stats["max_gap_ms"]:
+                                ingress_stats["max_gap_ms"] = gap_ms
+                            if gap_ms > 40:
+                                ingress_stats["gaps_over_40ms"] += 1
+                        last_ingress_ms = now_ms
+                        due = _ingress_due(
+                            ingress_buf,
+                            self.__ingress_target_ms,
+                            self.__ingress_max_ms,
+                            now_ms,
+                            translated,
+                        )
+                        ingress_stats["buffered"] = len(ingress_buf)
+                        ingress_broken = False
+                        for frame in due:
+                            try:
+                                await self.__send_voiceai(vws, frame, sid)
+                            except (ConnectionResetError, aiohttp.ClientConnectionResetError) as e:
+                                self.__logger.info(
+                                    f"[VOICEAI][RELAY] voiceai leg already closed at teardown sid={sid} — "
+                                    f"dropping trailing Tata frame ({type(e).__name__})"
+                                )
+                                ingress_broken = True
+                                break
+                        if ingress_broken:
                             break
             finally:
                 try:
@@ -378,6 +462,17 @@ class TalkoVoiceaiRelay:
             msgs = (pump_stats or {}).get("voiceai_msgs", 0)
             avg_rms = (pump_stats or {}).get("rms_sum", 0) / msgs if msgs else 0
             self.__logger.info(f"[VOICEAI][RELAY] Ended sid={sid} stats={pump_stats} avg_rms={avg_rms:.0f}")
+            # Ingress (Tata -> engine) timing: healthy legs arrive ~20 ms
+            # apart; large max_gap_ms here means the carrier/network leg —
+            # not the engine — delivered choppy audio.
+            self.__logger.info(
+                "[VOICEAI][RELAY] ingress sid={} max_gap_ms={:.0f} gaps_over_40ms={} residual_buffered={}".format(
+                    sid,
+                    ingress_stats["max_gap_ms"],
+                    ingress_stats["gaps_over_40ms"],
+                    ingress_stats["buffered"],
+                )
+            )
             # Phase-0 latency spans: every number is ms since run() entry.
             # ticket/ws/first_media/first_send must sum to first audible
             # audio; any span dominating points at its owner (Talko ticket /

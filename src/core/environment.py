@@ -58,6 +58,9 @@ class TalkoENV:
     VOICEAI_API_KEY = os.getenv("VOICEAI_API_KEY", "")
     VOICEAI_WS_TICKET_TIMEOUT_SECONDS = float(os.getenv("VOICEAI_WS_TICKET_TIMEOUT_SECONDS", "10"))
     VOICEAI_WS_CONNECT_TIMEOUT_SECONDS = float(os.getenv("VOICEAI_WS_CONNECT_TIMEOUT_SECONDS", "15"))
+    # Ingress jitter buffer (Tata -> engine), milliseconds. 0 disables.
+    VOICEAI_INGRESS_JBUF_TARGET_MS = float(os.getenv("VOICEAI_INGRESS_JBUF_TARGET_MS", "60"))
+    VOICEAI_INGRESS_JBUF_MAX_MS = float(os.getenv("VOICEAI_INGRESS_JBUF_MAX_MS", "120"))
     # Optional inbound routing: JSON map of Talko DID -> voiceai agent_id,
     # e.g. '{"918045678901": "agent_abc123"}'. DIDs listed here bypass the
     # makun-ai path even without per-call context_data.
