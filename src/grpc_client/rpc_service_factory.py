@@ -1,3 +1,6 @@
+from src.grpc_client.client_services.wallet_service_client import (
+    TalkoWalletServiceClient,
+)
 from src.grpc_client.client_services.api_key_service_client import TalkoApiKeyServiceClient
 from src.grpc_client.client_services.partner_service_client import (
     TalkoPartnerServiceClient,
@@ -30,6 +33,8 @@ class TalkoRPCServiceFactory:
             return TalkoTelephonyServiceClient()
         if service_name == TalkoGrpcServices.RELAY:
             return TalkoRelayServiceClient()
+        if service_name == TalkoGrpcServices.WALLET:
+            return TalkoWalletServiceClient()
         if service_name == TalkoGrpcServices.PARTNER:
             return TalkoPartnerServiceClient()
 

@@ -10,6 +10,7 @@ from src.components.billing.models import (
 )
 from src.components.billing.repository import TalkoBillingRepository, billed_minutes
 from src.components.call_management.repository import TalkoCallRepository
+from src.core.environment import TalkoENV
 from src.exceptions import TalkoBadRequestError, TalkoResourceNotFound
 from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.datetime_util import TalkoDateTimeUtil
@@ -105,10 +106,11 @@ class TalkoBillingService:
         cdr = await self.__call_repository.get_cdr_by_call_id_or_uuid(call_id, None)
         if not cdr:
             raise TalkoResourceNotFound(CDR_NOT_FOUND.format(call_id))
-        existing = await self.__repository.find_transaction_by_call(call_id)
-        if existing:
-            self.__logger.info(CALL_ALREADY_PRICED + f" call_id={call_id}")
-            raise TalkoBadRequestError(CALL_ALREADY_PRICED)
+        if not TalkoENV.TALKO_CENTRAL_BILLING:
+            existing = await self.__repository.find_transaction_by_call(call_id)
+            if existing:
+                self.__logger.info(CALL_ALREADY_PRICED + f" call_id={call_id}")
+                raise TalkoBadRequestError(CALL_ALREADY_PRICED)
         vendor_type = str(cdr.get("vendor_type") or cdr.get("vendor_id") or "default")
         card = await self.__repository.find_rate_card(vendor_type)
         per_min = float((card or {}).get("per_min_rate", 0))
@@ -116,17 +118,25 @@ class TalkoBillingService:
         currency = str((card or {}).get("currency", "INR"))
         minutes = billed_minutes(cdr.get("talk_time"), cdr.get("total_call_duration"))
         amount = round(per_call + per_min * minutes, 2)
-        partner_id = int(cdr.get("partner_id") or 0)
+        partner_id = cdr.get("partner_id") or 0
+        if TalkoENV.TALKO_CENTRAL_BILLING:
+            return await self.__price_call_central(
+                call_id, partner_id, amount, currency, minutes
+            )
+        existing = await self.__repository.find_transaction_by_call(call_id)
+        if existing:
+            self.__logger.info(CALL_ALREADY_PRICED + f" call_id={call_id}")
+            raise TalkoBadRequestError(CALL_ALREADY_PRICED)
         now = self.__datetime_util.get_current_time()
         ledger = await self.__repository.adjust_ledger(
-            partner_id=partner_id,
+            partner_id=int(partner_id) if partner_id else 0,
             amount=-amount,
             client_id=client_id,
             currency=currency,
         )
         await self.__repository.insert_transaction(
             TalkoTransactionModel(
-                partner_id=partner_id,
+                partner_id=int(partner_id) if partner_id else 0,
                 client_id=client_id,
                 kind="debit",
                 amount=-amount,
@@ -143,4 +153,39 @@ class TalkoBillingService:
             amount=amount,
             currency=currency,
             ledger_balance=float(ledger.get("balance", 0)),
+        )
+
+    async def __price_call_central(
+        self, call_id: str, partner_id, amount: float, currency: str, minutes: float
+    ) -> TalkoContract.PriceResponse:
+        """Unified billing: debit executes in console-core wallet.
+
+        Console is idempotent on call_id (retries return the original).
+        Transport errors propagate (caller retries safely).
+        """
+        from src.grpc_client.constants import TalkoGrpcServices
+        from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
+
+        client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.WALLET)
+        if client is None:
+            raise TalkoBadRequestError("Console wallet unavailable")
+        res = await client.wallet_debit(
+            partner_id=partner_id,
+            amount=amount,
+            currency=currency,
+            call_id=call_id,
+            billed_minutes=minutes,
+            description=f"call {call_id} ({minutes} min)",
+        )
+        if res is None:
+            raise TalkoBadRequestError("Console wallet debit refused")
+        self.__logger.info(
+            f"Priced via console call_id={call_id} minutes={minutes} amount={amount}"
+        )
+        return TalkoContract.PriceResponse(
+            call_id=call_id,
+            billed_minutes=minutes,
+            amount=amount,
+            currency=currency,
+            ledger_balance=float(res.get("remaining_balance", 0)),
         )

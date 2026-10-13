@@ -118,6 +118,9 @@ class TalkoENV:
     # talko_users collection. Transport errors fall back to local
     # validation during migration (dual-run); remove after cutover.
     TALKO_CENTRAL_LOGIN = os.getenv("TALKO_CENTRAL_LOGIN", "false").lower() == "true"
+    # Unified billing: price locally, debit in console-core wallet.
+    # Off = legacy local ledger. Flip after balance migration.
+    TALKO_CENTRAL_BILLING = os.getenv("TALKO_CENTRAL_BILLING", "false").lower() == "true"
 
     @classmethod
     def validate_env_vars(cls):
