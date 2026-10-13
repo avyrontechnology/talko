@@ -21,7 +21,7 @@ LOGGING_CONFIG = {
         #     "class": "logging.handlers.RotatingFileHandler",
         #     "formatter": "standard",
         #     "level": "INFO",
-        #     "filename": "maglo_service.log",
+        #     "filename": "talko_service.log",
         #     "mode": "a",
         #     "encoding": "utf-8",
         #     "maxBytes": 500000,

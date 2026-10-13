@@ -1,5 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import asyncio
+
 import pytest
 
 from src.grpc_client.telephony_bridge import GRPC_VENDOR_TYPES, TalkoTelephonyBridge
@@ -86,13 +88,25 @@ class TestTelephonyClient:
 
 
 class TestFactoryAndService:
-    def test_factory_telephony_disabled(self):
-        # gRPC disabled for now — factory must refuse every plane.
+    def test_factory_telephony_enabled(self):
+        # gRPC enabled — factory returns a real client per plane.
+        from src.grpc_client.client_services.telephony_service_client import (
+            TalkoTelephonyServiceClient,
+        )
         from src.grpc_client.constants import TalkoGrpcServices
         from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
 
-        with pytest.raises(RuntimeError, match="gRPC disabled"):
-            TalkoRPCServiceFactory.get_service(TalkoGrpcServices.TELEPHONY)
+        client = TalkoRPCServiceFactory.get_service(TalkoGrpcServices.TELEPHONY)
+        try:
+            assert isinstance(client, TalkoTelephonyServiceClient)
+        finally:
+            asyncio.run(client.close_channel())
+
+    def test_factory_unknown_service_rejected(self):
+        from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
+
+        with pytest.raises(RuntimeError, match="Unknown gRPC service"):
+            TalkoRPCServiceFactory.get_service("nope")
 
     @pytest.mark.asyncio
     async def test_service_grpc_hangup_releases_pool(self):

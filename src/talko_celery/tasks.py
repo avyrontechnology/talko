@@ -17,7 +17,7 @@ def add_numbers(x: int, y: int) -> int:
 
 # celery.conf.beat_schedule = {
 #     "run_periodic_task_example": {
-#         "task": "src.maglo_celery.tasks.my_periodic_task",
+#         "task": "src.talko_celery.tasks.my_periodic_task",
 #         "schedule": crontab(minute="*/1"),  # Every 1 minute
 #     },
 # }

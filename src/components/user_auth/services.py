@@ -110,6 +110,19 @@ class TalkoUserAuthService:
         """Verify credentials and mint a Talko JWT. Never reveals which half failed."""
         if not TalkoENV.TALKO_JWT_SECRET:
             raise RuntimeError("TALKO_JWT_SECRET is not provisioned")
+        if TalkoENV.TALKO_CENTRAL_LOGIN:
+            try:
+                central = await self.__central_login(payload)
+                if central is not None:
+                    return central
+            except (TalkoInvalidCredentialsError, TalkoInactiveUserError):
+                raise
+            except Exception as exc:
+                # Transport/RPC failure: fall back to local validation
+                # during migration (dual-run). Remove after cutover.
+                self.__logger.warning(
+                    "Central login unavailable, falling back to local: {}".format(exc)
+                )
         doc = await self.__repository.find_by_email(payload.credential)
         if doc is None or not verify_password(payload.password, doc.get("password_hash") or ""):
             raise TalkoInvalidCredentialsError("Invalid email or password")
@@ -125,6 +138,53 @@ class TalkoUserAuthService:
         )
         self.__logger.info("Talko user logged in email={}".format(doc.get("email")))
         return {"token": token, "token_type": "bearer"}
+
+    async def __central_login(self, payload: TalkoContract.Login) -> dict | None:
+        """Login via console-core. Returns token dict, None on bad creds.
+
+        Transport errors propagate (caller falls back to local validation).
+        """
+        from src.grpc_client.rpc_service_factory import (
+            TalkoGrpcServices,
+            TalkoRPCServiceFactory,
+        )
+
+        client = TalkoRPCServiceFactory.get_optional_service(TalkoGrpcServices.AUTH)
+        if client is None:
+            raise RuntimeError("Console gRPC unavailable for central login")
+        profile = await client.talko_login(
+            credential=payload.credential, password=payload.password
+        )
+        if profile is None:
+            raise TalkoInvalidCredentialsError("Invalid email or password")
+        if not profile.get("is_active", False):
+            raise TalkoInactiveUserError("Account is disabled")
+        role = self.__console_hierarchy_to_role(profile.get("role_hierarchy", -1))
+        token = mint_talko_token(
+            secret=TalkoENV.TALKO_JWT_SECRET,
+            user_id=profile["user_id"],
+            email=profile.get("email", ""),
+            role=role,
+            partner_id=profile.get("partner_id"),
+            ttl_hours=TalkoENV.TALKO_JWT_TTL_HOURS,
+        )
+        self.__logger.info(
+            "Talko user logged in via console email={}".format(payload.credential)
+        )
+        return {"token": token, "token_type": "bearer"}
+
+    @staticmethod
+    def __console_hierarchy_to_role(hierarchy: int) -> TalkoUserRole:
+        # Console hierarchy (0 super-admin, lower = senior) to Talko roles.
+        try:
+            h = int(hierarchy)
+        except (TypeError, ValueError):
+            h = 99
+        if h <= 0:
+            return TalkoUserRole.SUPERADMIN
+        if h <= 3:
+            return TalkoUserRole.MAINTAINER
+        return TalkoUserRole.VIEWER
 
     async def list_users(self, limit: int = 100) -> list[dict]:
         docs = await self.__repository.list_users(limit=min(max(limit, 1), 500))

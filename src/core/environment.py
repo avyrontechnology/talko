@@ -19,6 +19,15 @@ class TalkoENV:
     STORAGE_SERVICE_PROVIDER = os.getenv("STORAGE_SERVICE_PROVIDER", "")
     CA = os.getenv("CA", "None")
 
+    # ── console-core gRPC (client direction: talko -> console-core:50051)
+    # Original var names (tests + factory predate the dormant period).
+    CONSOLE_GRPC_HOST = os.getenv("CONSOLE_GRPC_HOST", "localhost")
+    CONSOLE_GRPC_PORT = os.getenv("CONSOLE_GRPC_PORT", "50051")
+    # Key console-core's ApiKeyAuthInterceptor accepts (see its VALID_SERVICE_KEYS).
+    CONSOLE_GRPC_API_KEY = os.getenv("CONSOLE_GRPC_API_KEY", "talko-key")
+    # Kill-switch: relay path (talko -> console-core -> plane) off by default.
+    TALKO_RELAY_ENABLED = os.getenv("TALKO_RELAY_ENABLED", "false")
+
     MONGO_DB = os.getenv("MONGO_DB", "talkoservice")
     MONGO_USER = os.getenv("MONGO_USER", "jaggerbomb")
     MONGO_PASSWORD = os.getenv("MONGO_PASSWORD", "jaggerbomb")
@@ -104,6 +113,11 @@ class TalkoENV:
     # Must equal the engine's VOICE_STREAM_SECRET.
     VOICE_STREAM_SECRET = os.getenv("VOICE_STREAM_SECRET", "")
     TALKO_JWT_TTL_HOURS = int(os.getenv("TALKO_JWT_TTL_HOURS", "72"))
+    # Centralized login: when true, Talko login validates credentials
+    # against console-core (TalkoLogin RPC) instead of the local
+    # talko_users collection. Transport errors fall back to local
+    # validation during migration (dual-run); remove after cutover.
+    TALKO_CENTRAL_LOGIN = os.getenv("TALKO_CENTRAL_LOGIN", "false").lower() == "true"
 
     @classmethod
     def validate_env_vars(cls):

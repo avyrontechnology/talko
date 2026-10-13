@@ -219,6 +219,30 @@ class TalkoCallService:
             # partner changes
             partner_config: dict[str, Any] = await self.__helper.get_partner_config(partner_id)
 
+            # Console gate: partner must exist + be active in console-core.
+            # Local config presence alone no longer suffices (centralized).
+            try:
+                from src.grpc_client.constants import TalkoGrpcServices
+                from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
+
+                _partner_client = TalkoRPCServiceFactory.get_optional_service(
+                    TalkoGrpcServices.PARTNER
+                )
+                if _partner_client is not None and not await _partner_client.is_partner_live(
+                    partner_id
+                ):
+                    raise TalkoBadRequestError(
+                        "Partner is not active in console-core."
+                    )
+            except TalkoBadRequestError:
+                raise
+            except Exception as exc:
+                # Console unreachable: fail open during migration (dual-run).
+                # Flip to fail-closed after cutover.
+                self.__logger.warning(
+                    f"Console partner gate unreachable, proceeding: {exc}"
+                )
+
             vendor_id: str | None = partner_config.get("vendor_id")
             if not vendor_id:
                 raise TalkoResourceNotFound(NO_VENDOR_ID_ASSIGNED_TO_PARTNER)

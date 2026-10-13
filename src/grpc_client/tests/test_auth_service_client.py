@@ -97,7 +97,7 @@ class TestAuthServiceClient:
         mock_response = MagicMock()
         mock_response.is_active = True
         mock_response.session_id = "session-123"
-        mock_response.user_id = 123  # Integer to match gRPC response
+        mock_response.user_id = "123"  # Integer to match gRPC response
         mock_response.partner_id = "partner-123"
         mock_auth_stub.ValidateToken = AsyncMock(return_value=mock_response)
 
@@ -109,7 +109,7 @@ class TestAuthServiceClient:
         assert result == {
             "is_active": True,
             "user_session_id": "session-123",
-            "user_id": 123,  # Integer
+            "user_id": "123",  # Integer
             "partner_id": "partner-123",
         }
         mock_logger.info.assert_any_call(
@@ -129,10 +129,10 @@ class TestAuthServiceClient:
         assert mock_auth_stub.ValidateToken.call_args[0][0].mbody.token == token
 
     async def test_get_user_child_hierarchy_success(self, client, mock_logger, mock_auth_stub):
-        user_id = 123
+        user_id = "123"
         mock_hierarchy = MagicMock()
         mock_hierarchy.user_id = user_id
-        mock_hierarchy.child_ids = [1, 2]
+        mock_hierarchy.child_ids = ["1", "2"]
         mock_response = MagicMock()
         mock_response.child_hierarchy = [mock_hierarchy]
         mock_auth_stub.GetUserChildHierarchy = AsyncMock(return_value=mock_response)
@@ -141,30 +141,30 @@ class TestAuthServiceClient:
 
         mock_auth_stub.GetUserChildHierarchy.assert_called_once()
         # ✅ FIX: Check user_ids (list), not user_id
-        assert mock_auth_stub.GetUserChildHierarchy.call_args[0][0].user_ids == [123]
+        assert mock_auth_stub.GetUserChildHierarchy.call_args[0][0].user_ids == ["123"]
         assert result == {
-            123: {"user_id": 123, "child_ids": [1, 2]},
+            "123": {"user_id": "123", "child_ids": ["1", "2"]},
         }
         mock_logger.info.assert_any_call(f"Sending GetUserChildHierarchy request for user_ids: {[user_id]}")
         mock_logger.info.assert_any_call(f"Received child hierarchies for user_ids: {[user_id]}")
 
     async def test_get_user_child_hierarchy_failure(self, client, mock_logger, mock_auth_stub):
-        user_id = 123
+        user_id = "123"
         mock_auth_stub.GetUserChildHierarchy = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_user_child_hierarchy(user_id)
 
         mock_auth_stub.GetUserChildHierarchy.assert_called_once()
         # ✅ FIX: Check user_ids
-        assert mock_auth_stub.GetUserChildHierarchy.call_args[0][0].user_ids == [123]
+        assert mock_auth_stub.GetUserChildHierarchy.call_args[0][0].user_ids == ["123"]
         assert result == {}
         mock_logger.info.assert_called_once_with(f"Sending GetUserChildHierarchy request for user_ids: {[user_id]}")
         mock_logger.error.assert_called_once_with("Error during GetUserChildHierarchy call: Simulated error")
 
     async def test_get_user_child_details_success(self, client, mock_logger, mock_auth_stub):
-        user_id = 123  # Integer
+        user_id = "123"  # Integer
         mock_user = MagicMock()
-        mock_user.user_id = 1  # Integer
+        mock_user.user_id = "1"  # Integer
         mock_user.name = "Child One"
         mock_user.is_active = True
         mock_user.is_suspended = False
@@ -175,10 +175,10 @@ class TestAuthServiceClient:
         result = await client.get_user_child_details(user_id)
 
         mock_auth_stub.GetUserChildDetails.assert_called_once()
-        assert mock_auth_stub.GetUserChildDetails.call_args[0][0].user_id == 123
+        assert mock_auth_stub.GetUserChildDetails.call_args[0][0].user_id == "123"
         assert result == {
-            1: {
-                "user_id": 1,
+            "1": {
+                "user_id": "1",
                 "name": "Child One",
                 "is_active": True,
                 "is_suspended": False,
@@ -187,21 +187,21 @@ class TestAuthServiceClient:
         mock_logger.info.assert_any_call(f"Sending GetUserChildHierarchy request for user_id: {user_id}")
 
     async def test_get_user_child_details_failure(self, client, mock_logger, mock_auth_stub):
-        user_id = 123  # Integer
+        user_id = "123"  # Integer
         mock_auth_stub.GetUserChildDetails = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_user_child_details(user_id)
 
         mock_auth_stub.GetUserChildDetails.assert_called_once()
-        assert mock_auth_stub.GetUserChildDetails.call_args[0][0].user_id == 123
+        assert mock_auth_stub.GetUserChildDetails.call_args[0][0].user_id == "123"
         assert result == {}
         mock_logger.info.assert_called_once_with(f"Sending GetUserChildHierarchy request for user_id: {user_id}")
         mock_logger.error.assert_called_once_with("Error during GetUserChildHierarchy call: Simulated error")
 
     async def test_get_user_details_success(self, client, mock_logger, mock_auth_stub):
-        user_id = 123  # Integer
+        user_id = "123"  # Integer
         mock_user = MagicMock()
-        mock_user.user_id = 123  # Integer
+        mock_user.user_id = "123"  # Integer
         mock_user.name = "Test User"
         mock_user.email = "test@example.com"
         mock_user.partner_id = "partner-123"
@@ -213,9 +213,9 @@ class TestAuthServiceClient:
         result = await client.get_user_details(user_id)
 
         mock_auth_stub.GetUserDetails.assert_called_once()
-        assert mock_auth_stub.GetUserDetails.call_args[0][0].user_id == 123
+        assert mock_auth_stub.GetUserDetails.call_args[0][0].user_id == "123"
         assert result == {
-            "user_id": 123,
+            "user_id": "123",
             "name": "Test User",
             "email": "test@example.com",
             "partner_id": "partner-123",
@@ -224,19 +224,19 @@ class TestAuthServiceClient:
         mock_logger.info.assert_any_call(f"Sending GetUserDetails request for user_id: {user_id}")
 
     async def test_get_user_details_failure(self, client, mock_logger, mock_auth_stub):
-        user_id = 123  # Integer
+        user_id = "123"  # Integer
         mock_auth_stub.GetUserDetails = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_user_details(user_id)
 
         mock_auth_stub.GetUserDetails.assert_called_once()
-        assert mock_auth_stub.GetUserDetails.call_args[0][0].user_id == 123
+        assert mock_auth_stub.GetUserDetails.call_args[0][0].user_id == "123"
         assert result == {}
         mock_logger.info.assert_called_once_with(f"Sending GetUserDetails request for user_id: {user_id}")
         mock_logger.error.assert_called_once_with("Error during GetUserDetails call: Simulated error")
 
     async def test_get_user_permissions_success(self, client, mock_logger, mock_auth_stub):
-        user_id = 123  # Integer
+        user_id = "123"  # Integer
         mock_response = MagicMock()
         mock_response.permissions = ["perm1", "perm2"]
         mock_auth_stub.GetUserPermissions = AsyncMock(return_value=mock_response)
@@ -244,25 +244,25 @@ class TestAuthServiceClient:
         result = await client.get_user_permissions(user_id)
 
         mock_auth_stub.GetUserPermissions.assert_called_once()
-        assert mock_auth_stub.GetUserPermissions.call_args[0][0].user_id == 123
+        assert mock_auth_stub.GetUserPermissions.call_args[0][0].user_id == "123"
         assert result == ["perm1", "perm2"]
         mock_logger.info.assert_any_call(f"Sending GetUserPermissions request for user_id: {user_id}")
         mock_logger.info.assert_any_call(f"Received permissions for user_id: {user_id}: ['perm1', 'perm2']")
 
     async def test_get_user_permissions_failure(self, client, mock_logger, mock_auth_stub):
-        user_id = 123  # Integer
+        user_id = "123"  # Integer
         mock_auth_stub.GetUserPermissions = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_user_permissions(user_id)
 
         mock_auth_stub.GetUserPermissions.assert_called_once()
-        assert mock_auth_stub.GetUserPermissions.call_args[0][0].user_id == 123
+        assert mock_auth_stub.GetUserPermissions.call_args[0][0].user_id == "123"
         assert result == []
         mock_logger.info.assert_called_once_with(f"Sending GetUserPermissions request for user_id: {user_id}")
         mock_logger.error.assert_called_once_with("Error during GetUserPermissions call: Simulated error")
 
     async def test_get_user_roles_success(self, client, mock_logger, mock_auth_stub):
-        user_id = 123  # Integer
+        user_id = "123"  # Integer
         mock_response = MagicMock()
         mock_response.hierarchy = 2
         mock_response.role = ["role1", "role2"]
@@ -271,7 +271,7 @@ class TestAuthServiceClient:
         result = await client.get_user_roles(user_id)
 
         mock_auth_stub.GetUserRole.assert_called_once()
-        assert mock_auth_stub.GetUserRole.call_args[0][0].user_id == 123
+        assert mock_auth_stub.GetUserRole.call_args[0][0].user_id == "123"
         assert result == {
             "hierarchy": 2,
             "roles": ["role1", "role2"],
@@ -280,21 +280,21 @@ class TestAuthServiceClient:
         mock_logger.info.assert_any_call(f"Received roles for user_id: {user_id}: ['role1', 'role2']")
 
     async def test_get_user_roles_failure(self, client, mock_logger, mock_auth_stub):
-        user_id = 123  # Integer
+        user_id = "123"  # Integer
         mock_auth_stub.GetUserRole = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_user_roles(user_id)
 
         mock_auth_stub.GetUserRole.assert_called_once()
-        assert mock_auth_stub.GetUserRole.call_args[0][0].user_id == 123
+        assert mock_auth_stub.GetUserRole.call_args[0][0].user_id == "123"
         assert result == {}
         mock_logger.info.assert_called_once_with(f"Sending GetUserRoles request for user_id: {user_id}")
         mock_logger.error.assert_called_once_with("Error during GetUserRoles call: Simulated error")
 
     async def test_get_workspace_users_details_success(self, client, mock_logger, mock_auth_stub):
-        user_ids = [1, 2]  # Integer list
+        user_ids = ["1", "2"]  # Integer list
         mock_user = MagicMock()
-        mock_user.user_id = 1  # Integer
+        mock_user.user_id = "1"  # Integer
         mock_user.name = "User One"
         mock_user.is_active = True
         mock_user.is_suspended = False
@@ -309,12 +309,12 @@ class TestAuthServiceClient:
 
         mock_auth_stub.GetServiceBoardUsersDetails.assert_called_once()
         assert mock_auth_stub.GetServiceBoardUsersDetails.call_args[0][0].user_ids == [
-            1,
-            2,
+            "1",
+            "2",
         ]
         assert result == {
-            1: {
-                "user_id": 1,
+            "1": {
+                "user_id": "1",
                 "name": "User One",
                 "is_active": True,
                 "is_suspended": False,
@@ -326,15 +326,15 @@ class TestAuthServiceClient:
         mock_logger.info.assert_any_call(f"Sending GetUserChildHierarchy request for user_id: {user_ids}")
 
     async def test_get_workspace_users_details_failure(self, client, mock_logger, mock_auth_stub):
-        user_ids = [1, 2]  # Integer list
+        user_ids = ["1", "2"]  # Integer list
         mock_auth_stub.GetServiceBoardUsersDetails = AsyncMock(side_effect=TalkoDummyAioRpcError())
 
         result = await client.get_workspace_users_details(user_ids)
 
         mock_auth_stub.GetServiceBoardUsersDetails.assert_called_once()
         assert mock_auth_stub.GetServiceBoardUsersDetails.call_args[0][0].user_ids == [
-            1,
-            2,
+            "1",
+            "2",
         ]
         assert result == {}
         mock_logger.info.assert_called_once_with(f"Sending GetUserChildHierarchy request for user_id: {user_ids}")
@@ -346,7 +346,7 @@ class TestAuthServiceClient:
         mock_response = MagicMock()
         mock_response.is_active = False
         mock_response.session_id = "session-123"
-        mock_response.user_id = 123
+        mock_response.user_id = "123"
         mock_response.partner_id = "partner-123"
         mock_auth_stub.ValidateToken = AsyncMock(return_value=mock_response)
 
@@ -360,3 +360,32 @@ class TestAuthServiceClient:
             f"Sending ValidateToken request for token: {token} correlation_id: {correlation_id}"
         )
         mock_logger.info.assert_any_call("Received response for user: False")
+
+    async def test_talko_login_success(self, client, mock_logger, mock_auth_stub):
+        mock_response = MagicMock()
+        mock_response.user_id = "11111111-1111-1111-1111-111111111111"
+        mock_response.partner_id = "10101010-1010-1010-1010-101010101010"
+        mock_response.role_id = "22222222-2222-2222-2222-222222222222"
+        mock_response.role_hierarchy = 1
+        mock_response.email = "admin@x.com"
+        mock_response.name = "Admin"
+        mock_response.is_active = True
+        mock_auth_stub.TalkoLogin = AsyncMock(return_value=mock_response)
+
+        result = await client.talko_login("admin@x.com", "secret")
+
+        mock_auth_stub.TalkoLogin.assert_called_once()
+        req = mock_auth_stub.TalkoLogin.call_args[0][0]
+        assert req.credential == "admin@x.com"
+        assert req.password == "secret"
+        assert result["user_id"] == "11111111-1111-1111-1111-111111111111"
+        assert result["role_hierarchy"] == 1
+
+    async def test_talko_login_bad_credentials_returns_none(self, client, mock_logger, mock_auth_stub):
+        err = TalkoDummyAioRpcError("bad")
+        err.code = lambda: grpc.StatusCode.UNAUTHENTICATED
+        mock_auth_stub.TalkoLogin = AsyncMock(side_effect=err)
+
+        result = await client.talko_login("admin@x.com", "wrong")
+
+        assert result is None
