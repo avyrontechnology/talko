@@ -7,6 +7,9 @@ service AuthService {
     // RPC to validate a token and return user information.
     rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse);
 
+    // Centralized Talko login: console verifies credentials, returns profile.
+    rpc TalkoLogin (TalkoLoginRequest) returns (TalkoLoginResponse);
+
     // RPC to get the list of child users for a given user.
     rpc GetUserChildHierarchy (GetUserChildHierarchyRequest) returns (GetUserChildHierarchyResponse);
 
@@ -22,6 +25,13 @@ service AuthService {
 
     //RPC to get User role
     rpc GetUserRole (GetUserRoleRequest) returns (GetUserRoleResponse);
+
+    // RPC to get partner details.
+    rpc GetPartnerDetails (GetPartnerDetailsRequest) returns (GetPartnerDetailsResponse);
+    // RPC to get partner metadata details
+    rpc GetPartnerMetaDataDetails (GetPartnerMetaDataDetailsRequest) returns (GetPartnerMetaDataDetailsResponse);
+    // RPC to get partner enabled services
+    rpc GetPartnerServicesDetails (GetPartnerServiceRequest) returns (GetPartnerServiceDetailsResponse);
 
     // RPC to get service board user details
     rpc GetServiceBoardUsersDetails(GetUsersDetailsRequest) returns (GetServiceBoardUserDetailsResponse);
@@ -46,20 +56,37 @@ message ValidateTokenRequest {
     MBody mbody = 2;       
 }
 
+// Credential check for Talko login (centralized identity).
+message TalkoLoginRequest {
+    string credential = 1;
+    string password = 2;
+}
+
+message TalkoLoginResponse {
+    string message = 1;
+    string user_id = 2;
+    string partner_id = 3;
+    string role_id = 4;
+    int64 role_hierarchy = 5;
+    string email = 6;
+    string name = 7;
+    bool is_active = 8;
+}
+
 // The response message for token validation.
 message ValidateTokenResponse {
     string message = 1;              
     string correlation_id = 2;     
     bool is_active = 3;                
-    int64 user_id = 4;            
+    string user_id = 4;            
     string session_id = 6;           
     int64 expires_in = 7;            
-    int64 partner_id = 8;
+    string partner_id = 8;
 }
 
 // UserDetail message representing a user's directory information.
 message UserDetail {
-    int64 user_id = 1;        // User's ID.
+    string user_id = 1;        // User's ID.
     string email = 2;         // Email of the child user.
     bool is_active = 3;       // Indicates whether the user is active (true) or inactive (false).
     bool is_suspended = 4;    // Indicates whether the user is suspended or not.
@@ -71,7 +98,7 @@ message UserDetail {
 // The request message for retrieving the child user list.
 message GetUserChildDetailsRequest {
     MContext mcontext = 1; // Metadata context.
-    int64 user_id = 2;     // The current user's ID.
+    string user_id = 2;     // The current user's ID.
 }
 
 // The response message for the child user list.
@@ -83,7 +110,7 @@ message GetUserChildDetailsResponse {
 // The request message for retrieving child user hierarchies.
 message GetUserChildHierarchyRequest {
     MContext mcontext = 1; // Metadata context.
-    repeated int64 user_ids = 2; // List of user IDs.
+    repeated string user_ids = 2; // List of user IDs.
 }
 
 // The response message for child user hierarchies.
@@ -94,16 +121,16 @@ message GetUserChildHierarchyResponse {
 
 // Message for a single user’s child hierarchy.
 message ChildHierarchy {
-    int64 user_id = 1; // The input user ID.
-    repeated int64 child_ids = 2; // List of child user IDs.
+    string user_id = 1; // The input user ID.
+    repeated string child_ids = 2; // List of child user IDs.
 }
 
 
 message UserProfile {
-    int64 user_id = 1;        // User's ID.
+    string user_id = 1;        // User's ID.
     string name = 2;      // name of the child user.
     string email = 3;         // Email of the child user.
-    int64 partner_id = 4;       // partner_id
+    string partner_id = 4;       // partner_id
     int64 role_hierarchy_level=5; //role hierarchy level
     
 }
@@ -111,7 +138,7 @@ message UserProfile {
 //The request for retrieving current user details
 message GetUserDetailsRequest{
     MContext mcontext = 1; // Metadata context.
-    int64 user_id=2;// The current user's ID.
+    string user_id =2;// The current user's ID.
 }
 
 message GetUserDetailsResponse{
@@ -122,7 +149,7 @@ message GetUserDetailsResponse{
 
 
 message GetUserPermissionsRequest{
-    int64 user_id = 1;  //user Id 
+    string user_id = 1;  //user Id 
 }
 
 message GetUserPermissionsResponse{
@@ -131,7 +158,7 @@ message GetUserPermissionsResponse{
 }
 
 message GetUserRoleRequest{
-    int64 user_id = 1; //user_id
+    string user_id = 1; //user_id
 }
 
 message GetUserRoleResponse{
@@ -149,13 +176,138 @@ message GetServiceBoardUserDetailsResponse {
 // The request message for retrieving user list ids.
 message GetUsersDetailsRequest {
     MContext mcontext = 1; // Metadata context.
-    repeated int64 user_ids = 2;     // List of user's ID.
+    repeated string user_ids = 2;     // List of user's ID.
 }
 
 message GetPartnerApiKeyRequest{
-    int64 partner_id = 1;
+    string partner_id = 1;
 }
 
 message GetPartnerApiKeyResponse{
     string api_key = 1;
+}
+
+message ServiceSubscriptionStatus {
+    string status = 1;
+    optional int64 entitlement_start_date = 2;
+    optional int64 entitlement_end_date = 3;
+    optional int64 grace_start_date = 4;       // only populated when status == "grace"
+    optional int64 grace_end_date = 5;          // only populated when status == "grace"
+}
+
+// ---- Partner master (mirrors console-core; field numbers must match) ----
+message GetPartnerDetailsRequest {
+    MContext mcontext = 1; // Metadata context.
+    string partner_id = 2;  // The partner's ID.
+}
+
+message GetPartnerDetailsResponse {
+    string message = 1;              // Response message.
+    PartnerDetail partner_detail = 2; // Partner information.
+}
+
+message PartnerDetail {
+    string partner_id = 1;           // Partner's ID.
+    string name = 2;                // Name of the partner.
+    bool is_active = 3;             // Indicates whether the partner is active.
+    string partner_status = 5;      // Status of the partner (enum value as string).
+    string partner_logo = 6;        // URL of the partner's logo.
+    int64 created_at = 7;           // Creation date of the partner.
+    bool is_feedback_enabled = 10;  // Indicates whether feedback is enabled for the partner.
+    bool is_publisher_onboarding_completed = 11;  // Indicates whether publisher onboarding is completed or not.
+    map<string, ServiceSubscriptionStatus> subscription_status = 12;
+    int64 active_license = 13;  // Active liscense of partner
+    string company_legal_name = 14; // Legal company name
+    string cin_no = 15;             // CIN number
+    string gst_no = 16;             // GST number
+}
+
+message GetPartnerMetaDataDetailsRequest{
+    string partner_id = 1;
+}
+
+message GetPartnerMetaDataDetailsResponse {
+    reserved 26, 27; // removed with the Teams feature
+    string type_of_business = 1;       
+    int32 years_in_business = 2;       
+    int64 annual_revenue = 3;         
+    bool is_talko_enabled = 5;
+    bool is_email_verification_enabled = 7;
+    bool is_phone_number_verification_enabled = 8;
+    bool can_create_deals = 9;
+    bool can_add_workflow = 10;
+    bool can_view_workflow = 11;
+    bool is_wallet_enabled = 12;
+    string email_config_key = 13;
+    string smtp_username = 14;
+    string smtp_password = 15;
+    string from_email = 16;
+    string subscription_mode = 17;
+    bool is_rule_based_assignment_enabled = 18;
+    bool can_view_contact=19;
+    bool can_view_organization=20;
+    bool can_view_template_management=21;
+    bool can_view_product_management=22;
+    bool can_view_finance_management=23;
+    bool is_add_number_enabled = 24;
+    bool is_obotaai_enabled = 25;
+    bool is_user_tracker_enabled = 28;
+    bool can_view_report_management = 29;
+    bool can_download_call_logs = 30;
+    bool is_international_tenant = 31;
+    bool can_view_helpdesk_management = 32;
+    bool is_agent_availability_based_assignment_enabled = 33;
+    bool is_sticky_dids_enabled = 34;
+    bool is_assignee_sync_enabled = 35;
+}
+
+message GetPartnerServiceRequest{
+    string partner_id = 1; //Partner id for get enabled services
+}
+
+message GetPartnerServiceDetailsResponse{
+    reserved 32, 33; // removed with the Teams feature
+    bool is_talko_service_enabled=3;
+    bool is_talko_service_free_trial_enabled=4;
+    bool is_email_verification_enabled=7;
+    bool is_phone_number_verification_enabled=8;
+    bool can_create_deals=9;
+    bool can_add_workflow=10;
+    bool can_view_workflow=11;
+    bool is_mailer_enabled=14;
+    bool is_gsm_calling_enabled=15;
+    bool can_view_task_management=16;
+    bool is_meeting_log_enabled=17;
+    string subscription_mode = 18;
+    bool is_rule_based_assignment_enabled = 19;
+    bool can_view_pipeline_management = 20;
+    bool can_view_contact = 22;
+    bool can_view_organization = 23;
+    bool enable_dialer = 24;
+    bool is_bulk_workflow_enabled=25;
+    bool can_view_mview_management=26;
+    bool is_advance_filter_enabled=27;
+    bool can_view_template_management = 28;
+    bool can_view_product_management = 29;
+    bool can_view_finance_management = 30;
+    bool can_view_csf_lead_listing = 31;
+    bool can_view_products = 34;
+    bool can_view_inventory = 35;
+    bool can_view_order_management = 36;
+    bool is_partner_custom_roles_enabled = 37;
+    bool can_view_payment_history = 38;
+    bool is_user_tracker_enabled = 39;
+    bool is_reenquiry_chain_enabled = 40;
+    bool can_view_report_management = 41;
+    bool can_download_call_logs = 42;
+    bool is_inbox_enabled = 43;
+    bool is_international_tenant = 44;
+    bool is_field_tracking_enabled = 45;
+    bool can_view_helpdesk_management = 46;
+    bool can_view_inactive_agents = 47;
+    bool is_agent_availability_based_assignment_enabled = 48;
+    bool is_sticky_dids_enabled = 49;
+    bool can_add_address_with_google_places = 50;
+    bool is_assignee_sync_enabled = 51;
+
 }

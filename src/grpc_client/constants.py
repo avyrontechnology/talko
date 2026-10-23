@@ -13,3 +13,5 @@ class TalkoGrpcServices:
     USER: str = "user"
     API_KEY: str = "x_api_key"
     TELEPHONY: str = "telephony"
+    RELAY: str = "relay"
+    WALLET: str = "wallet"

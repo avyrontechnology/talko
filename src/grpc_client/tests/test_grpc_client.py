@@ -86,7 +86,7 @@ class TestGRPCClient:
         with patch("src.grpc_client.grpc_client.grpc.aio.insecure_channel") as mock_insecure_channel:
             with patch(
                 "src.grpc_client.grpc_client.TalkoApiKeyClientInterceptor",
-                return_value=TalkoMockInterceptor(api_key="maglo-key"),
+                return_value=TalkoMockInterceptor(api_key="talko-key"),
             ) as mock_interceptor:
                 with patch("os.getenv") as mock_getenv:
                     mock_getenv.side_effect = lambda key, default=None: {
@@ -97,7 +97,7 @@ class TestGRPCClient:
                     client = TalkoGRPCClient()
                     channel = client._create_insecure_channel("localhost:50051")
 
-                mock_interceptor.assert_called_with(api_key="maglo-key")
+                mock_interceptor.assert_called_with(api_key="talko-key")
                 mock_insecure_channel.assert_called_with(
                     "localhost:50051", interceptors=[mock_interceptor.return_value]
                 )

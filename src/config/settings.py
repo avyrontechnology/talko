@@ -2,10 +2,9 @@ from pydantic_settings import BaseSettings
 
 
 class TalkoLocalSettings(BaseSettings):
-    # database_url: "postgresql+asyncpg://jaggerbomb:jaggerbomb@maglo-db/magloservice"
     echo_sql: bool = True
     test: bool = False
-    project_name: str = "Maglo Service"
+    project_name: str = "Talko Service"
     oauth_token_secret: str = "my_dev_secret"
     log_level: str = "DEBUG"
     # telecom_service = "TOCOM"

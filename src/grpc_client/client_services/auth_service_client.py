@@ -4,6 +4,7 @@ import grpc
 from grpc.aio import AioRpcError
 
 from src.components.common.responses import TalkoInternalServerErrorResponse
+from src.grpc_client.console_ids import console_id_list, console_id_str
 from src.grpc_client.grpc_client import TalkoGRPCClient
 from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.pub import auth_pb2, auth_pb2_grpc
@@ -42,9 +43,37 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
             raise
 
     @TalkoGRPCClient.call_with_retry
-    async def get_user_child_hierarchy(self, user_ids: int | list[int]) -> dict[int, dict[str, Any]]:
+    async def talko_login(self, credential, password):
+        """Centralized login: console verifies credentials, returns profile.
+
+        Returns profile dict on success, None on bad credentials.
+        Raises on transport errors (caller decides fallback).
+        """
+        logger.info(f"Sending TalkoLogin request for credential: {credential}")
+        request = auth_pb2.TalkoLoginRequest(credential=credential, password=password)
+        try:
+            response = await self.stub.TalkoLogin(request)
+            logger.info(f"TalkoLogin success for user: {response.user_id}")
+            return {
+                "user_id": response.user_id,
+                "partner_id": response.partner_id,
+                "role_id": response.role_id,
+                "role_hierarchy": response.role_hierarchy,
+                "email": response.email,
+                "name": response.name,
+                "is_active": response.is_active,
+            }
+        except AioRpcError as exc:
+            if exc.code() == grpc.StatusCode.UNAUTHENTICATED:
+                logger.info("TalkoLogin rejected: bad credentials")
+                return None
+            logger.error(f"gRPC error during TalkoLogin: {exc}")
+            raise
+
+    @TalkoGRPCClient.call_with_retry
+    async def get_user_child_hierarchy(self, user_ids) -> dict:
         """Fetches child user hierarchies for one or multiple user IDs."""
-        user_ids_list = [user_ids] if isinstance(user_ids, int) else user_ids
+        user_ids_list = console_id_list(user_ids)
         # mcontext = auth_pb2.MContext(correlation_id=correlation_id)
         logger.info(f"Sending GetUserChildHierarchy request for user_ids: {user_ids_list}")
 
@@ -72,7 +101,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
 
         # Create the request with MContext and user_id
         # mcontext = auth_pb2.MContext(correlation_id=correlation_id)
-        request = auth_pb2.GetUserChildDetailsRequest(user_id=user_id)
+        request = auth_pb2.GetUserChildDetailsRequest(user_id=console_id_str(user_id))
 
         try:
             response = await self.stub.GetUserChildDetails(request)
@@ -98,7 +127,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
 
         # Create the request with MContext and user_id
         # mcontext = auth_pb2.MContext(correlation_id=correlation_id)
-        request = auth_pb2.GetUserDetailsRequest(user_id=user_id)
+        request = auth_pb2.GetUserDetailsRequest(user_id=console_id_str(user_id))
 
         try:
             response = await self.stub.GetUserDetails(request)
@@ -121,7 +150,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
         logger.info(f"Sending GetUserPermissions request for user_id: {user_id}")
 
         # Create the request with MContext and user_id
-        request = auth_pb2.GetUserPermissionsRequest(user_id=user_id)
+        request = auth_pb2.GetUserPermissionsRequest(user_id=console_id_str(user_id))
 
         try:
             response = await self.stub.GetUserPermissions(request)
@@ -136,7 +165,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
         logger.info(f"Sending GetUserRoles request for user_id: {user_id}")
 
         # Create the request with MContext and user_id
-        request = auth_pb2.GetUserRoleRequest(user_id=user_id)
+        request = auth_pb2.GetUserRoleRequest(user_id=console_id_str(user_id))
 
         try:
             response = await self.stub.GetUserRole(request)
@@ -151,7 +180,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
 
     @TalkoGRPCClient.call_with_retry
     async def get_workspace_users_details(self, user_ids):
-        user_ids: list = [user_ids] if isinstance(user_ids, int) else [uid for uid in user_ids if isinstance(uid, int)]
+        user_ids: list = console_id_list(user_ids)
 
         logger.info(f"Sending GetUserChildHierarchy request for user_id: {user_ids}")
 
@@ -183,7 +212,7 @@ class TalkoAuthServiceClient(TalkoGRPCClient):
     async def get_partner_api_key(self, partner_id):
         logger.info(f"Getting API Key for Partner ID: {partner_id}")
 
-        request = auth_pb2.GetPartnerApiKeyRequest(partner_id=partner_id)
+        request = auth_pb2.GetPartnerApiKeyRequest(partner_id=console_id_str(partner_id))
 
         try:
             response = await self.stub.GetPartnerApiKey(request)

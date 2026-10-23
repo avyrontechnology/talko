@@ -147,3 +147,68 @@ class TestGuard:
         assert billed_minutes(60, 60) == 1
         assert billed_minutes(0, 0) == 0
         assert billed_minutes(None, None) == 0
+
+    @pytest.mark.asyncio
+    async def test_price_central_billing_debits_console(self):
+        from unittest.mock import patch
+
+        svc, repo, call_repo = _svc()
+        call_repo.get_cdr_by_call_id_or_uuid = AsyncMock(
+            return_value={
+                "call_id": "C9",
+                "partner_id": 7,
+                "talk_time": 60,
+                "total_call_duration": 60,
+            }
+        )
+        repo.find_rate_card = AsyncMock(
+            return_value={"per_min_rate": 2.0, "per_call_rate": 1.0, "currency": "INR"}
+        )
+        wallet_client = AsyncMock()
+        wallet_client.wallet_debit = AsyncMock(
+            return_value={
+                "transaction_id": "tx-1",
+                "amount": 3.0,
+                "remaining_balance": 97.0,
+                "already_charged": False,
+            }
+        )
+        with (
+            patch(
+                "src.components.billing.services.TalkoENV.TALKO_CENTRAL_BILLING", True
+            ),
+            patch(
+                "src.grpc_client.rpc_service_factory.TalkoRPCServiceFactory.get_optional_service",
+                return_value=wallet_client,
+            ),
+        ):
+            out = await svc.price_call("C9")
+        assert out.amount == 3.0
+        assert out.ledger_balance == 97.0
+        wallet_client.wallet_debit.assert_awaited_once()
+        kwargs = wallet_client.wallet_debit.call_args.kwargs
+        assert kwargs["call_id"] == "C9"
+        repo.adjust_ledger.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_price_central_billing_refused_propagates(self):
+        from unittest.mock import patch
+
+        svc, repo, call_repo = _svc()
+        call_repo.get_cdr_by_call_id_or_uuid = AsyncMock(
+            return_value={"call_id": "C9", "partner_id": 7}
+        )
+        repo.find_rate_card = AsyncMock(return_value={})
+        wallet_client = AsyncMock()
+        wallet_client.wallet_debit = AsyncMock(return_value=None)
+        with (
+            patch(
+                "src.components.billing.services.TalkoENV.TALKO_CENTRAL_BILLING", True
+            ),
+            patch(
+                "src.grpc_client.rpc_service_factory.TalkoRPCServiceFactory.get_optional_service",
+                return_value=wallet_client,
+            ),
+        ):
+            with pytest.raises(TalkoBadRequestError):
+                await svc.price_call("C9")

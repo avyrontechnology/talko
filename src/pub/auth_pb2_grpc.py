@@ -5,7 +5,7 @@ import warnings
 
 from . import auth_pb2 as auth__pb2
 
-GRPC_GENERATED_VERSION = '1.73.0'
+GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -40,6 +40,11 @@ class AuthServiceStub(object):
                 request_serializer=auth__pb2.ValidateTokenRequest.SerializeToString,
                 response_deserializer=auth__pb2.ValidateTokenResponse.FromString,
                 _registered_method=True)
+        self.TalkoLogin = channel.unary_unary(
+                '/auth.AuthService/TalkoLogin',
+                request_serializer=auth__pb2.TalkoLoginRequest.SerializeToString,
+                response_deserializer=auth__pb2.TalkoLoginResponse.FromString,
+                _registered_method=True)
         self.GetUserChildHierarchy = channel.unary_unary(
                 '/auth.AuthService/GetUserChildHierarchy',
                 request_serializer=auth__pb2.GetUserChildHierarchyRequest.SerializeToString,
@@ -65,6 +70,21 @@ class AuthServiceStub(object):
                 request_serializer=auth__pb2.GetUserRoleRequest.SerializeToString,
                 response_deserializer=auth__pb2.GetUserRoleResponse.FromString,
                 _registered_method=True)
+        self.GetPartnerDetails = channel.unary_unary(
+                '/auth.AuthService/GetPartnerDetails',
+                request_serializer=auth__pb2.GetPartnerDetailsRequest.SerializeToString,
+                response_deserializer=auth__pb2.GetPartnerDetailsResponse.FromString,
+                _registered_method=True)
+        self.GetPartnerMetaDataDetails = channel.unary_unary(
+                '/auth.AuthService/GetPartnerMetaDataDetails',
+                request_serializer=auth__pb2.GetPartnerMetaDataDetailsRequest.SerializeToString,
+                response_deserializer=auth__pb2.GetPartnerMetaDataDetailsResponse.FromString,
+                _registered_method=True)
+        self.GetPartnerServicesDetails = channel.unary_unary(
+                '/auth.AuthService/GetPartnerServicesDetails',
+                request_serializer=auth__pb2.GetPartnerServiceRequest.SerializeToString,
+                response_deserializer=auth__pb2.GetPartnerServiceDetailsResponse.FromString,
+                _registered_method=True)
         self.GetServiceBoardUsersDetails = channel.unary_unary(
                 '/auth.AuthService/GetServiceBoardUsersDetails',
                 request_serializer=auth__pb2.GetUsersDetailsRequest.SerializeToString,
@@ -83,6 +103,13 @@ class AuthServiceServicer(object):
 
     def ValidateToken(self, request, context):
         """RPC to validate a token and return user information.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def TalkoLogin(self, request, context):
+        """Centralized Talko login: console verifies credentials, returns profile.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -123,6 +150,27 @@ class AuthServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetPartnerDetails(self, request, context):
+        """RPC to get partner details.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetPartnerMetaDataDetails(self, request, context):
+        """RPC to get partner metadata details
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetPartnerServicesDetails(self, request, context):
+        """RPC to get partner enabled services
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetServiceBoardUsersDetails(self, request, context):
         """RPC to get service board user details
         """
@@ -144,6 +192,11 @@ def add_AuthServiceServicer_to_server(servicer, server):
                     servicer.ValidateToken,
                     request_deserializer=auth__pb2.ValidateTokenRequest.FromString,
                     response_serializer=auth__pb2.ValidateTokenResponse.SerializeToString,
+            ),
+            'TalkoLogin': grpc.unary_unary_rpc_method_handler(
+                    servicer.TalkoLogin,
+                    request_deserializer=auth__pb2.TalkoLoginRequest.FromString,
+                    response_serializer=auth__pb2.TalkoLoginResponse.SerializeToString,
             ),
             'GetUserChildHierarchy': grpc.unary_unary_rpc_method_handler(
                     servicer.GetUserChildHierarchy,
@@ -169,6 +222,21 @@ def add_AuthServiceServicer_to_server(servicer, server):
                     servicer.GetUserRole,
                     request_deserializer=auth__pb2.GetUserRoleRequest.FromString,
                     response_serializer=auth__pb2.GetUserRoleResponse.SerializeToString,
+            ),
+            'GetPartnerDetails': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetPartnerDetails,
+                    request_deserializer=auth__pb2.GetPartnerDetailsRequest.FromString,
+                    response_serializer=auth__pb2.GetPartnerDetailsResponse.SerializeToString,
+            ),
+            'GetPartnerMetaDataDetails': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetPartnerMetaDataDetails,
+                    request_deserializer=auth__pb2.GetPartnerMetaDataDetailsRequest.FromString,
+                    response_serializer=auth__pb2.GetPartnerMetaDataDetailsResponse.SerializeToString,
+            ),
+            'GetPartnerServicesDetails': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetPartnerServicesDetails,
+                    request_deserializer=auth__pb2.GetPartnerServiceRequest.FromString,
+                    response_serializer=auth__pb2.GetPartnerServiceDetailsResponse.SerializeToString,
             ),
             'GetServiceBoardUsersDetails': grpc.unary_unary_rpc_method_handler(
                     servicer.GetServiceBoardUsersDetails,
@@ -209,6 +277,33 @@ class AuthService(object):
             '/auth.AuthService/ValidateToken',
             auth__pb2.ValidateTokenRequest.SerializeToString,
             auth__pb2.ValidateTokenResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def TalkoLogin(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/auth.AuthService/TalkoLogin',
+            auth__pb2.TalkoLoginRequest.SerializeToString,
+            auth__pb2.TalkoLoginResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -344,6 +439,87 @@ class AuthService(object):
             '/auth.AuthService/GetUserRole',
             auth__pb2.GetUserRoleRequest.SerializeToString,
             auth__pb2.GetUserRoleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetPartnerDetails(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/auth.AuthService/GetPartnerDetails',
+            auth__pb2.GetPartnerDetailsRequest.SerializeToString,
+            auth__pb2.GetPartnerDetailsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetPartnerMetaDataDetails(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/auth.AuthService/GetPartnerMetaDataDetails',
+            auth__pb2.GetPartnerMetaDataDetailsRequest.SerializeToString,
+            auth__pb2.GetPartnerMetaDataDetailsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetPartnerServicesDetails(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/auth.AuthService/GetPartnerServicesDetails',
+            auth__pb2.GetPartnerServiceRequest.SerializeToString,
+            auth__pb2.GetPartnerServiceDetailsResponse.FromString,
             options,
             channel_credentials,
             insecure,

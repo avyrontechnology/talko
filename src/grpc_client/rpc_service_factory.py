@@ -1,11 +1,17 @@
-# NOTE (grpc disabled for now): all client imports commented out — see
-# get_service below. Uncomment to re-enable a plane.
-# from src.grpc_client.client_services.api_key_service_client import TalkoApiKeyServiceClient
-# from src.grpc_client.client_services.auth_service_client import TalkoAuthServiceClient
-# from src.grpc_client.client_services.telephony_service_client import (
-#     TalkoTelephonyServiceClient,
-# )
-# from src.grpc_client.client_services.user_service_client import TalkoUserServiceClient
+from src.grpc_client.client_services.wallet_service_client import (
+    TalkoWalletServiceClient,
+)
+from src.grpc_client.client_services.api_key_service_client import TalkoApiKeyServiceClient
+from src.grpc_client.client_services.partner_service_client import (
+    TalkoPartnerServiceClient,
+)
+from src.grpc_client.client_services.auth_service_client import TalkoAuthServiceClient
+from src.grpc_client.client_services.relay_service_client import TalkoRelayServiceClient
+from src.grpc_client.client_services.telephony_service_client import (
+    TalkoTelephonyServiceClient,
+)
+from src.grpc_client.client_services.user_service_client import TalkoUserServiceClient
+from src.grpc_client.constants import TalkoGrpcServices
 from src.grpc_client.grpc_client import TalkoGRPCClient
 from src.loggers.talko_rpc_logger import TalkoRPCLogger
 
@@ -17,22 +23,23 @@ class TalkoRPCServiceFactory:
 
     @staticmethod
     def get_service(service_name: str) -> TalkoGRPCClient:
-        # NOTE (grpc disabled for now): we will not use gRPC anywhere in our
-        # code for now. All planes commented out — uncomment the branch you
-        # need to re-enable it. Talko-native JWT + partner API keys keep
-        # working (they verify locally, no gRPC hop).
-        #
-        # if service_name == TalkoGrpcServices.AUTH:
-        #     return TalkoAuthServiceClient()
-        # if service_name == TalkoGrpcServices.API_KEY:
-        #     return TalkoApiKeyServiceClient()
-        # if service_name == TalkoGrpcServices.USER:
-        #     return TalkoUserServiceClient()
-        # if service_name == TalkoGrpcServices.TELEPHONY:
-        #     return TalkoTelephonyServiceClient()
+        if service_name == TalkoGrpcServices.AUTH:
+            return TalkoAuthServiceClient()
+        if service_name == TalkoGrpcServices.API_KEY:
+            return TalkoApiKeyServiceClient()
+        if service_name == TalkoGrpcServices.USER:
+            return TalkoUserServiceClient()
+        if service_name == TalkoGrpcServices.TELEPHONY:
+            return TalkoTelephonyServiceClient()
+        if service_name == TalkoGrpcServices.RELAY:
+            return TalkoRelayServiceClient()
+        if service_name == TalkoGrpcServices.WALLET:
+            return TalkoWalletServiceClient()
+        if service_name == TalkoGrpcServices.PARTNER:
+            return TalkoPartnerServiceClient()
 
         # Future services can be added here.
-        raise RuntimeError(f"gRPC disabled for now (requested service: {service_name})")
+        raise RuntimeError(f"Unknown gRPC service: {service_name}")
 
     @staticmethod
     def get_optional_service(service_name: str) -> TalkoGRPCClient | None:

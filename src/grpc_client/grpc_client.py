@@ -18,14 +18,14 @@ class TalkoGRPCClient:
     MAX_RETRIES = 3
     RETRY_DELAY = 2
 
-    # NOTE (grpc disabled for now): console endpoint vars removed from
-    # environment.py — literals kept so this dormant module still imports.
-    HOST = "localhost"
-    PORT = "50051"
+    # Console endpoint comes from env (TalkoENV), literals are fallback.
+    HOST = environment.CONSOLE_GRPC_HOST or "localhost"
+    PORT = environment.CONSOLE_GRPC_PORT or "50051"
+    API_KEY = environment.CONSOLE_GRPC_API_KEY or "talko-key"
 
-    def __init__(self):
+    def __init__(self, server_address: str = ""):
         logger.info("Initializing TalkoGRPCClient")
-        self.server_address = f"{TalkoGRPCClient.HOST}:{TalkoGRPCClient.PORT}"
+        self.server_address = server_address or f"{TalkoGRPCClient.HOST}:{TalkoGRPCClient.PORT}"
         logger.debug(f"Resolved server address: {self.server_address}")
         self.channel = self.create_channel(self.server_address)
 
@@ -48,7 +48,7 @@ class TalkoGRPCClient:
         credentials = grpc.ssl_channel_credentials(root_certificates=ca_cert)
         logger.debug("SSL credentials created successfully")
 
-        auth_interceptor = TalkoApiKeyClientInterceptor(api_key="maglo-key")
+        auth_interceptor = TalkoApiKeyClientInterceptor(api_key=TalkoGRPCClient.API_KEY)
         options = (("grpc.ssl_target_name_override", "console-service.makunaiglobal.ai"),)
 
         logger.info(f"Creating secure gRPC channel with interceptors to {server_address}")
@@ -56,7 +56,7 @@ class TalkoGRPCClient:
 
     def _create_insecure_channel(self, server_address):
         logger.info(f"Creating an insecure gRPC channel to: {server_address}")
-        auth_interceptor = TalkoApiKeyClientInterceptor(api_key="maglo-key")
+        auth_interceptor = TalkoApiKeyClientInterceptor(api_key=TalkoGRPCClient.API_KEY)
         logger.debug(f"Auth interceptor instantiated: {auth_interceptor}")
         return grpc.aio.insecure_channel(server_address, interceptors=[auth_interceptor])
 

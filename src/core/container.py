@@ -64,6 +64,8 @@ from src.components.vendor_config.validation import TalkoVendorConfigValidator
 from src.core.doc_db import TalkoDocDatabaseSessionManager
 from src.core.environment import TalkoENV
 from src.core.redis import TalkoRedisCache
+from src.grpc_client.constants import TalkoGrpcServices
+from src.grpc_client.rpc_service_factory import TalkoRPCServiceFactory
 from src.grpc_client.telephony_bridge import TalkoTelephonyBridge
 from src.loggers.talko_service_logger import TalkoServiceLogger
 from src.utils.datetime_util import TalkoDateTimeUtil
@@ -125,13 +127,11 @@ class TalkoContainer(containers.DeclarativeContainer):
         logger=logger,
     )
 
-    # grpc (disabled for now — no gRPC anywhere in our code; providers kept
-    # as None so wiring stays valid and Talko-native auth keeps working)
-    # grpc_client = providers.Singleton(
-    #     TalkoRPCServiceFactory.get_service,
-    #     TalkoGrpcServices.AUTH,
-    # )
-    grpc_client = providers.Object(None)
+    # grpc console-core client (talko -> console-core:50051)
+    grpc_client = providers.Singleton(
+        TalkoRPCServiceFactory.get_service,
+        TalkoGrpcServices.AUTH,
+    )
 
     # analytics query builder
     analytics_query_builder = providers.Factory(TalkoQueryBuilder, logger=logger)
@@ -354,12 +354,11 @@ class TalkoContainer(containers.DeclarativeContainer):
         vendor_config_repository=vendor_config_repo,
         logger=logger,
     )
-    # telephony gRPC client disabled for now (no gRPC anywhere in our code).
-    # telephony_client = providers.Factory(
-    #     TalkoRPCServiceFactory.get_service,
-    #     TalkoGrpcServices.TELEPHONY,
-    # )
-    telephony_client = providers.Object(None)
+    # telephony gRPC client (talko -> vendor plane; TalkoGrpcControlService uses it)
+    telephony_client = providers.Factory(
+        TalkoRPCServiceFactory.get_service,
+        TalkoGrpcServices.TELEPHONY,
+    )
     telephony_bridge = providers.Factory(
         TalkoTelephonyBridge,
         logger=logger,
