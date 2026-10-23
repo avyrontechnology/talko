@@ -57,7 +57,7 @@ def mint_talko_token(
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(hours=ttl_hours)).timestamp()),
     }
-    if partner_id is not None:
+    if partner_id:
         claims["partner_id"] = int(partner_id)
     return jwt.encode(claims, secret, algorithm=_JWT_ALGO)
 
